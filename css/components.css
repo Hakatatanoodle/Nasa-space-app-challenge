@@ -1,28 +1,31 @@
 /* File: css/components.css
  * Owner: Person B (Saurav)
- * AI-assisted: YES — Gemini, 2026-11-14. Reviewed by a human: NO.
+ * AI-assisted: YES — Gemini, 2026-11-15. Reviewed by a human: NO.
  * Sources used: none
  */
 .card {
   display: flex;
   gap: 10px;
   width: 100%;
-  max-width: 310px;
+  max-width: 320px;
   min-height: 44px;
   padding: 12px;
-  background: #12304fdd;
+  background: #12304fe0;
   border: 2px solid var(--line);
   border-radius: 10px;
   cursor: pointer;
+  transition: border-color 0.15s ease, transform 0.12s ease, background-color 0.15s ease;
 }
 
-.card:hover {
-  border-color: #4c8fd1;
+.card:hover:not(.lkd) {
+  border-color: #5ca2e8;
+  background: #163a61ee;
+  transform: translateY(-2px);
 }
 
 .card.sel {
   border-color: var(--accent);
-  box-shadow: 0 0 0 1px var(--accent);
+  box-shadow: 0 0 0 1px var(--accent), 0 6px 18px #040d1888;
 }
 
 .card img {
@@ -98,25 +101,130 @@
 .badge-source {
   display: inline-block;
   margin-left: 6px;
-  padding: 1px 6px;
-  font-size: 0.75rem;
+  padding: 2px 8px;
+  font-size: 0.78rem;
+  font-weight: 600;
   color: var(--ok);
   background: #7fe3b81a;
   border: 1px solid var(--ok);
-  border-radius: 4px;
+  border-radius: 6px;
+  vertical-align: middle;
+}
+
+.weather-banner {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin: 8px 0 12px;
+  padding: 10px 14px;
+  background: #0d253fe6;
+  border: 1px solid #3c78b5;
+  border-left: 4px solid var(--ok);
+  border-radius: 8px;
+  font-size: 0.9rem;
 }
 
 .box {
   padding: 16px 20px;
-  background: #12304ff0;
+  background: #102a46f5;
   border: 1px solid var(--line);
   border-radius: 12px;
+  box-shadow: 0 16px 44px #030a14cc;
 }
 
 .modal-box {
-  width: min(720px, 95vw);
-  max-height: 90vh;
-  overflow: auto;
+  position: relative;
+  width: min(760px, 95vw);
+  max-height: 88vh;
+  overflow-y: auto;
+  padding-top: 0;
+}
+
+.modal-header {
+  position: sticky;
+  top: 0;
+  z-index: 10;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin: 0 -20px 12px;
+  padding: 12px 20px;
+  background: #0d243df7;
+  backdrop-filter: blur(8px);
+  border-bottom: 1px solid var(--line);
+}
+
+.modal-header h2 {
+  margin: 0;
+  font-size: 1.25rem;
+}
+
+.modal-close-x {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 44px;
+  height: 44px;
+  min-width: 44px;
+  min-height: 44px;
+  padding: 0;
+  font-size: 1.25rem;
+  font-weight: 700;
+  line-height: 1;
+  color: var(--text);
+  background: #183d63;
+  border: 1px solid #4c8fd1;
+  border-radius: 8px;
+  flex: none;
+}
+
+.modal-close-x:hover:not(:disabled) {
+  background: var(--bad);
+  border-color: var(--bad);
+  color: #0b2038;
+}
+
+.career-progress {
+  height: 10px;
+  margin: 8px 0 14px;
+  background: #08182b;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  overflow: hidden;
+}
+
+.career-progress > i {
+  display: block;
+  height: 100%;
+  background: linear-gradient(90deg, var(--ok), var(--accent));
+  transition: width 0.3s ease;
+}
+
+.decision-box {
+  margin: 12px 0;
+  padding: 12px 14px;
+  background: #0b2038ee;
+  border: 1.5px solid var(--accent);
+  border-radius: 10px;
+}
+
+.decision-box p {
+  margin: 0 0 8px;
+}
+
+.decision-choices {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.decision-btn {
+  text-align: left;
+  background: #163a61;
+  border-color: var(--accent);
 }
 
 #toast {
@@ -142,7 +250,8 @@
   justify-content: center;
   padding: 12px;
   overflow: auto;
-  background: #0b2038e0;
+  background: #061322e0;
+  backdrop-filter: blur(4px);
   z-index: 20;
 }
 
@@ -159,10 +268,14 @@
 
 .rt th,
 .rt td {
-  padding: 6px 8px;
+  padding: 7px 9px;
   text-align: left;
   vertical-align: top;
   border: 1px solid var(--line);
+}
+
+.rt th {
+  background: #0d243d;
 }
 
 .bar {
@@ -191,7 +304,7 @@
   font-family: monospace;
   font-size: 0.875rem;
 }
-/* Career mode: locked destinations, feasibility badges, destination briefings */
+
 .card.lkd {
   opacity: 0.55;
   cursor: not-allowed;
@@ -227,10 +340,10 @@
 .pin {
   display: block;
   margin-top: 4px;
-  padding: 8px 10px;
+  padding: 10px 12px;
   font-size: 14px;
   line-height: 1.55;
-  background: #0b203899;
+  background: #0b2038aa;
   border-left: 3px solid var(--accent);
   border-radius: 6px;
 }

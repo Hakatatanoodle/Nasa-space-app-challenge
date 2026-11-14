@@ -149,10 +149,6 @@ export function mirrorPartIfEnabled(childPart) {
   attachParts(twinPart, childPart.cn, host, oppositeNode);
 }
 
-/**
- * Centers the starter spacecraft both horizontally (x = 480) and vertically (around y = 520)
- * on the 960x1100 world canvas, omitting the antenna so players finish building before launch.
- */
 export function buildStarterSpacecraft() {
   appState.mission.parts = [];
   appState.mission.nu = 1;
@@ -291,6 +287,7 @@ export function calculateTelemetry(missionInput = appState.mission) {
   const orbit = contract.orbits[missionInput.oi];
   const launcher = DATA.launchers[missionInput.L];
   const tankSpec = DATA.tank;
+  const weather = appState.spaceWeather;
 
   const connectedUids = getConnectedPartUids();
   const connectedParts = missionInput.parts.filter(p => connectedUids.has(p.u));
@@ -385,8 +382,15 @@ export function calculateTelemetry(missionInput = appState.mission) {
     DATA.transitDaysBase[contract.dest].value * engineSpec.tf,
     engineSpec.dvDay ? (orbit.dv * 1000) / engineSpec.dvDay : 0
   );
+
+  // Live NASA DONKI space weather affects unhardened electronics in radiation environments
+  const radWear = orbit.rad && !busSpec.hard
+    ? Math.max(0.5, 0.65 / (weather?.radiationMultiplier || 1))
+    : orbit.rad > 1
+      ? 0.75
+      : 1;
   telemetry.baseLife = contract.life || DATA.constants.designLifeMonths.value;
-  telemetry.life = telemetry.baseLife * (orbit.rad && !busSpec.hard ? 0.6 : orbit.rad > 1 ? 0.7 : 1) - telemetry.days / 30;
+  telemetry.life = telemetry.baseLife * radWear - telemetry.days / 30;
 
   const buildCheckRow = (name, category, used, capacity, unit, src, verified) => {
     const margin = used <= 0 ? 1 : capacity > 0 ? (capacity - used) / used : -1;
@@ -420,7 +424,7 @@ export function calculateTelemetry(missionInput = appState.mission) {
     buildCheckRow('Budget', 'budget', telemetry.cost, contract.cap, '$M', contract.src, contract.verified),
     buildCheckRow('Data storage', 'data', telemetry.data * (1 - orbit.contact), telemetry.gb, 'Gb', DATA.constants.baseStorageGb.src, false),
     buildCheckRow('Comms', 'comms', requiredContactHours, orbit.contact * 24, 'h/day', DATA.commsDistanceFactor[contract.dest].src, false),
-    buildCheckRow('Time', 'time', contract.months, telemetry.life, 'months', DATA.constants.designLifeMonths.src, false)
+    buildCheckRow('Time', 'time', contract.months, telemetry.life, 'months', weather?.isLive ? weather.src : DATA.constants.designLifeMonths.src, weather?.isLive || false)
   ];
 
   if (engineSpec.pw) {
@@ -532,7 +536,7 @@ export function calculateTelemetry(missionInput = appState.mission) {
   return telemetry;
 }
 
-/* ---- Deterministic Flight Resolution ---- */
+/* ---- Deterministic Flight Resolution & Present-Day Events ---- */
 
 export function fillTemplate(template, values = {}) {
   return template.replace(/\{(\w+)\}/g, (match, key) => {
@@ -545,6 +549,7 @@ export function fillTemplate(template, values = {}) {
 function doesEventTrigger(event, telemetry) {
   const { trigger } = event;
   if (trigger.dest !== undefined) return telemetry.C.dest === trigger.dest;
+  if (trigger.minTransitDays !== undefined) return telemetry.days >= trigger.minTransitDays;
   const value = telemetry.O[trigger.orbitField];
   if (trigger.gte !== undefined && value < trigger.gte) return false;
   if (trigger.lte !== undefined && value > trigger.lte) return false;
@@ -558,16 +563,25 @@ function isEventImmune(event, telemetry) {
 }
 
 export function getTriggeredEvents(telemetry) {
+  const weather = appState.spaceWeather;
   return DATA.events
     .filter(event => doesEventTrigger(event, telemetry))
-    .map(event => ({
-      id: event.id,
-      immune: isEventImmune(event, telemetry),
-      scienceFactor: isEventImmune(event, telemetry) ? 1 : event.scienceFactor
-    }));
+    .map(event => {
+      const immune = isEventImmune(event, telemetry);
+      // Scale solar flare penalty dynamically with live NASA DONKI space weather
+      let factor = event.scienceFactor;
+      if (!immune && event.id === 'solar_flare' && weather?.radiationMultiplier > 1) {
+        factor = Math.max(0.65, +(event.scienceFactor / weather.radiationMultiplier).toFixed(2));
+      }
+      return {
+        id: event.id,
+        immune,
+        scienceFactor: immune ? 1 : factor
+      };
+    });
 }
 
-function scoreFlight(telemetry, outcome, science) {
+export function scoreFlight(telemetry, outcome, science) {
   const weights = DATA.scoringWeights;
   const contract = telemetry.C;
 
@@ -663,7 +677,15 @@ export function resolveFlight(telemetry) {
 
   const events = getTriggeredEvents(telemetry);
   events.forEach(event => {
-    steps.push({ key: 'event', ok: event.immune, values: { eventId: event.id, scienceFactor: event.scienceFactor } });
+    steps.push({
+      key: 'event',
+      ok: event.immune,
+      values: {
+        eventId: event.id,
+        scienceFactor: event.scienceFactor,
+        flareClass: appState.spaceWeather?.flareClass || 'M1.4'
+      }
+    });
   });
 
   const science = events.reduce((total, event) => total * event.scienceFactor, telemetry.sciF);

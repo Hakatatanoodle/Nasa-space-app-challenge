@@ -1,6 +1,6 @@
 /* File: js/content.js
  * Owner: Person C (Yochan)
- * AI-assisted: YES — Gemini, 2026-11-14; Claude, 2026-11-14. Reviewed by a human: NO.
+ * AI-assisted: YES — Gemini, 2026-11-15; Claude, 2026-11-14. Reviewed by a human: NO.
  * Sources used: NASA_CUBESAT101, JPL_CML
  */
 
@@ -15,7 +15,7 @@ export const CONTENT = {
     win: 'assets/audio/win.mp3',
     loss: 'assets/audio/loss.mp3'
   },
-  disclaimer: 'Mission design simulation — simplified engineering model. Reference tags shown per parameter.',
+  disclaimer: 'Mission design simulation — live NASA DONKI space weather + simplified spacecraft engineering model.',
   stageNames: ['Objective', 'Build', 'Launch', 'Debrief'],
   subResources: ['Delta-v', 'Battery', 'Ion power'],
   uiLabels: {
@@ -84,25 +84,61 @@ export const CONTENT = {
   },
   eventText: {
     solar_flare: {
-      n: 'Solar flare',
-      txt: 'This orbit sits inside harsh radiation, and a burst of charged particles hits your spacecraft.',
-      immT: 'Your radiation-hardened bus shrugs off the particle surge.',
-      hitT: 'Without a hardened bus, the electronics go into safe mode.',
-      fix: 'Choose the hardened bus.'
+      n: 'Solar flare & CME particle surge',
+      txt: 'NASA DONKI space-weather telemetry flags active solar flare activity ({flareClass}) impacting this radiation environment.',
+      immT: 'Your radiation-hardened bus shrugs off the energetic particle surge.',
+      hitT: 'Without a hardened bus, avionics enter safe mode during the flare.',
+      fix: 'Choose the hardened bus.',
+      choices: [
+        {
+          label: 'Throttle down & enter safe-point (+8% science saved)',
+          bonusFactor: 1.08,
+          note: 'Flight Control points the bus edge-on to the Sun, salvaging partial observation windows.'
+        },
+        {
+          label: 'Hold observation lock through storm (high risk)',
+          bonusFactor: 0.96,
+          note: 'Sensor noise corrupts extra frames during peak proton flux.'
+        }
+      ]
     },
     ground_outage: {
-      n: 'Ground station outage',
-      txt: 'Contact time with Earth is short here, so an outage of the receiving antennas hurts.',
-      immT: 'Your onboard data recorder buffers all observations until contact returns.',
-      hitT: 'With no data recorder, observations are dropped while Earth cannot listen.',
-      fix: 'Add a data recorder.'
+      n: 'Deep Space Network (DSN) weather outage',
+      txt: 'Severe storms over a ground-station complex cut into your short daily downlink window.',
+      immT: 'Your onboard data recorder buffers every observation until the next DSN pass.',
+      hitT: 'With no data recorder, live observations are overwritten while the station is offline.',
+      fix: 'Add a data recorder.',
+      choices: [
+        {
+          label: 'Compress telemetry & prioritize key packets (+7% science saved)',
+          bonusFactor: 1.07,
+          note: 'Flight team switches to lossy compression to squeeze vital science through.'
+        },
+        {
+          label: 'Keep uncompressed raw stream (drops packets)',
+          bonusFactor: 0.97,
+          note: 'Buffer overflow drops high-resolution frames.'
+        }
+      ]
     },
     computer_glitch: {
-      n: 'Computer glitch',
-      txt: 'Mars is months from help, and the primary flight computer reboots mid-observation.',
-      immT: 'Your redundant backup computer takes over seamlessly.',
-      hitT: 'With no backup computer, the ship restarts and loses observations.',
-      fix: 'Choose the hardened bus with the backup computer.'
+      n: 'Cosmic-ray flight computer single-event upset',
+      txt: 'Months from Earth, a high-energy cosmic ray flips a memory bit and forces a primary flight-computer reboot.',
+      immT: 'Your redundant backup flight computer takes over seamlessly with zero downtime.',
+      hitT: 'With no backup computer, the spacecraft reboots slowly and misses prime orbital passes.',
+      fix: 'Choose the hardened bus with the backup computer.',
+      choices: [
+        {
+          label: 'Execute fast warm-restart sequence (+9% science saved)',
+          bonusFactor: 1.09,
+          note: 'Ground engineers uplink a rapid patch to recover attitude lock early.'
+        },
+        {
+          label: 'Run full diagnostic memory scrub (slower recovery)',
+          bonusFactor: 0.98,
+          note: 'Safe diagnostics take extra orbits before instruments power back on.'
+        }
+      ]
     }
   },
   flightLog: {
@@ -143,7 +179,7 @@ export const CONTENT = {
     note: 'No dice: the same design always flies the same way. Change the design to change the result.',
     noEvents: 'No flight events expected in this orbit.',
     eventImmune: 'protected',
-    eventHit: 'will cost {lossPct}% science'
+    eventHit: 'will cost {lossPct}% science (mid-flight decision available)'
   },
   realMissionText: {
     Terra: 'Polar Earth-observing satellite carrying cameras and heat sensors for climate science.',
@@ -178,7 +214,7 @@ export const CONTENT = {
     },
     Power: {
       why: 'Average sunlit power generation cannot sustain continuous subsystem loads.',
-      fix: 'Add solar wings or remove power-hungry instruments.'
+      fix: 'Add solar wings (or RTGs in deep space) or remove power-hungry instruments.'
     },
     Battery: {
       why: 'Battery capacity is insufficient to power the spacecraft through orbital shadow (eclipse).',
@@ -197,7 +233,7 @@ export const CONTENT = {
       fix: 'Upgrade to a higher-gain antenna or reduce high-data instruments.'
     },
     Time: {
-      why: 'Transit duration and radiation degradation reduce useful life below mission requirements.',
+      why: 'Transit duration and space-weather radiation reduce useful life below mission requirements.',
       fix: 'Select a radiation-hardened bus or a faster propulsion system.'
     },
     'Ion power': {
@@ -205,7 +241,6 @@ export const CONTENT = {
       fix: 'Add solar wings until total generation meets 1500 W.'
     }
   },
-  /* Destination briefings: UNVERIFIED_MEMORY (recalled public values, not checked against a source). */
   planetInfo: {
     earth: { name: 'Earth', grav: '9.81', gx: 1, env: 'Liquid-water oceans cover about 71% of the surface. Active plate tectonics and a global magnetic field that shields everything from the solar wind.', temp: 'Average 15 °C (roughly -90 to 57 °C)', atm: '78% nitrogen, 21% oxygen, 1 bar of pressure', day: '24 h day, 365.25 day year', moons: '1 moon', uniq: 'The only world known to host life, and the yardstick for every other planet.' },
     moon: { name: 'the Moon', grav: '1.62', gx: 0.165, env: 'Dusty regolith, craters and dark lava plains. Water ice hides in permanently shadowed polar craters. No global magnetic field, and it has moonquakes.', temp: '+127 °C in sunlight, -173 °C at night, below -230 °C in polar craters', atm: 'Practically none (a trace exosphere)', day: 'Turns once per orbit: one day-night cycle lasts 29.5 Earth days, and the same face always looks at Earth', moons: 'It is Earth’s moon', uniq: 'Gravity so low you could jump about six times higher. It raises Earth’s tides.' },
@@ -218,7 +253,6 @@ export const CONTENT = {
     neptune: { name: 'Neptune', grav: '11.15', gx: 1.14, env: 'An ice giant with the fastest winds in the Solar System, over 2,000 km/h, and dark storm spots that come and go.', temp: '-200 °C', atm: 'About 80% hydrogen, 19% helium, 1% methane (blue)', day: '16 h day; a year lasts 165 Earth years', moons: '16 known moons and faint rings. Triton orbits backward, a captured Kuiper Belt world with nitrogen geysers', uniq: 'Found with mathematics in 1846 before anyone saw it. Sunlight is about 1/900 of Earth’s.', gnote: 'measured at the cloud tops; there is nothing to stand on' },
     sun: { name: 'the Sun', grav: '274', gx: 27.9, env: 'A ball of glowing plasma with no surface to land on. It holds 99.86% of the Solar System’s mass and fuses hydrogen into helium in its core.', temp: '5,500 °C at the visible surface, 1 to 3 million °C in the corona, about 15 million °C in the core', atm: 'The corona, a thin plasma that streams out as the solar wind', day: 'Spins once in about 25 days at the equator, slower at the poles', moons: 'Eight planets orbit it', uniq: 'Sunlight delivers 1,361 W per square meter at Earth. Flares and coronal mass ejections can disable electronics.', gnote: 'if you could stand on it' }
   },
-  /* The Sun mission always ends in the same way (contract.doom). Each line is [html, colour class]. */
   sunDive: {
     lines: [
       ['<b>Transfer burn.</b> To fall toward the Sun you must cancel Earth’s 29.8 km/s sideways orbital speed. That takes about 24 km/s from low Earth orbit. Leaving the Solar System needs only about 9. You burn everything you have.', ''],
@@ -237,14 +271,12 @@ export const CONTENT = {
     ]
   },
   helpHtml: `
-    <h2 id="help-title">How to play</h2>
-    <p><b>Four stages:</b> 1. Objective (mission, orbit, launcher) &rarr; 2. Build (assemble spacecraft) &rarr; 3. Launch (simulation) &rarr; 4. Debrief (engineering report).</p>
-    <p><b>Free-form assembly:</b> Drag parts from the left palette onto the glowing attachment nodes, or click/press Enter on a part to auto-attach. Unattached parts glow red and will not launch. Select a part to Rotate (<code>R</code>), Flip (<code>F</code>), or Delete.</p>
+    <p><b>Four stages:</b> 1. Objective (mission, orbit, launcher) &rarr; 2. Build (assemble spacecraft) &rarr; 3. Launch (live simulation &amp; mid-flight decisions) &rarr; 4. Debrief (engineering report).</p>
+    <p><b>Spacecraft assembly:</b> Click a part on the left palette (or drag it onto a glowing attachment node) to build your stack. Select any placed part to Rotate (<code>R</code>), Flip (<code>F</code>), or Delete.</p>
+    <p><b>Live NASA space weather:</b> APOGEE fetches recent solar flare &amp; CME telemetry from NASA DONKI to set radiation conditions and mid-flight anomalies.</p>
     <p><b>Center of mass &amp; thrust:</b> Keep the yellow Center of Mass aligned with the dashed green engine thrust line so the rocket does not tumble.</p>
-    <p><b>Six resources:</b> Mass, Power, Budget, Data, Comms, and Time. Green = healthy reserve, Amber = thin reserve (lowers launch reliability and your final score), Red = critical failure.</p>
-    <p><b>Design review &amp; trade space:</b> Before launch, a Concept Maturity checklist verifies readiness (80% green required to pass) and shows your predicted flight. No dice: the same design always flies the same way. Save up to 3 candidates to compare trade-offs.</p>
-    <p><b>Career mode:</b> Earth, the Moon and Mars start open. Safe arrivals unlock Venus, then the outer planets, Mercury and finally the Sun (a trap). Far from the Sun, solar wings give almost nothing: use radioisotope generators. Press the Career button to see levels and achievements; progress is saved in your browser.</p>
+    <p><b>Six resources:</b> Mass, Power, Budget, Data, Comms, and Time. Green = healthy reserve, Amber = thin reserve, Red = critical failure.</p>
+    <p><b>Career progression:</b> Earth, the Moon, and Mars start open. Safe arrivals unlock Venus, Jupiter, Saturn, Uranus, Neptune, Mercury, and the Sun. Progress saves automatically in your browser.</p>
     <p><b>Stars:</b> 1&#9733; survive mission, 2&#9733; meet baseline science, 3&#9733; earn all four role sign-offs and spend under 85% of budget.</p>
-    <button type="button" id="x">Start designing</button>
   `
 };

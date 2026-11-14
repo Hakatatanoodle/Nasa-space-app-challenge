@@ -1,6 +1,6 @@
 /* File: js/ui/renderer.js
  * Owner: Person B (Saurav)
- * AI-assisted: YES — Gemini, 2026-11-15. Reviewed by a human: NO.
+ * AI-assisted: YES — Gemini, 2026-11-15; Claude, 2026-11-14. Reviewed by a human: NO.
  * Sources used: NASA_CUBESAT101, JPL_CML
  */
 import { DATA } from '../api/mockData.js';
@@ -24,6 +24,7 @@ import {
   getConnectedPartUids,
   calculateTelemetry,
   resolveFlight,
+  scoreFlight,
   buildStarterSpacecraft
 } from '../core/engine.js';
 import { getFeasibility, buildPlanetBriefing } from '../core/planets.js';
@@ -49,6 +50,20 @@ const renderDataBadge = isVerified =>
   isVerified
     ? ''
     : '<span class="badge-simplified">simplified</span>';
+
+const renderModalHeader = (titleText, titleId = '') => `
+  <div class="modal-header">
+    <h2 ${titleId ? `id="${titleId}"` : ''}>${titleText}</h2>
+    <button type="button" class="modal-close-x" data-close-modal="1" aria-label="Close window">&times;</button>
+  </div>
+`;
+
+export function renderHelpModal() {
+  $('#help-body').innerHTML = `
+    ${renderModalHeader('How to play', 'help-title')}
+    ${CONTENT.helpHtml}
+  `;
+}
 
 /* ---- Stage Navigation ---- */
 
@@ -95,6 +110,7 @@ const formatOrbitSummary = orbit =>
 export function renderObjectiveStage() {
   const mission = appState.mission;
   const contract = DATA.contracts[mission.ci];
+  const weather = appState.spaceWeather;
 
   const contractCards = DATA.contracts
     .map((c, index) => [c, index])
@@ -142,7 +158,11 @@ export function renderObjectiveStage() {
 
   $('#s1').innerHTML = `
     <div>
-      <h2>1. Choose your mission objective <small style="font-size:0.85rem;font-weight:400;">(${appState.dataSourceLabel}${isGodMode() ? ' · Director Override' : ''})</small></h2>
+      <h2>1. Choose your mission objective <span class="badge-source">${appState.dataSourceLabel}</span>${isGodMode() ? ' <span class="badge-simplified">Director Override</span>' : ''}</h2>
+      <div class="weather-banner">
+        <span><b>Space Weather Telemetry:</b> ${weather.summary}</span>
+        <small>Solar Activity: <b>${weather.stormLevel}</b> (${weather.src})</small>
+      </div>
       <div class="row">${contractCards}</div>
       <h3>Orbit: where will it work?</h3>
       <div class="row">${orbitCards}</div>
@@ -352,10 +372,6 @@ function renderSpacecraftCanvas(telemetry) {
   return html;
 }
 
-/**
- * Fast, jitter-free DOM position update during active pointer dragging.
- * Avoids wiping #world.innerHTML while the pointer is held down.
- */
 export function updateBuilderLiveDrag() {
   const drag = appState.activeDrag;
   if (!drag || !drag.mv) return;
@@ -384,7 +400,6 @@ function autoFitBuilderCanvas() {
   appState.canvasZoom = idealZoom;
   refreshBuilderView();
 
-  // Center both horizontally and vertically around the spacecraft's bounding box
   const parts = appState.mission.parts;
   if (parts.length) {
     const xs = parts.map(p => p.x);
@@ -425,7 +440,7 @@ export function refreshBuilderView() {
   const selectedPart = appState.selectedPartUid && findPartByUid(appState.selectedPartUid);
   $('#insp').innerHTML = selectedPart
     ? `<b>${getPartDisplayName(selectedPart.id)}</b> <small>${formatPartSpecs(selectedPart.id)}</small> <button type="button" data-a="rot">Rotate (R)</button><button type="button" data-a="flp">Flip (F)</button><button type="button" data-a="del">Delete</button>`
-    : '<small>Drag parts onto glowing dots, or click/Enter a part to auto-attach. Click a placed part to rotate, flip, or delete.</small>';
+    : '<small>Click a part in the palette (or drag it onto a glowing dot) to attach. Click a placed part to rotate, flip, or delete.</small>';
 
   const openMap = {};
   $$('#mt details[data-dd]').forEach(el => {
@@ -627,7 +642,7 @@ export function refreshBuilderView() {
           : 'Design review and launch';
 }
 
-/* ---- Modals: Design Review, Trade Space, Share/Load Code ---- */
+/* ---- Modals: Design Review, Trade Space, Share/Load Code (with sticky top-right X) ---- */
 
 const renderPredictedFlight = telemetry => {
   const flight = resolveFlight(telemetry);
@@ -656,7 +671,7 @@ export function showReviewModal() {
 
   $('#rev').innerHTML = `
     <div class="box modal-box">
-      <h2>Design review</h2>
+      ${renderModalHeader('Design review')}
       <p>${appState.mission.hard ? 'NASA CML 4 policy: 35% reserve.' : 'Rookie policy: 10% reserve.'} A concept passes readiness review when at least ${toPercent(DATA.reviewThreshold.v)}% of items are green (${DATA.reviewThreshold.src}).</p>
       <p><b class="${rev.pass ? 'g' : 'r'}">${rev.pass ? '✓ REVIEW PASSED' : '✗ NOT READY'}</b> — ${rev.g} green, ${rev.y} amber, ${rev.r} red of ${rev.n} items (${toPercent(rev.pct)}%)</p>
       <div class="row">
@@ -664,8 +679,7 @@ export function showReviewModal() {
       </div>
       ${renderPredictedFlight(telemetry)}
       <div class="row" style="margin-top:14px">
-        <button type="button" class="go" id="rgo" style="margin:0">Launch now</button>
-        <button type="button" id="rback">Back to design</button>
+        <button type="button" class="go" id="rgo" style="margin:0; width:100%;">Launch now</button>
       </div>
     </div>
   `;
@@ -701,14 +715,13 @@ export function showCompareModal() {
 
   $('#rev').innerHTML = `
     <div class="box modal-box" style="width: min(980px, 96vw);">
-      <h2>Trade space: compare candidates</h2>
+      ${renderModalHeader('Trade space: compare candidates')}
       <p><small>Compare cost, science, and risk side by side, then load a candidate to refine.</small></p>
       <table class="rt">
         <tr><th>Metric</th>${evaluations.map((_, i) => `<th>Candidate ${'ABC'[i]}</th>`).join('')}</tr>
         ${metrics.map(([title, formatter]) => `<tr><th>${title}</th>${evaluations.map(ev => `<td>${formatter(ev)}</td>`).join('')}</tr>`).join('')}
         <tr><th>Actions</th>${evaluations.map((_, i) => `<td><button type="button" data-c="${i}">Load</button> <button type="button" data-x="${i}">Delete</button></td>`).join('')}</tr>
       </table>
-      <button type="button" id="rback">Close</button>
     </div>
   `;
   $('#rev').hidden = false;
@@ -720,20 +733,19 @@ export function showDesignCodeModal() {
 
   $('#rev').innerHTML = `
     <div class="box modal-box">
-      <h2>Share or Load Design Code</h2>
+      ${renderModalHeader('Share or Load Design Code')}
       <p><label for="design-code-input">Copy your current spacecraft code or paste a teammate's code below:</label></p>
       <textarea id="design-code-input" class="code-box">${encoded}</textarea>
       <div class="row">
         <button type="button" id="copy-code-btn">Copy to clipboard</button>
         <button type="button" id="load-code-btn">Load pasted code</button>
-        <button type="button" id="rback">Close</button>
       </div>
     </div>
   `;
   $('#rev').hidden = false;
 }
 
-/* ---- Stage 3: Deterministic Launch Sequence ---- */
+/* ---- Stage 3: Deterministic Launch Sequence with Mid-Flight Interactive Decisions ---- */
 
 function renderFlightSpacecraft() {
   const connected = getConnectedPartUids();
@@ -774,13 +786,42 @@ function renderFlightSpacecraft() {
 function describeFlightStep(step) {
   if (step.key === 'event') {
     const text = CONTENT.eventText[step.values.eventId];
-    return `<b>Event: ${text.n}.</b> ${text.txt} ${step.ok ? text.immT : text.hitT}`;
+    const headline = fillTemplate(text.txt, step.values);
+    return `<b>Anomaly: ${text.n}.</b> ${headline} ${step.ok ? text.immT : text.hitT}`;
   }
   if (step.key === 'briefing') return buildPlanetBriefing(step.values.contractId, true);
   return fillTemplate(CONTENT.flightLog[step.key], step.values);
 }
 
 const getFlightStepClass = step => (!step.ok ? 'bad' : ['ascent', 'arrival', 'event'].includes(step.key) ? 'ok' : '');
+
+function promptMidFlightDecision(logEl, eventId) {
+  const text = CONTENT.eventText[eventId];
+  const choices = text?.choices;
+  if (!choices || !choices.length) return Promise.resolve(null);
+
+  return new Promise(resolve => {
+    const box = document.createElement('div');
+    box.className = 'decision-box';
+    box.innerHTML = `
+      <p><b>Flight Director Action Required — ${text.n}:</b> Choose how the spacecraft responds:</p>
+      <div class="decision-choices">
+        ${choices.map((c, idx) => `<button type="button" class="decision-btn" data-choice="${idx}">${c.label}</button>`).join('')}
+      </div>
+    `;
+    logEl.appendChild(box);
+    box.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+
+    box.addEventListener('click', e => {
+      const btn = e.target.closest('[data-choice]');
+      if (!btn) return;
+      AudioEngine.click();
+      const chosen = choices[+btn.dataset.choice];
+      box.innerHTML = `<p class="ok"><b>Decision executed:</b> ${chosen.label} — ${chosen.note}</p>`;
+      resolve(chosen);
+    });
+  });
+}
 
 export async function startLaunchSequence() {
   const mission = appState.mission;
@@ -810,12 +851,14 @@ export async function startLaunchSequence() {
   const logMessage = async (html, statusClass = '') => {
     AudioEngine.tick();
     logEl.innerHTML += `<p class="${statusClass}">${html}</p>`;
-    await delay(900);
+    await delay(850);
   };
 
   void craftEl.offsetWidth;
   craftEl.classList.add('fly');
   AudioEngine.launch();
+
+  let decisionMultiplier = 1.0;
 
   for (const step of flight.steps) {
     if (step.key === 'arrival') {
@@ -834,7 +877,30 @@ export async function startLaunchSequence() {
       craftEl.classList.add('boom');
       AudioEngine.fail();
     }
+
+    if (step.key === 'operations' && decisionMultiplier !== 1.0) {
+      const adjustedScience = flight.science * decisionMultiplier;
+      step.values = { ...step.values, science: adjustedScience };
+    }
+
     await logMessage(describeFlightStep(step), getFlightStepClass(step));
+
+    // Interactive mid-flight trade-off when an unshielded anomaly strikes
+    if (step.key === 'event' && !step.ok) {
+      const chosen = await promptMidFlightDecision(logEl, step.values.eventId);
+      if (chosen) {
+        decisionMultiplier *= chosen.bonusFactor;
+        flight.reasons.push(`Flight Director response (${CONTENT.eventText[step.values.eventId].n}): ${chosen.label}.`);
+      }
+    }
+  }
+
+  if (decisionMultiplier !== 1.0) {
+    flight.science = flight.science * decisionMultiplier;
+    flight.outcome = flight.science >= telemetry.C.target ? 'success' : flight.science > 0 ? 'partial' : 'lost';
+    const rescored = scoreFlight(telemetry, flight.outcome, flight.science);
+    flight.stars = rescored.stars;
+    flight.score = rescored.score;
   }
 
   concludeMission(flight);
@@ -976,7 +1042,7 @@ export function renderDebriefStage() {
   `;
 }
 
-/* ---- Career mode: debrief news and the Career window ---- */
+/* ---- Career Modal with Sticky Top-Right X Close Button ---- */
 
 function renderCareerNews(news = []) {
   const career = getCareer();
@@ -991,7 +1057,7 @@ function renderCareerNews(news = []) {
     : 'Every destination is unlocked.';
 
   const tip = career.streak >= 2
-    ? `<br><b class="y">Mission Control tip:</b> ${career.streak} losses in a row. Press Starter ship in the Build screen (it reaches Earth and the Moon safely; Mars and beyond need extra tanks and a bigger launcher), keep the Rookie 10% margin, and fix every red meter before you launch. Each red meter explains how to fix it.`
+    ? `<br><b class="y">Mission Control tip:</b> ${career.streak} losses in a row. Press Starter ship in the Build screen, attach an antenna, keep the Rookie 10% margin, and fix every red meter before you launch.`
     : '';
 
   return `<div class="pin">${items}<b>Career:</b> Level ${getCareerLevel()} - ${getCareerRank()}. ${nextLine}${tip}</div>`;
@@ -1000,13 +1066,16 @@ function renderCareerNews(news = []) {
 export function showCareerModal() {
   const career = getCareer();
   const achievementCount = Object.keys(career.ach).length;
+  const unlockedCount = DATA.contracts.filter(c => isContractOpen(c.id)).length;
+  const progressPct = Math.round((unlockedCount / DATA.contracts.length) * 100);
 
   $('#rev').innerHTML = `
     <div class="box modal-box" style="width: min(900px, 96vw);">
-      <h2>Career: Level ${getCareerLevel()} - ${getCareerRank()}</h2>
-      <p>Safe arrivals: ${career.tot} - Missions lost: ${career.lost}. Your career and spacecraft build save automatically in this browser.</p>
+      ${renderModalHeader(`Career: Level ${getCareerLevel()} — ${getCareerRank()}`)}
+      <p>Safe arrivals: <b>${career.tot}</b> · Missions lost: <b>${career.lost}</b> · Destinations unlocked: <b>${unlockedCount}/${DATA.contracts.length}</b>. Progress saves automatically in your browser.</p>
+      <div class="career-progress" title="${progressPct}% of Solar System unlocked"><i style="width:${progressPct}%"></i></div>
       <table class="rt">
-        <tr><th>Level</th><th>Title</th><th>Unlocks</th><th>Requirement</th><th></th></tr>
+        <tr><th>Level</th><th>Title</th><th>Unlocks</th><th>Requirement</th><th>Status</th></tr>
         <tr><td>0</td><td>Launch Pad Rookie</td><td>Earth, Moon, Mars</td><td>Start here</td><td class="g">Unlocked</td></tr>
         ${GATES.map(gate => {
           const unlocked = isContractOpen(gate.id);
@@ -1014,9 +1083,8 @@ export function showCareerModal() {
         }).join('')}
       </table>
       <h3>Achievements (${achievementCount}/${ACHIEVEMENTS.length})</h3>
-      ${ACHIEVEMENTS.map(a => `<div class="chk ${career.ach[a.id] ? 'ok' : ''}">${career.ach[a.id] ? '&#9733;' : '&#9734;'} <b>${a.n}</b> - ${a.t}</div>`).join('')}
-      <div class="row" style="margin-top:12px;">
-        <button type="button" id="rback">Close</button>
+      ${ACHIEVEMENTS.map(a => `<div class="chk ${career.ach[a.id] ? 'ok' : ''}">${career.ach[a.id] ? '&#9733;' : '&#9734;'} <b>${a.n}</b> — ${a.t}</div>`).join('')}
+      <div class="row" style="margin-top:14px;">
         <button type="button" id="creset">Reset progress</button>
       </div>
     </div>
