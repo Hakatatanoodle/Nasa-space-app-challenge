@@ -319,6 +319,55 @@ export function bindGlobalControls() {
     }
   });
 
+  document.addEventListener('keydown', e => {
+    if (appState.mission.stage !== 2 || /SELECT|TEXTAREA/.test(e.target.tagName)) return;
+    const key = e.key.toLowerCase();
+
+    if (e.ctrlKey || e.metaKey) {
+      if (key === 'z') {
+        e.preventDefault();
+        undoLastAction();
+      }
+      return;
+    }
+
+    if (key === 'r') rotateSelectedPart(e.shiftKey ? -1 : 1);
+    else if (key === 'f') flipSelectedPart();
+    else if (key === 'delete' || key === 'backspace') {
+      e.preventDefault();
+      deleteSelectedPart();
+    }
+  });
+
+  // Mouse-wheel zoom & drag-to-pan on the rocket builder canvas (#cv)
+  let panState = null;
+  document.addEventListener('wheel', e => {
+    if (appState.mission.stage !== 2 || !e.target.closest('#cv')) return;
+    e.preventDefault();
+    const delta = e.deltaY < 0 ? 0.08 : -0.08;
+    appState.canvasZoom = Math.max(0.45, Math.min(1.5, +(appState.canvasZoom + delta).toFixed(2)));
+    refreshBuilderView();
+  }, { passive: false });
+
+  document.addEventListener('pointerdown', e => {
+    if (appState.mission.stage !== 2) return;
+    const cv = e.target.closest('#cv');
+    if (!cv || e.target.closest('.pt[data-u]') || e.target.closest('[data-p]')) return;
+    panState = { cv, x: e.clientX, y: e.clientY, sl: cv.scrollLeft, st: cv.scrollTop };
+  });
+
+  document.addEventListener('pointermove', e => {
+    if (!panState) return;
+    panState.cv.scrollLeft = panState.sl - (e.clientX - panState.x);
+    panState.cv.scrollTop = panState.st - (e.clientY - panState.y);
+  });
+
+  document.addEventListener('pointerup', () => {
+    panState = null;
+  });
+
+
+
   document.addEventListener('click', e => {
     const actionEl = e.target.closest('[data-a], [data-st]');
     if (actionEl) {
@@ -337,7 +386,7 @@ export function bindGlobalControls() {
       if (a === 'del') return deleteSelectedPart();
       if (a === 'undo') return undoLastAction();
       if (a === 'zi') { appState.canvasZoom = Math.min(1.3, appState.canvasZoom + 0.1); return refreshBuilderView(); }
-      if (a === 'zo') { appState.canvasZoom = Math.max(0.45, appState.canvasZoom - 0.1); return refreshBuilderView(); }
+      if (a === 'zo') { appState.canvasZoom = Math.max(0.35, appState.canvasZoom - 0.1); return refreshBuilderView(); }
       if (a === 'rev') return showReviewModal();
       return;
     }
@@ -434,10 +483,14 @@ export function bindGlobalControls() {
     navigateToStage(appState.mission.stage);
   });
 
+  $('#mute')
+
+
   $('#mute').addEventListener('click', e => {
     const isNowOn = AudioEngine.toggleMute();
     e.target.textContent = `Sound: ${isNowOn ? 'on' : 'off'}`;
   });
+
 
   $('#copy').addEventListener('click', () => {
     showDesignCodeModal();
