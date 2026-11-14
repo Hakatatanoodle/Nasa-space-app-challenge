@@ -1,7 +1,7 @@
 /* File: js/config.js
  * Owner: Person B (Saurav)
- * AI-assisted: YES — Gemini, 2026-11-14. Reviewed by a human: NO.
- * Sources used: none
+ * AI-assisted: YES — Gemini, 2026-11-15. Reviewed by a human: NO.
+ * Sources used: SPACEAPPS_CHALLENGE
  */
 
 export const ROLES = {
@@ -31,10 +31,6 @@ export const PART_DIMENSIONS = {
   i_mag: [52, 16]
 };
 
-/*
- * Inset attachment nodes so SVG hulls, bulkheads, engine bells, solar yokes,
- * and antenna mounts seat flush against each other with zero air gaps.
- */
 const STACK_AND_RADIAL_NODES = [
   ['top', 0.5, 0.07],
   ['bottom', 0.5, 0.93],
@@ -60,7 +56,8 @@ export const MAX_HISTORY = 40;
 export const DEFAULT_SEED = 20261115;
 
 export const API_CONFIG = {
-  enableLiveFetch: false,
-  endpoint: 'https://api.nasa.gov/planetary/apod?api_key=DEMO_KEY',
-  timeoutMs: 2500
+  enableLiveFetch: true,
+  donkiFlareEndpoint: 'https://api.nasa.gov/DONKI/FLR?api_key=DEMO_KEY',
+  donkiCmeEndpoint: 'https://api.nasa.gov/DONKI/CME?api_key=DEMO_KEY',
+  timeoutMs: 3500
 };

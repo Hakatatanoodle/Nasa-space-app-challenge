@@ -34,7 +34,17 @@ export const appState = {
   canvasZoom: 0.9,
   undoHistory: [],
   activeDrag: null,
-  dataSourceLabel: 'Offline sample'
+  dataSourceLabel: 'Offline sample',
+  spaceWeather: {
+    isLive: false,
+    flareClass: 'M1.4 (Baseline Sample)',
+    flareCount: 2,
+    cmeCount: 1,
+    stormLevel: 'Moderate',
+    radiationMultiplier: 1.0,
+    summary: 'Nominal solar wind & moderate flare activity (offline reference profile).',
+    src: 'SIMPLIFIED_FOR_GAMEPLAY'
+  }
 };
 
 try {
@@ -319,4 +329,4 @@ export const AudioEngine = (() => {
       playTone(120, 0, 1.0, 'sawtooth', 0.22, 35);
     }
   };
-})();
+})(); 

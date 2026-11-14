@@ -123,8 +123,12 @@ function activateSecretGodMode() {
   );
 }
 
+function closeOpenModals() {
+  $('#rev').hidden = true;
+  $('#help').hidden = true;
+}
+
 export function bindGlobalControls() {
-  // Block native browser HTML5 ghost-dragging on all images/buttons across the entire app
   document.addEventListener('dragstart', e => {
     e.preventDefault();
   });
@@ -149,6 +153,10 @@ export function bindGlobalControls() {
 
   let keyBuffer = '';
   document.addEventListener('keydown', e => {
+    if (e.key === 'Escape') {
+      closeOpenModals();
+      return;
+    }
     if (/SELECT|TEXTAREA|INPUT/.test(e.target.tagName)) return;
     if (e.key && e.key.length === 1) {
       keyBuffer = (keyBuffer + e.key.toLowerCase()).slice(-6);
@@ -159,7 +167,6 @@ export function bindGlobalControls() {
     }
   });
 
-  // Placed parts stay locked in place during click / long-press; only palette parts drag onto nodes
   document.addEventListener('pointerdown', e => {
     if (appState.mission.stage !== 2) return;
 
@@ -359,7 +366,6 @@ export function bindGlobalControls() {
     }
   });
 
-  // Mouse-wheel zoom & drag-to-pan on the rocket builder canvas (#cv)
   let panState = null;
   document.addEventListener('wheel', e => {
     if (appState.mission.stage !== 2 || !e.target.closest('#cv')) return;
@@ -387,6 +393,13 @@ export function bindGlobalControls() {
   });
 
   document.addEventListener('click', e => {
+    // Sticky top-right X button or clicking dark backdrop closes any open modal
+    if (e.target.closest('[data-close-modal]') || e.target.id === 'rev' || e.target.id === 'help') {
+      AudioEngine.click();
+      closeOpenModals();
+      return;
+    }
+
     const actionEl = e.target.closest('[data-a], [data-st]');
     if (actionEl) {
       AudioEngine.click();
@@ -418,9 +431,6 @@ export function bindGlobalControls() {
     if (e.target.id === 'rgo') {
       $('#rev').hidden = true;
       startLaunchSequence();
-    }
-    if (e.target.id === 'rback') {
-      $('#rev').hidden = true;
     }
 
     if (e.target.id === 'car') showCareerModal();
@@ -473,8 +483,8 @@ export function bindGlobalControls() {
       showToast('Loaded overweight/under-fueled Mars design to inspect failure diagnostics.');
     }
 
-    if (['x', 'hp', 'hp2'].includes(e.target.id)) {
-      $('#help').hidden = e.target.id === 'x';
+    if (['hp', 'hp2'].includes(e.target.id)) {
+      $('#help').hidden = false;
     }
 
     if (e.target.id === 'copy-code-btn') {
@@ -525,4 +535,4 @@ export function bindGlobalControls() {
   $('#copy').addEventListener('click', () => {
     showDesignCodeModal();
   });
-} 
+}

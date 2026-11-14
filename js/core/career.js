@@ -8,14 +8,15 @@ import { CONTENT } from '../content.js';
 
 export const HOME_IDS = ['earth', 'moon', 'mars'];
 
+/* Engaging, paced unlock chain so players unlock new worlds steadily without tedious grinding */
 export const GATES = [
-  { id: 'venus', lv: 2, need: [['earth', 1], ['moon', 1], ['mars', 1]], title: 'Orbital Cadet' },
-  { id: 'jupiter', lv: 4, need: [['venus', 2]], title: 'Deep-Space Navigator' },
-  { id: 'saturn', lv: 6, need: [['jupiter', 2]], title: 'Ring Rider' },
-  { id: 'uranus', lv: 8, need: [['saturn', 2], ['saturn', 1, 1]], title: 'Ice Voyager' },
-  { id: 'neptune', lv: 10, need: [['uranus', 2], ['uranus', 1, 1]], title: 'Edge Walker' },
-  { id: 'mercury', lv: 12, need: [['neptune', 2], ['neptune', 1, 1]], title: 'Fire Walker' },
-  { id: 'sun', lv: 14, need: [['mercury', 2], ['mercury', 1, 1]], title: 'Master of the Solar System' }
+  { id: 'venus', lv: 2, need: [['earth', 1], ['moon', 1]], title: 'Orbital Cadet' },
+  { id: 'jupiter', lv: 4, need: [['mars', 1], ['venus', 1]], title: 'Deep-Space Navigator' },
+  { id: 'saturn', lv: 6, need: [['jupiter', 1]], title: 'Ring Rider' },
+  { id: 'uranus', lv: 8, need: [['saturn', 1, 1]], title: 'Ice Voyager' },
+  { id: 'neptune', lv: 10, need: [['uranus', 1, 1]], title: 'Edge Walker' },
+  { id: 'mercury', lv: 12, need: [['neptune', 1, 1]], title: 'Fire Walker' },
+  { id: 'sun', lv: 14, need: [['mercury', 1, 1]], title: 'Master of the Solar System' }
 ];
 
 const GRAND_TOUR = ['mercury', 'venus', 'earth', 'mars', 'jupiter', 'saturn', 'uranus', 'neptune'];
@@ -38,21 +39,19 @@ const saveCareer = () => {
 export const ACHIEVEMENTS = [
   { id: 'first', n: 'First Light', t: 'Make your first safe arrival.', test: x => x.ok },
   { id: 'star3', n: 'Flawless', t: 'Earn 3 stars on a mission.', test: x => x.st >= 3 },
-  { id: 'thrift', n: 'Penny Pincher', t: 'Succeed while spending under 60% of the budget.', test: x => x.out === 'success' && x.d.cost <= x.C.cap * 0.6 },
+  { id: 'thrift', n: 'Penny Pincher', t: 'Succeed while spending under 65% of the budget.', test: x => x.out === 'success' && x.d.cost <= x.C.cap * 0.65 },
   { id: 'home', n: 'Home Turf', t: 'Arrive safely at Earth, the Moon and Mars.', test: () => HOME_IDS.every(h => career.arr[h] > 0) },
   { id: 'nuke', n: 'Nuclear Option', t: 'Arrive safely using a nuclear thermal engine.', test: x => x.ok && x.d.E.patch === 'nuc' },
   { id: 'ion', n: 'Slow and Steady', t: 'Arrive safely using an ion engine.', test: x => x.ok && x.d.E.patch === 'ion' },
   { id: 'rtg', n: 'Atomic Battery', t: 'Arrive safely with a radioisotope generator aboard.', test: x => x.ok && x.rtg },
   { id: 'book', n: 'By the Book', t: 'Succeed under the NASA 35% margin policy.', test: x => x.out === 'success' && x.hard },
   { id: 'phoenix', n: 'Phoenix', t: 'Succeed right after losing a mission.', test: x => x.ok && x.wasLost },
-  { id: 'learn', n: 'Learning the Hard Way', t: 'Lose 5 missions. Every engineer has.', test: () => career.lost >= 5 },
-  { id: 'vet', n: 'Veteran', t: 'Make 10 safe arrivals.', test: () => career.tot >= 10 },
-  { id: 'dir', n: 'Flight Director', t: 'Make 25 safe arrivals.', test: () => career.tot >= 25 },
+  { id: 'learn', n: 'Learning the Hard Way', t: 'Lose 3 missions. Every engineer iterates.', test: () => career.lost >= 3 },
+  { id: 'vet', n: 'Veteran', t: 'Make 8 safe arrivals.', test: () => career.tot >= 8 },
+  { id: 'dir', n: 'Flight Director', t: 'Make 15 safe arrivals.', test: () => career.tot >= 15 },
   { id: 'tour', n: 'Grand Tour', t: 'Arrive safely at all eight planets.', test: () => GRAND_TOUR.every(h => career.arr[h] > 0) },
   { id: 'icarus', n: 'Icarus', t: 'Fly toward the Sun. It did not end well.', test: x => !!x.C.doom }
 ];
-
-/* ---- Queries ---- */
 
 export const getCareer = () => career;
 export const isGodMode = () => !!career.god;
@@ -89,8 +88,6 @@ export const getLockInfo = contract => {
   const gate = GATES.find(g => g.id === contract.id);
   return gate ? { level: gate.lv, need: describeGateNeed(gate) } : null;
 };
-
-/* ---- Updates ---- */
 
 export function recordMission({ out, C, d, st, rtg, sci, hard }) {
   const ok = out !== 'lost';

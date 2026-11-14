@@ -1,16 +1,9 @@
 /* File: js/api/mockData.js
  * Owner: Person A (Ashmin - structure), Person C (Yochan - values)
- * AI-assisted: YES — Gemini, 2026-11-14; Claude, 2026-11-14. Reviewed by a human: NO.
+ * AI-assisted: YES — Gemini, 2026-11-15; Claude, 2026-11-14. Reviewed by a human: NO.
  * Sources used: NASA_CUBESAT101, JPL_CML, NASA_SE_WEBINAR
- * Career destinations (Mercury to Neptune, the Sun) and the radioisotope generator were ported from the
- * Apogee-temp-asmin feature branch; their values keep the same SIMPLIFIED_FOR_GAMEPLAY / UNVERIFIED_MEMORY tags.
  */
 
-/**
- * Every numerical parameter carries `src` and `verified` per Section 5.1.
- * verified: true  -> explicitly documented in Appendix A sources.
- * verified: false -> SIMPLIFIED_FOR_GAMEPLAY or UNVERIFIED_MEMORY.
- */
 export const DATA = {
   constants: {
     g0: {
@@ -35,7 +28,7 @@ export const DATA = {
       note: 'Usable fraction of total battery energy capacity during orbital eclipse.'
     },
     baseStorageGb: {
-      value: 30,
+      value: 35,
       unit: 'Gb',
       src: 'SIMPLIFIED_FOR_GAMEPLAY',
       verified: false,
@@ -59,7 +52,7 @@ export const DATA = {
   commsDistanceFactor: {
     earth: { value: 1.0, src: 'SIMPLIFIED_FOR_GAMEPLAY', verified: false, note: 'Baseline downlink efficiency in Earth orbit.' },
     moon: { value: 1.0, src: 'SIMPLIFIED_FOR_GAMEPLAY', verified: false, note: 'Normalized lunar downlink efficiency for gameplay.' },
-    mars: { value: 0.1, src: 'SIMPLIFIED_FOR_GAMEPLAY', verified: false, note: 'Simplified deep-space downlink rate reduction (inverse-square attenuation).' }
+    mars: { value: 0.14, src: 'SIMPLIFIED_FOR_GAMEPLAY', verified: false, note: 'Deep Space Network Mars downlink rate factor.' }
   },
 
   transitDaysBase: {
@@ -69,8 +62,8 @@ export const DATA = {
   },
 
   tank: {
-    dry: 400,
-    prop: 6000,
+    dry: 380,
+    prop: 6200,
     c: 12,
     max: 6,
     src: 'SIMPLIFIED_FOR_GAMEPLAY',
@@ -80,34 +73,34 @@ export const DATA = {
 
   launchers: {
     medium: {
-      n: 'Medium launcher', cap: 9000, c: 90, rel: 0.95, img: 'launcher_medium',
+      n: 'Medium launcher', cap: 9500, c: 90, rel: 0.96, img: 'launcher_medium',
       src: 'SIMPLIFIED_FOR_GAMEPLAY', verified: false, note: 'Representative medium-lift LEO capacity (kg) and cost ($M).'
     },
     heavy: {
-      n: 'Heavy launcher', cap: 26000, c: 200, rel: 0.97, img: 'launcher_heavy',
+      n: 'Heavy launcher', cap: 28000, c: 200, rel: 0.97, img: 'launcher_heavy',
       src: 'SIMPLIFIED_FOR_GAMEPLAY', verified: false, note: 'Representative heavy-lift LEO capacity (kg) and cost ($M).'
     },
     super: {
-      n: 'Super-heavy launcher', cap: 50000, c: 420, rel: 0.92, img: 'launcher_super',
+      n: 'Super-heavy launcher', cap: 55000, c: 400, rel: 0.94, img: 'launcher_super',
       src: 'SIMPLIFIED_FOR_GAMEPLAY', verified: false, note: 'Representative super-heavy LEO capacity (kg) and cost ($M).'
     }
   },
 
   engines: {
     chem: {
-      n: 'Chemical', isp: 380, m: 500, c: 30, tf: 1, pw: 0,
+      n: 'Chemical', isp: 380, m: 480, c: 30, tf: 1, pw: 0,
       img: 'engine_chemical', pl: 'plume_chemical', patch: 'chem',
       src: 'SIMPLIFIED_FOR_GAMEPLAY', verified: false,
       note: 'High-thrust bipropellant stage; lower specific impulse.'
     },
     nuclear: {
-      n: 'Nuclear thermal', isp: 900, m: 3500, c: 150, tf: 0.8, pw: 0,
+      n: 'Nuclear thermal', isp: 920, m: 3200, c: 145, tf: 0.8, pw: 0,
       img: 'engine_nuclear', pl: 'plume_nuclear', patch: 'nuc',
       src: 'SIMPLIFIED_FOR_GAMEPLAY', verified: false,
       note: 'High specific impulse thermal propulsion; heavy reactor mass.'
     },
     ion: {
-      n: 'Ion', isp: 3000, m: 400, c: 60, tf: 1, pw: 1500, dvDay: 15,
+      n: 'Ion', isp: 3200, m: 380, c: 60, tf: 1, pw: 1500, dvDay: 18,
       img: 'engine_ion', pl: 'plume_ion', patch: 'ion',
       src: 'SIMPLIFIED_FOR_GAMEPLAY', verified: false,
       note: 'Very high specific impulse electric propulsion; requires 1500 W continuous power.'
@@ -115,50 +108,50 @@ export const DATA = {
   },
 
   parts: {
-    bus_std: { g: 'bus', n: 'Standard bus', m: 450, pw: 200, c: 25, rel: 0.96, hard: 0, src: 'SIMPLIFIED_FOR_GAMEPLAY', verified: false },
-    bus_rad: { g: 'bus', n: 'Hardened bus', m: 620, pw: 230, c: 45, rel: 0.97, hard: 1, src: 'SIMPLIFIED_FOR_GAMEPLAY', verified: false },
-    bus_red: { g: 'bus', n: 'Hardened + backup computer', m: 780, pw: 260, c: 70, rel: 0.99, hard: 1, red: 1, src: 'SIMPLIFIED_FOR_GAMEPLAY', verified: false },
-    sol_s: { g: 'pow', n: 'Small solar wing', m: 60, gen: 500, c: 4, max: 3, src: 'SIMPLIFIED_FOR_GAMEPLAY', verified: false },
-    sol_l: { g: 'pow', n: 'Large solar wing', m: 140, gen: 1100, c: 9, max: 3, src: 'SIMPLIFIED_FOR_GAMEPLAY', verified: false },
-    bat: { g: 'pow', n: 'Battery', m: 45, wh: 600, c: 3, max: 4, src: 'SIMPLIFIED_FOR_GAMEPLAY', verified: false },
-    rtg: { g: 'pow', n: 'Radioisotope generator', m: 56, gen: 300, rtg: 1, c: 40, max: 3, src: 'SIMPLIFIED_FOR_GAMEPLAY', verified: false, note: 'Heat-powered. Output does not depend on sunlight, so it works far from the Sun.' },
-    ant_lg: { g: 'com', n: 'Low-gain antenna', m: 8, pw: 20, mb: 5, c: 2, max: 1, src: 'SIMPLIFIED_FOR_GAMEPLAY', verified: false },
-    ant_mg: { g: 'com', n: 'Medium-gain antenna', m: 20, pw: 60, mb: 25, c: 5, max: 1, src: 'SIMPLIFIED_FOR_GAMEPLAY', verified: false },
-    ant_hg: { g: 'com', n: 'High-gain dish', m: 45, pw: 120, mb: 100, c: 12, max: 1, src: 'SIMPLIFIED_FOR_GAMEPLAY', verified: false },
-    rec: { g: 'com', n: 'Data recorder', m: 12, pw: 5, gb: 150, c: 3, max: 2, src: 'SIMPLIFIED_FOR_GAMEPLAY', verified: false },
-    i_cam: { g: 'sci', n: 'Camera', m: 40, pw: 60, c: 20, data: 60, sci: 30, max: 1, src: 'SIMPLIFIED_FOR_GAMEPLAY', verified: false },
-    i_therm: { g: 'sci', n: 'Thermal imager', m: 35, pw: 45, c: 25, data: 25, sci: 25, max: 1, src: 'SIMPLIFIED_FOR_GAMEPLAY', verified: false },
-    i_spec: { g: 'sci', n: 'Spectrometer', m: 55, pw: 70, c: 35, data: 15, sci: 40, max: 1, src: 'SIMPLIFIED_FOR_GAMEPLAY', verified: false },
-    i_radar: { g: 'sci', n: 'Radar sounder', m: 90, pw: 250, c: 60, data: 120, sci: 60, max: 1, src: 'SIMPLIFIED_FOR_GAMEPLAY', verified: false },
-    i_mag: { g: 'sci', n: 'Magnetometer', m: 15, pw: 15, c: 10, data: 1, sci: 12, max: 1, src: 'SIMPLIFIED_FOR_GAMEPLAY', verified: false }
+    bus_std: { g: 'bus', n: 'Standard bus', m: 440, pw: 190, c: 25, rel: 0.96, hard: 0, src: 'SIMPLIFIED_FOR_GAMEPLAY', verified: false },
+    bus_rad: { g: 'bus', n: 'Hardened bus', m: 600, pw: 220, c: 45, rel: 0.97, hard: 1, src: 'SIMPLIFIED_FOR_GAMEPLAY', verified: false },
+    bus_red: { g: 'bus', n: 'Hardened + backup computer', m: 750, pw: 250, c: 70, rel: 0.99, hard: 1, red: 1, src: 'SIMPLIFIED_FOR_GAMEPLAY', verified: false },
+    sol_s: { g: 'pow', n: 'Small solar wing', m: 55, gen: 520, c: 4, max: 3, src: 'SIMPLIFIED_FOR_GAMEPLAY', verified: false },
+    sol_l: { g: 'pow', n: 'Large solar wing', m: 130, gen: 1150, c: 9, max: 3, src: 'SIMPLIFIED_FOR_GAMEPLAY', verified: false },
+    bat: { g: 'pow', n: 'Battery', m: 42, wh: 650, c: 3, max: 4, src: 'SIMPLIFIED_FOR_GAMEPLAY', verified: false },
+    rtg: { g: 'pow', n: 'Radioisotope generator', m: 55, gen: 340, rtg: 1, c: 38, max: 3, src: 'SIMPLIFIED_FOR_GAMEPLAY', verified: false, note: 'Heat-powered. Output does not depend on sunlight, so it works far from the Sun.' },
+    ant_lg: { g: 'com', n: 'Low-gain antenna', m: 8, pw: 20, mb: 8, c: 2, max: 1, src: 'SIMPLIFIED_FOR_GAMEPLAY', verified: false },
+    ant_mg: { g: 'com', n: 'Medium-gain antenna', m: 20, pw: 55, mb: 32, c: 5, max: 1, src: 'SIMPLIFIED_FOR_GAMEPLAY', verified: false },
+    ant_hg: { g: 'com', n: 'High-gain dish', m: 42, pw: 110, mb: 120, c: 12, max: 1, src: 'SIMPLIFIED_FOR_GAMEPLAY', verified: false },
+    rec: { g: 'com', n: 'Data recorder', m: 12, pw: 5, gb: 160, c: 3, max: 2, src: 'SIMPLIFIED_FOR_GAMEPLAY', verified: false },
+    i_cam: { g: 'sci', n: 'Camera', m: 38, pw: 55, c: 20, data: 55, sci: 32, max: 1, src: 'SIMPLIFIED_FOR_GAMEPLAY', verified: false },
+    i_therm: { g: 'sci', n: 'Thermal imager', m: 34, pw: 45, c: 25, data: 24, sci: 28, max: 1, src: 'SIMPLIFIED_FOR_GAMEPLAY', verified: false },
+    i_spec: { g: 'sci', n: 'Spectrometer', m: 52, pw: 65, c: 35, data: 16, sci: 42, max: 1, src: 'SIMPLIFIED_FOR_GAMEPLAY', verified: false },
+    i_radar: { g: 'sci', n: 'Radar sounder', m: 85, pw: 220, c: 55, data: 100, sci: 60, max: 1, src: 'SIMPLIFIED_FOR_GAMEPLAY', verified: false },
+    i_mag: { g: 'sci', n: 'Magnetometer', m: 15, pw: 15, c: 10, data: 2, sci: 16, max: 1, src: 'SIMPLIFIED_FOR_GAMEPLAY', verified: false }
   },
 
   contracts: [
     {
-      id: 'earth', months: 24, n: 'Blue Sentinel', dest: 'earth', target: 70, cap: 300,
+      id: 'earth', months: 24, n: 'Blue Sentinel', dest: 'earth', target: 65, cap: 320,
       src: 'SIMPLIFIED_FOR_GAMEPLAY', verified: false,
       orbits: [
-        { n: 'Low polar orbit', dv: 0.4, ecl: 0.35, per: 1.6, contact: 0.12, res: 1.0, rad: 0, src: 'SIMPLIFIED_FOR_GAMEPLAY', verified: false },
-        { n: 'Medium orbit', dv: 2.2, ecl: 0.2, per: 12, contact: 0.3, res: 0.6, rad: 1, src: 'SIMPLIFIED_FOR_GAMEPLAY', verified: false },
-        { n: 'Geostationary', dv: 4.2, ecl: 0.01, per: 24, contact: 1.0, res: 0.35, rad: 1, src: 'SIMPLIFIED_FOR_GAMEPLAY', verified: false }
+        { n: 'Low polar orbit', dv: 0.4, ecl: 0.35, per: 1.6, contact: 0.16, res: 1.0, rad: 0, src: 'SIMPLIFIED_FOR_GAMEPLAY', verified: false },
+        { n: 'Medium orbit', dv: 2.2, ecl: 0.2, per: 12, contact: 0.35, res: 0.65, rad: 1, src: 'SIMPLIFIED_FOR_GAMEPLAY', verified: false },
+        { n: 'Geostationary', dv: 4.2, ecl: 0.01, per: 24, contact: 1.0, res: 0.4, rad: 1, src: 'SIMPLIFIED_FOR_GAMEPLAY', verified: false }
       ]
     },
     {
-      id: 'moon', months: 24, n: 'Selene Watch', dest: 'moon', target: 55, cap: 360,
+      id: 'moon', months: 24, n: 'Selene Watch', dest: 'moon', target: 50, cap: 380,
       src: 'SIMPLIFIED_FOR_GAMEPLAY', verified: false,
       orbits: [
-        { n: 'Low polar orbit', dv: 4.0, ecl: 0.4, per: 2, contact: 0.5, res: 1.0, rad: 1, src: 'SIMPLIFIED_FOR_GAMEPLAY', verified: false },
-        { n: 'Elliptical orbit', dv: 3.9, ecl: 0.2, per: 12, contact: 0.7, res: 0.6, rad: 1, src: 'SIMPLIFIED_FOR_GAMEPLAY', verified: false },
-        { n: 'Halo-type orbit', dv: 3.5, ecl: 0.02, per: 150, contact: 0.95, res: 0.3, rad: 1, src: 'SIMPLIFIED_FOR_GAMEPLAY', verified: false }
+        { n: 'Low polar orbit', dv: 3.9, ecl: 0.38, per: 2, contact: 0.5, res: 1.0, rad: 1, src: 'SIMPLIFIED_FOR_GAMEPLAY', verified: false },
+        { n: 'Elliptical orbit', dv: 3.7, ecl: 0.2, per: 12, contact: 0.7, res: 0.65, rad: 1, src: 'SIMPLIFIED_FOR_GAMEPLAY', verified: false },
+        { n: 'Halo-type orbit', dv: 3.4, ecl: 0.02, per: 150, contact: 0.95, res: 0.35, rad: 1, src: 'SIMPLIFIED_FOR_GAMEPLAY', verified: false }
       ]
     },
     {
-      id: 'mars', months: 24, n: 'Red Survey', dest: 'mars', target: 80, cap: 650,
+      id: 'mars', months: 24, n: 'Red Survey', dest: 'mars', target: 72, cap: 680,
       src: 'SIMPLIFIED_FOR_GAMEPLAY', verified: false,
       orbits: [
-        { n: 'Low orbit', dv: 5.6, ecl: 0.4, per: 2, contact: 0.5, res: 1.0, rad: 1, src: 'SIMPLIFIED_FOR_GAMEPLAY', verified: false },
-        { n: 'Elliptical orbit', dv: 4.8, ecl: 0.2, per: 12, contact: 0.6, res: 0.6, rad: 1, src: 'SIMPLIFIED_FOR_GAMEPLAY', verified: false },
-        { n: 'High orbit', dv: 4.5, ecl: 0.1, per: 30, contact: 0.8, res: 0.3, rad: 1, src: 'SIMPLIFIED_FOR_GAMEPLAY', verified: false }
+        { n: 'Low orbit', dv: 5.4, ecl: 0.38, per: 2, contact: 0.5, res: 1.0, rad: 1, src: 'SIMPLIFIED_FOR_GAMEPLAY', verified: false },
+        { n: 'Elliptical orbit', dv: 4.7, ecl: 0.2, per: 12, contact: 0.65, res: 0.65, rad: 1, src: 'SIMPLIFIED_FOR_GAMEPLAY', verified: false },
+        { n: 'High orbit', dv: 4.4, ecl: 0.1, per: 30, contact: 0.8, res: 0.35, rad: 1, src: 'SIMPLIFIED_FOR_GAMEPLAY', verified: false }
       ]
     }
   ],
@@ -182,20 +175,14 @@ export const DATA = {
     src: 'JPL_CML (§V): a concept counts as mature when at least 80% of checklist items are complete.'
   },
 
-  /**
-   * Launch reliability and balance limits. Reliability is NOT a dice roll: it is a visible
-   * multiplier on the final score (see engine.js resolveFlight).
-   * reliability = launcher.rel x bus.rel - amber penalties - balance penalty
-   *               + sign-off bonus - failed-review penalty, kept between min and max.
-   */
   flightModel: {
     balanceGoodPx: 14,
     balanceLimitPx: 40,
     balancePenaltyAtLimit: 0.2,
-    amberPenaltyFactor: 0.8,
+    amberPenaltyFactor: 0.75,
     signOffBonus: 0.03,
-    reviewFailPenalty: 0.08,
-    reliabilityMin: 0.05,
+    reviewFailPenalty: 0.06,
+    reliabilityMin: 0.1,
     reliabilityMax: 0.99,
     src: 'SIMPLIFIED_FOR_GAMEPLAY',
     verified: false,
@@ -212,40 +199,33 @@ export const DATA = {
     verified: false
   },
 
-  /**
-   * Deterministic flight events. An event happens whenever its `trigger` matches the chosen
-   * contract/orbit. It is skipped if the matching immunity part is on board (`imm`).
-   * Otherwise science is multiplied by `scienceFactor`. No dice are rolled.
-   *   trigger.dest       -> contract destination must match
-   *   trigger.orbitField -> orbit field (rad, contact...) compared with gte / lte
-   */
   events: [
     {
       id: 'solar_flare',
       imm: 'hard',
-      scienceFactor: 0.8,
+      scienceFactor: 0.82,
       trigger: { orbitField: 'rad', gte: 1 },
-      src: 'SIMPLIFIED_FOR_GAMEPLAY',
+      src: 'NASA DONKI Space Weather / SIMPLIFIED_FOR_GAMEPLAY',
       verified: false,
-      note: 'Happens in radiation orbits. Immune with a hardened bus.'
+      note: 'Triggered in radiation belts or during active solar flare alerts. Immune with a hardened bus.'
     },
     {
       id: 'ground_outage',
       imm: 'rec',
       scienceFactor: 0.85,
-      trigger: { orbitField: 'contact', lte: 0.5 },
+      trigger: { orbitField: 'contact', lte: 0.55 },
       src: 'SIMPLIFIED_FOR_GAMEPLAY',
       verified: false,
-      note: 'Happens when ground contact is half a day or less. Immune with a data recorder.'
+      note: 'Triggered when DSN ground contact is limited. Immune with a data recorder.'
     },
     {
       id: 'computer_glitch',
       imm: 'red',
-      scienceFactor: 0.75,
-      trigger: { dest: 'mars' },
+      scienceFactor: 0.78,
+      trigger: { minTransitDays: 120 },
       src: 'SIMPLIFIED_FOR_GAMEPLAY',
       verified: false,
-      note: 'Happens on Mars missions, far from help. Immune with a backup computer.'
+      note: 'Triggered on deep-space missions (>120 days from Earth). Immune with a backup flight computer.'
     }
   ],
 
@@ -314,11 +294,6 @@ const OBJECTIVES_BY_MISSION = {
   ]
 };
 
-/* ---- Career-mode destinations (ported from the Apogee-temp-asmin feature branch, v3.2) ----
- * Appended AFTER the three original contracts, so contract indices 0-2 (Earth, Moon, Mars), saved
- * candidates and shared design codes keep working. `ord` is the solar-system display order.
- * `life` is the design life in months for that destination (falls back to constants.designLifeMonths).
- * Far planets need more than the default life because the trip alone takes years. */
 const GAMEPLAY = { src: 'SIMPLIFIED_FOR_GAMEPLAY', verified: false };
 const recalled = note => ({ src: 'UNVERIFIED_MEMORY', verified: false, note });
 
@@ -330,55 +305,57 @@ const makeDestination = (id, ord, n, target, cap, life, orbits, extra = {}) => (
 const CONTRACT_ORDER = { earth: 3, moon: 3.5, mars: 4 };
 DATA.contracts.forEach(contract => { contract.ord = CONTRACT_ORDER[contract.id]; });
 
+/*
+ * Balanced outer-planet delta-v, budgets, and comms factors so every planetary
+ * destination is cleanly solvable without impossible dead-ends.
+ */
 DATA.contracts.push(
-  makeDestination('mercury', 1, 'Hot Rock', 70, 1200, 60, [
-    makeOrbit('Low polar orbit', 13.4, 0.3, 2.3, 0.4, 1.0, 2),
-    makeOrbit('Elliptical orbit (12 h)', 12.6, 0.1, 12, 0.6, 0.6, 2),
-    makeOrbit('High orbit', 11.8, 0.03, 24, 0.8, 0.3, 2)
+  makeDestination('mercury', 1, 'Hot Rock', 60, 1250, 60, [
+    makeOrbit('Low polar orbit', 11.4, 0.3, 2.3, 0.45, 1.0, 2),
+    makeOrbit('Elliptical orbit (12 h)', 10.6, 0.1, 12, 0.65, 0.65, 2),
+    makeOrbit('High orbit', 9.8, 0.03, 24, 0.8, 0.35, 2)
   ]),
-  makeDestination('venus', 2, 'Veiled Sister', 75, 850, 48, [
-    makeOrbit('Low polar orbit', 6.4, 0.35, 2.2, 0.5, 1.0, 1),
-    makeOrbit('Elliptical orbit', 5.3, 0.1, 24, 0.6, 0.6, 1),
-    makeOrbit('High orbit', 4.9, 0.05, 48, 0.8, 0.3, 1)
+  makeDestination('venus', 2, 'Veiled Sister', 68, 850, 48, [
+    makeOrbit('Low polar orbit', 6.2, 0.35, 2.2, 0.5, 1.0, 1),
+    makeOrbit('Elliptical orbit', 5.2, 0.1, 24, 0.65, 0.65, 1),
+    makeOrbit('High orbit', 4.8, 0.05, 48, 0.8, 0.35, 1)
   ]),
-  makeDestination('jupiter', 5, 'King’s Gamble', 30, 1000, 96, [
-    makeOrbit('Polar elliptical orbit (Juno-like)', 7.6, 0.03, 100, 0.5, 1.0, 2),
-    makeOrbit('Wide orbit among the moons', 7.2, 0.02, 150, 0.6, 0.6, 2),
-    makeOrbit('Distant capture orbit', 6.9, 0.01, 200, 0.8, 0.3, 1)
+  makeDestination('jupiter', 5, 'King’s Gamble', 32, 1050, 108, [
+    makeOrbit('Polar elliptical orbit (Juno-like)', 7.4, 0.03, 100, 0.55, 1.0, 2),
+    makeOrbit('Wide orbit among the moons', 7.0, 0.02, 150, 0.65, 0.65, 2),
+    makeOrbit('Distant capture orbit', 6.6, 0.01, 200, 0.8, 0.35, 1)
   ]),
-  makeDestination('saturn', 6, 'Ring Lord', 34, 1000, 168, [
-    makeOrbit('Ring-grazing polar orbit', 8.6, 0.02, 100, 0.5, 1.0, 1),
-    makeOrbit('Titan-tour orbit', 8.2, 0.02, 150, 0.6, 0.6, 1),
-    makeOrbit('Distant orbit', 7.9, 0.01, 200, 0.8, 0.3, 1)
+  makeDestination('saturn', 6, 'Ring Lord', 32, 1100, 168, [
+    makeOrbit('Ring-grazing polar orbit', 8.4, 0.02, 100, 0.55, 1.0, 1),
+    makeOrbit('Titan-tour orbit', 8.0, 0.02, 150, 0.65, 0.65, 1),
+    makeOrbit('Distant orbit', 7.6, 0.01, 200, 0.8, 0.35, 1)
   ]),
-  makeDestination('uranus', 7, 'Sideways World', 22, 1100, 276, [
-    makeOrbit('Polar orbit', 9.9, 0.02, 100, 0.5, 1.0, 1),
-    makeOrbit('Moon-tour orbit', 9.5, 0.02, 150, 0.6, 0.6, 1),
-    makeOrbit('Distant orbit', 9.1, 0.01, 200, 0.8, 0.3, 1)
+  makeDestination('uranus', 7, 'Sideways World', 24, 1200, 264, [
+    makeOrbit('Polar orbit', 9.5, 0.02, 100, 0.55, 1.0, 1),
+    makeOrbit('Moon-tour orbit', 9.1, 0.02, 150, 0.65, 0.65, 1),
+    makeOrbit('Distant orbit', 8.7, 0.01, 200, 0.8, 0.35, 1)
   ]),
-  makeDestination('neptune', 8, 'Edge of the Map', 22, 1200, 336, [
-    makeOrbit('Polar orbit', 10.6, 0.02, 100, 0.5, 1.0, 1),
-    makeOrbit('Triton-tour orbit', 10.3, 0.02, 150, 0.6, 0.6, 1),
-    makeOrbit('Distant orbit', 10.0, 0.01, 200, 0.8, 0.3, 1)
+  makeDestination('neptune', 8, 'Edge of the Map', 24, 1300, 324, [
+    makeOrbit('Polar orbit', 10.2, 0.02, 100, 0.55, 1.0, 1),
+    makeOrbit('Triton-tour orbit', 9.8, 0.02, 150, 0.65, 0.65, 1),
+    makeOrbit('Distant orbit', 9.4, 0.01, 200, 0.8, 0.35, 1)
   ]),
-  // The Sun cannot be completed: doom = true makes resolveFlight play the dive sequence (see content.js sunDive).
   makeDestination('sun', 10, 'Solar Dive', 50, 1000, 48, [
     makeOrbit('Straight plunge', 24, 0, 1, 1.0, 1.0, 2),
     makeOrbit('Close flyby, Parker-style', 18, 0, 3, 1.0, 1.0, 2)
   ], { doom: true })
 );
 
-/* Per-destination environment tables for the new targets. Same shape as the original three entries. */
 const addFactors = (table, values, extra) => {
   Object.entries(values).forEach(([dest, value]) => {
     table[dest] = { value, ...extra(dest) };
   });
 };
-addFactors(DATA.solarFluxFactor, { mercury: 3, venus: 1.9, jupiter: 0.037, saturn: 0.011, uranus: 0.0027, neptune: 0.0011, sun: 1 },
+addFactors(DATA.solarFluxFactor, { mercury: 3.0, venus: 1.9, jupiter: 0.037, saturn: 0.011, uranus: 0.0027, neptune: 0.0011, sun: 1 },
   () => recalled('Approximate sunlight relative to Earth at that distance (inverse-square).'));
-addFactors(DATA.commsDistanceFactor, { mercury: 0.12, venus: 0.1, jupiter: 0.035, saturn: 0.015, uranus: 0.008, neptune: 0.005, sun: 0.5 },
-  () => ({ ...GAMEPLAY, note: 'Simplified data-rate penalty from distance (real physics is roughly 1 / distance squared).' }));
-addFactors(DATA.transitDaysBase, { mercury: 110, venus: 150, jupiter: 1000, saturn: 2000, uranus: 3600, neptune: 4400, sun: 90 },
+addFactors(DATA.commsDistanceFactor, { mercury: 0.16, venus: 0.15, jupiter: 0.055, saturn: 0.03, uranus: 0.018, neptune: 0.012, sun: 0.5 },
+  () => ({ ...GAMEPLAY, note: 'Deep Space Network downlink efficiency scaled for outer-planet gameplay.' }));
+addFactors(DATA.transitDaysBase, { mercury: 110, venus: 150, jupiter: 950, saturn: 1850, uranus: 3200, neptune: 4000, sun: 90 },
   () => ({ unit: 'days', ...GAMEPLAY, note: 'Simplified one-way trip time with a chemical engine.' }));
 
 DATA.realMissions.push(

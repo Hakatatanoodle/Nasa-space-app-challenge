@@ -13,7 +13,7 @@ import {
 } from './core/state.js';
 import { buildStarterSpacecraft } from './core/engine.js';
 import { $ } from './ui/domElements.js';
-import { navigateToStage } from './ui/renderer.js';
+import { navigateToStage, renderHelpModal } from './ui/renderer.js';
 import { bindGlobalControls } from './ui/controls.js';
 
 function initBackgroundVideo() {
@@ -32,6 +32,7 @@ async function initApp() {
 
   const serviceResult = await fetchMissionReferenceData();
   appState.dataSourceLabel = serviceResult.sourceMode;
+  appState.spaceWeather = serviceResult.spaceWeather;
 
   $('#cr').textContent = CONTENT.bgCredit;
   $('#title-disclaimer').textContent = CONTENT.disclaimer;
@@ -39,7 +40,7 @@ async function initApp() {
   $('#hn').textContent = CONTENT.appName;
   $('#tt').textContent = CONTENT.appName;
   $('#tg').textContent = CONTENT.tagline;
-  $('#help-body').innerHTML = CONTENT.helpHtml;
+  renderHelpModal();
 
   const restored = loadSavedMissionProgress();
   if (!restored) {
