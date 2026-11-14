@@ -321,26 +321,6 @@ export function bindGlobalControls() {
     }
   });
 
-  document.addEventListener('keydown', e => {
-    if (appState.mission.stage !== 2 || /SELECT|TEXTAREA/.test(e.target.tagName)) return;
-    const key = e.key.toLowerCase();
-
-    if (e.ctrlKey || e.metaKey) {
-      if (key === 'z') {
-        e.preventDefault();
-        undoLastAction();
-      }
-      return;
-    }
-
-    if (key === 'r') rotateSelectedPart(e.shiftKey ? -1 : 1);
-    else if (key === 'f') flipSelectedPart();
-    else if (key === 'delete' || key === 'backspace') {
-      e.preventDefault();
-      deleteSelectedPart();
-    }
-  });
-
   // Mouse-wheel zoom & drag-to-pan on the rocket builder canvas (#cv)
   let panState = null;
   document.addEventListener('wheel', e => {
@@ -367,8 +347,6 @@ export function bindGlobalControls() {
   document.addEventListener('pointerup', () => {
     panState = null;
   });
-
-
 
   document.addEventListener('click', e => {
     const actionEl = e.target.closest('[data-a], [data-st]');
@@ -430,19 +408,23 @@ export function bindGlobalControls() {
 
     if (e.target.id === 'start') {
       $('#title').hidden = true;
+      AudioEngine.setMusic('design');
       navigateToStage(1);
     }
 
     if (e.target.id === 'demo-ok') {
       $('#title').hidden = true;
       buildStarterSpacecraft();
+      autoAttachPart('ant_lg');
+      AudioEngine.setMusic('design');
       navigateToStage(2);
-      showToast('Loaded passing starter spacecraft. Click "Design review and launch" to simulate.');
+      showToast('Loaded complete starter spacecraft. Click "Design review and launch" to simulate.');
     }
 
     if (e.target.id === 'demo-fail') {
       $('#title').hidden = true;
       buildFailingDemoSpacecraft();
+      AudioEngine.setMusic('design');
       navigateToStage(2);
       showToast('Loaded overweight/under-fueled Mars design to inspect failure diagnostics.');
     }
@@ -500,14 +482,11 @@ export function bindGlobalControls() {
     navigateToStage(appState.mission.stage);
   });
 
-  $('#mute')
-
-
   $('#mute').addEventListener('click', e => {
     const isNowOn = AudioEngine.toggleMute();
     e.target.textContent = `Sound: ${isNowOn ? 'on' : 'off'}`;
+    e.target.classList.toggle('sound-on', isNowOn);
   });
-
 
   $('#copy').addEventListener('click', () => {
     showDesignCodeModal();

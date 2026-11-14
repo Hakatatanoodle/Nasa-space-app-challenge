@@ -55,6 +55,13 @@ export function navigateToStage(stageNumber) {
   if (appState.isFlying) return;
   appState.mission.stage = stageNumber;
 
+  const isTitleVisible = $('#title') && !$('#title').hidden;
+  if (isTitleVisible) {
+    AudioEngine.setMusic('landing');
+  } else if (stageNumber === 1 || stageNumber === 2) {
+    AudioEngine.setMusic('design');
+  }
+
   $$('.st').forEach((section, index) => {
     section.classList.toggle('on', index + 1 === stageNumber);
   });
@@ -89,7 +96,6 @@ export function renderObjectiveStage() {
   const mission = appState.mission;
   const contract = DATA.contracts[mission.ci];
 
-  // Career mode: unlocked planets sit in solar-system order, locked ones wait at the end (still listed, not selectable).
   const contractCards = DATA.contracts
     .map((c, index) => [c, index])
     .sort((a, b) => getContractSortKey(a[0]) - getContractSortKey(b[0]))
@@ -278,16 +284,26 @@ export function renderBuilderStage() {
   autoFitBuilderCanvas();
 }
 
+// Layer parts cleanly: radial wings/dishes behind, engine bell behind tank skirt, main bus/tanks in front
+const getPartZIndex = part => {
+  const cat = getNodeCategory(part.id);
+  const base = cat === 'bus' ? 20 : cat === 'tank' ? 18 : cat === 'eng' ? 14 : 10;
+  return part.u === appState.selectedPartUid ? 35 : base;
+};
+
 function renderSpacecraftCanvas(telemetry) {
   const connected = getConnectedPartUids();
   const occupied = getOccupiedNodes();
   const drag = appState.activeDrag;
   const isDragging = drag && drag.mv;
 
-  let html = appState.mission.parts.map(part => {
+  const sortedParts = [...appState.mission.parts].sort((a, b) => getPartZIndex(a) - getPartZIndex(b));
+
+  let html = sortedParts.map(part => {
     const [w, h] = getPartSize(part);
     const selectedClass = part.u === appState.selectedPartUid ? ' sel' : '';
     const floatingClass = connected.has(part.u) ? '' : ' float';
+    const zIndex = getPartZIndex(part);
     return `
       <img class="pt${selectedClass}${floatingClass}"
            tabindex="0"
@@ -295,7 +311,7 @@ function renderSpacecraftCanvas(telemetry) {
            aria-label="${getPartDisplayName(part.id)}"
            data-u="${part.u}"
            src="assets/${getAssetFilename(part.id)}.svg"
-           style="left:${part.x - w / 2}px; top:${part.y - h / 2}px; width:${w}px; height:${h}px; transform:rotate(${part.rot}deg) scaleX(${part.flip ? -1 : 1});"
+           style="left:${part.x - w / 2}px; top:${part.y - h / 2}px; width:${w}px; height:${h}px; z-index:${zIndex}; transform:rotate(${part.rot}deg) scaleX(${part.flip ? -1 : 1});"
            draggable="false">
     `;
   }).join('');
@@ -325,10 +341,6 @@ function renderSpacecraftCanvas(telemetry) {
   return html;
 }
 
-
-
-
-
 function autoFitBuilderCanvas() {
   const cv = $('#cv');
   if (!cv) return;
@@ -336,7 +348,7 @@ function autoFitBuilderCanvas() {
   appState.canvasZoom = idealZoom;
   refreshBuilderView();
   cv.scrollLeft = Math.max(0, (960 * idealZoom - cv.clientWidth) / 2);
-  cv.scrollTop = 40;
+  cv.scrollTop = 90;
 }
 
 export function refreshBuilderView() {
@@ -366,108 +378,153 @@ export function refreshBuilderView() {
     ? `<b>${getPartDisplayName(selectedPart.id)}</b> <small>${formatPartSpecs(selectedPart.id)}</small> <button type="button" data-a="rot">Rotate (R)</button><button type="button" data-a="flp">Flip (F)</button><button type="button" data-a="del">Delete</button>`
     : '<small>Drag parts onto glowing dots, or click/Enter a part to auto-attach. Click a placed part to rotate, flip, or delete.</small>';
 
-
+  const openMap = {};
+  $$('#mt details[data-dd]').forEach(el => {
+    openMap[el.dataset.dd] = el.open;
+  });
 
   const getStatusClass = row =>
     row.mg < 0 ? 'bad' :
     row.mg < appState.marginThreshold ? 'w' : 'ok';
 
-  // Render one resource row.
-  const renderResourceRow = (row, number = null) => {
+  const getStatusLabel = row =>
+    row.mg < 0 ? 'FAIL' :
+    row.mg < appState.marginThreshold ? 'THIN' : 'OK';
+
+  const getWorstStatus = rows => {
+    const valid = rows.filter(Boolean);
+    if (valid.some(r => r.mg < 0)) return { cls: 'bad', label: 'FAIL' };
+    if (valid.some(r => r.mg < appState.marginThreshold)) return { cls: 'w', label: 'THIN' };
+    return { cls: 'ok', label: 'OK' };
+  };
+
+  const renderResourceRow = (row, options = {}) => {
     if (!row) return '';
-
+    const { number = null, isSubTopic = false } = options;
     const status = getStatusClass(row);
-
-    const fillPct = row.cap > 0
-      ? Math.min(100, (row.use / row.cap) * 100)
-      : 100;
-
-    const statusLabel =
-      row.mg < 0 ? 'FAIL' :
-      row.mg < appState.marginThreshold ? 'THIN' : 'OK';
+    const fillPct = row.cap > 0 ? Math.min(100, (row.use / row.cap) * 100) : 100;
+    const statusLabel = getStatusLabel(row);
 
     return `
-      <div class="m">
+      <div class="m${isSubTopic ? ' sub' : ''}">
         <span>
-         ${number !== null ? `<span class="resource-number">${number}.</span> ` : ''} 
+          ${isSubTopic ? '<span class="sub-branch" aria-hidden="true">&rarr;</span> ' : ''}
+          ${number !== null ? `<span class="resource-number">${number}.</span> ` : ''}
           ${row.n}
         </span>
-
-        <i class="${status}">
-          <u style="width:${fillPct}%"></u>
-        </i>
-
+        <i class="${status}"><u style="width:${fillPct}%"></u></i>
         <b class="${status}">${statusLabel}</b>
-
         <em>
-          ${formatNumber(row.use)} needed /
-          ${formatNumber(row.cap)} ${row.u}
-          ${row.verified
-            ? ''
-            : '<span class="badge-simplified">simplified</span>'}
+          ${formatNumber(row.use)} needed / ${formatNumber(row.cap)} ${row.u}
+          ${row.verified ? '' : '<span class="badge-simplified">simplified</span>'}
         </em>
-
-        ${row.mg < appState.marginThreshold
-          ? `<p class="why">${row.why} <b>Fix:</b> ${row.fix}</p>`
-          : ''}
+        ${row.mg < appState.marginThreshold ? `<p class="why">${row.why} <b>Fix:</b> ${row.fix}</p>` : ''}
       </div>
     `;
   };
 
-  // Find existing telemetry rows.
-  const findResource = name =>
-    telemetry.rows.find(row => row.n === name);
-
-  // 1. Mass System: Mass and Delta-v.
-  const massSystemHtml = `
-    <details class="resource-system">
-      <summary>
-        <b>1.</b> Mass System
-      </summary>
-
-      <div class="resource-system-content">
-        ${renderResourceRow(findResource('Mass'))}
-        ${renderResourceRow(findResource('Delta-v'))}
+  const renderStandaloneResourceCard = (row, number) => {
+    if (!row) return '';
+    const status = getStatusClass(row);
+    return `
+      <div class="resource-card ${status}">
+        ${renderResourceRow(row, { number })}
       </div>
-    </details>
-  `;
+    `;
+  };
 
-  // 2. Power System: Power, Battery and Ion power.
-  const powerSystemHtml = `
-    <details class="resource-system">
-      <summary>
-        <b>2.</b> Power System
-      </summary>
+  const findResource = name => telemetry.rows.find(row => row.n === name);
 
-      <div class="resource-system-content">
-        ${renderResourceRow(findResource('Power'))}
-        ${renderResourceRow(findResource('Battery'))}
-        ${renderResourceRow(findResource('Ion power'))}
-      </div>
-    </details>
-  `;
+  const renderTopicDropdown = (key, number, topicTitle, primaryRow, subRows) => {
+    const validSubs = subRows.filter(Boolean);
+    const worst = getWorstStatus([primaryRow, ...validSubs]);
+    const isOpen = openMap[key] !== undefined ? openMap[key] : worst.cls !== 'ok';
+    const subNames = validSubs.map(r => r.n).join(' / ');
 
-  // Remaining resources.
-  const otherResourceNames = [
-    'Budget',
-    'Data storage',
-    'Comms',
-    'Time'
-  ];
+    return `
+      <details class="resource-system ${worst.cls}" data-dd="${key}" ${isOpen ? 'open' : ''}>
+        <summary>
+          <span class="topic-title"><b>${number}.</b> ${topicTitle} <small class="topic-sub">(${subNames})</small></span>
+          <b class="topic-badge ${worst.cls}">${worst.label}</b>
+        </summary>
+        <div class="resource-system-content">
+          ${renderResourceRow(primaryRow)}
+          ${validSubs.map(sub => renderResourceRow(sub, { isSubTopic: true })).join('')}
+        </div>
+      </details>
+    `;
+  };
 
-  const otherResourcesHtml = otherResourceNames
-    .map((name, index) =>
-      renderResourceRow(findResource(name), index + 3)
-    )
+  const massTopicHtml = renderTopicDropdown(
+    'topic-mass',
+    1,
+    CONTENT.uiLabels.massTopic,
+    findResource('Mass'),
+    [findResource('Delta-v')]
+  );
+
+  const powerTopicHtml = renderTopicDropdown(
+    'topic-power',
+    2,
+    CONTENT.uiLabels.powerTopic,
+    findResource('Power'),
+    [findResource('Battery'), findResource('Ion power')]
+  );
+
+  const otherResourcesHtml = ['Budget', 'Data storage', 'Comms', 'Time']
+    .map((name, index) => renderStandaloneResourceCard(findResource(name), index + 3))
     .join('');
 
-  // Complete resource panel.
-  const resourceBarsHtml = `
-    ${massSystemHtml}
-    ${powerSystemHtml}
-    ${otherResourcesHtml}
-  `;
+  const alerts = [];
+  telemetry.rows.forEach(r => {
+    if (r.mg < 0) {
+      alerts.push({ level: 'bad', tag: CONTENT.uiLabels.alertCriticalTag, title: r.n, fix: r.fix });
+    } else if (r.mg < appState.marginThreshold) {
+      alerts.push({ level: 'w', tag: CONTENT.uiLabels.alertAmberTag, title: `${r.n} (${toPercent(r.mg)}% reserve)`, fix: r.fix });
+    }
+  });
+  telemetry.checks.forEach(c => {
+    if (c.st === 0) {
+      alerts.push({ level: 'bad', tag: CONTENT.uiLabels.alertCriticalTag, title: c.t, fix: c.fix });
+    } else if (c.st === 1) {
+      alerts.push({ level: 'w', tag: CONTENT.uiLabels.alertAmberTag, title: c.t, fix: c.fix });
+    }
+  });
+  if (telemetry.mb === 0 && telemetry.data > 0) {
+    alerts.push({
+      level: 'bad',
+      tag: CONTENT.uiLabels.alertCriticalTag,
+      title: 'Downlink antenna missing',
+      fix: CONTENT.uiLabels.commsEmptyHint
+    });
+  }
 
+  const redCount = alerts.filter(a => a.level === 'bad').length;
+  const amberCount = alerts.filter(a => a.level === 'w').length;
+  const alertSummaryBadge = alerts.length
+    ? fillTemplate(CONTENT.uiLabels.alertsCount, { red: redCount, amber: amberCount })
+    : CONTENT.uiLabels.alertsClear;
+  const alertHeaderClass = redCount > 0 ? 'bad' : amberCount > 0 ? 'w' : 'ok';
+  const isAlertsOpen = openMap.alerts !== undefined ? openMap.alerts : alerts.length > 0;
+
+  const alertsDropdownHtml = `
+    <details class="alerts-box ${alertHeaderClass}" data-dd="alerts" ${isAlertsOpen ? 'open' : ''}>
+      <summary>
+        <span><b>${CONTENT.uiLabels.alertsHeading}</b></span>
+        <b class="topic-badge ${alertHeaderClass}">${alertSummaryBadge}</b>
+      </summary>
+      <div class="alerts-list">
+        ${alerts.length
+          ? alerts.map(a => `
+              <div class="alert-item ${a.level}">
+                <span class="alert-pill ${a.level}">${a.tag}</span>
+                <b>${a.title}:</b> <span>${a.fix}</span>
+              </div>
+            `).join('')
+          : `<p class="alert-clear">${CONTENT.uiLabels.alertsClear}</p>`}
+      </div>
+    </details>
+  `;
 
   const checksHtml = telemetry.checks.map(c => `
     <div class="chk ${['bad', 'w', 'ok'][c.st]}">
@@ -483,31 +540,46 @@ export function refreshBuilderView() {
   `).join('');
 
   $('#mt').innerHTML = `
-    <b>Mission resources</b>
-    ${resourceBarsHtml}
-    <p><b>Assembly checks</b></p>
-    ${checksHtml}
-    <p>Predicted science <b>${telemetry.sciF.toFixed(0)}</b> / ${contract.target} pts. Transit ${formatNumber(telemetry.days)} days. Useful life ${Math.max(0, telemetry.life).toFixed(0)} months. Launch reliability <b>${toPercent(telemetry.reliability)}%</b> (multiplies your final score).</p>
-    <div class="row">${signOffChips}</div>
+    ${alertsDropdownHtml}
+    <div class="panel-section-label">Mission resources</div>
+    ${massTopicHtml}
+    ${powerTopicHtml}
+    ${otherResourcesHtml}
+    <div class="panel-card">
+      <div class="panel-card-title">Assembly checks</div>
+      ${checksHtml}
+    </div>
+    <div class="panel-card">
+      <div class="panel-card-title">Mission forecast &amp; sign-offs</div>
+      <div class="forecast-grid">
+        <div><small>Science</small><b>${telemetry.sciF.toFixed(0)} / ${contract.target} pts</b></div>
+        <div><small>Transit</small><b>${formatNumber(telemetry.days)} days</b></div>
+        <div><small>Useful life</small><b>${Math.max(0, telemetry.life).toFixed(0)} mo</b></div>
+        <div><small>Reliability</small><b>${toPercent(telemetry.reliability)}%</b></div>
+      </div>
+      <div class="row" style="margin-top:8px;">${signOffChips}</div>
+    </div>
     <button type="button" class="go" id="gol" data-a="rev" style="width:100%"></button>
     <button type="button" data-a="go1" style="width:100%; margin-top:8px">&larr; Back to objective</button>
   `;
 
   const isOverweight = telemetry.g('Mass').mg < 0;
   const isOverBudget = telemetry.g('Budget').mg < 0;
-  $('#gol').disabled = !!telemetry.bad || isOverweight || isOverBudget;
+  const isMissingComms = telemetry.mb === 0 && telemetry.data > 0;
+  $('#gol').disabled = !!telemetry.bad || isOverweight || isOverBudget || isMissingComms;
   $('#gol').textContent = telemetry.bad
     ? telemetry.bad.t
     : isOverweight
       ? 'Too heavy for this launcher'
       : isOverBudget
         ? 'Over budget'
-        : 'Design review and launch';
+        : isMissingComms
+          ? 'Attach an antenna to downlink data'
+          : 'Design review and launch';
 }
 
 /* ---- Modals: Design Review, Trade Space, Share/Load Code ---- */
 
-/** Predicted flight: the same deterministic result the launch will play out. No dice. */
 const renderPredictedFlight = telemetry => {
   const flight = resolveFlight(telemetry);
   const text = CONTENT.predictedFlight;
@@ -616,7 +688,9 @@ export function showDesignCodeModal() {
 
 function renderFlightSpacecraft() {
   const connected = getConnectedPartUids();
-  const parts = appState.mission.parts.filter(p => connected.has(p.u));
+  const parts = appState.mission.parts
+    .filter(p => connected.has(p.u))
+    .sort((a, b) => getPartZIndex(a) - getPartZIndex(b));
   if (!parts.length) return '';
 
   const bounds = parts.map(p => {
@@ -636,18 +710,18 @@ function renderFlightSpacecraft() {
 
   const hullHtml = parts.map(p => {
     const [w, h] = getPartSize(p);
-    return `<img class="pt" src="assets/${getAssetFilename(p.id)}.svg" alt="" style="left:${p.x * scale + offsetX - (w * scale) / 2}px; top:${p.y * scale + offsetY - (h * scale) / 2}px; width:${w * scale}px; height:${h * scale}px; transform:rotate(${p.rot}deg) scaleX(${p.flip ? -1 : 1});" draggable="false">`;
+    const zIndex = getPartZIndex(p);
+    return `<img class="pt" src="assets/${getAssetFilename(p.id)}.svg" alt="" style="left:${p.x * scale + offsetX - (w * scale) / 2}px; top:${p.y * scale + offsetY - (h * scale) / 2}px; width:${w * scale}px; height:${h * scale}px; z-index:${zIndex}; transform:rotate(${p.rot}deg) scaleX(${p.flip ? -1 : 1});" draggable="false">`;
   }).join('');
 
   const plumeHtml = parts.filter(p => getNodeCategory(p.id) === 'eng').map(p => {
     const [, h] = getPartSize(p);
-    return `<img class="pt plume" src="assets/${DATA.engines[p.id].pl}.svg" alt="" style="left:${p.x * scale + offsetX - 40 * scale}px; top:${p.y * scale + offsetY + (h * scale) / 2 - 14 * scale}px; width:${80 * scale}px; z-index:-1;" draggable="false">`;
+    return `<img class="pt plume" src="assets/${DATA.engines[p.id].pl}.svg" alt="" style="left:${p.x * scale + offsetX - 40 * scale}px; top:${p.y * scale + offsetY + (h * scale) / 2 - 18 * scale}px; width:${80 * scale}px; z-index:5;" draggable="false">`;
   }).join('');
 
   return hullHtml + plumeHtml;
 }
 
-/** Turns one engine flight step into a log line. The engine decides; this only describes. */
 function describeFlightStep(step) {
   if (step.key === 'event') {
     const text = CONTENT.eventText[step.values.eventId];
@@ -667,6 +741,7 @@ export async function startLaunchSequence() {
 
   navigateToStage(3);
   appState.isFlying = true;
+  AudioEngine.setMusic(null);
 
   $('#s3').innerHTML = `
     <div class="fl3">
@@ -716,13 +791,13 @@ export async function startLaunchSequence() {
   concludeMission(flight);
 }
 
-/** Stores the engine's result, plays the end sound and unlocks the debrief. */
 function concludeMission(flight) {
   const mission = appState.mission;
   const contract = mission.d.C;
 
   if (flight.outcome === 'success') AudioEngine.win();
   else if (flight.outcome === 'partial') AudioEngine.partial();
+  else AudioEngine.fail();
 
   appState.highScores[contract.id] = Math.max(appState.highScores[contract.id] || 0, flight.score);
   try {

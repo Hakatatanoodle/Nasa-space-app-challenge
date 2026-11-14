@@ -1,6 +1,6 @@
 /* File: js/core/engine.js
  * Owner: Person A (Ashmin)
- * AI-assisted: YES — Gemini, 2026-11-14; Claude, 2026-11-14. Reviewed by a human: NO.
+ * AI-assisted: YES — Gemini, 2026-11-14. Reviewed by a human: NO.
  * Sources used: NASA_CUBESAT101, JPL_CML
  */
 import { DATA } from '../api/mockData.js';
@@ -155,13 +155,19 @@ export function mirrorPartIfEnabled(childPart) {
   attachParts(twinPart, childPart.cn, host, oppositeNode);
 }
 
+/**
+ * Centers the starter rocket on the 960x1100 world canvas (x = 480) and omits
+ * the communications antenna so the craft starts slightly incomplete (un-flyable
+ * due to zero downlink) until the player finishes building it.
+ */
 export function buildStarterSpacecraft() {
   appState.mission.parts = [];
   appState.mission.nu = 1;
 
-  const bus = createPartInstance('bus_rad', 400, 170);
-  const tank = createPartInstance('tank', 400, 300);
-  const engine = createPartInstance('chem', 400, 420);
+  const centerX = 480;
+  const bus = createPartInstance('bus_rad', centerX, 240);
+  const tank = createPartInstance('tank', centerX, 370);
+  const engine = createPartInstance('chem', centerX, 490);
 
   attachParts(tank, 'top', bus, 'bottom');
   attachParts(engine, 'top', tank, 'bottom');
@@ -175,7 +181,6 @@ export function buildStarterSpacecraft() {
 
   mirrorPartIfEnabled(mountPart('sol_s', bus, 'R1'));
   mountPart('i_cam', bus, 'R2');
-  mountPart('ant_lg', bus, 'top');
   mountPart('bat', tank, 'R1');
 }
 
@@ -190,10 +195,11 @@ export function buildFailingDemoSpacecraft() {
   appState.mission.parts = [];
   appState.mission.nu = 1;
 
-  const bus = createPartInstance('bus_std', 400, 170);
-  const tank1 = createPartInstance('tank', 400, 300);
-  const tank2 = createPartInstance('tank', 400, 430);
-  const engine = createPartInstance('chem', 400, 550);
+  const centerX = 480;
+  const bus = createPartInstance('bus_std', centerX, 220);
+  const tank1 = createPartInstance('tank', centerX, 350);
+  const tank2 = createPartInstance('tank', centerX, 480);
+  const engine = createPartInstance('chem', centerX, 600);
 
   attachParts(tank1, 'top', bus, 'bottom');
   attachParts(tank2, 'top', tank1, 'bottom');
@@ -220,7 +226,7 @@ export function autoAttachPart(partId) {
       bus.id = partId;
     } else {
       saveUndoSnapshot();
-      createPartInstance(partId, 400, 170);
+      createPartInstance(partId, 480, 240);
     }
     return { ok: true };
   }
