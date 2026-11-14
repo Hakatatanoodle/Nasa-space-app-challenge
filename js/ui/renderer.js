@@ -48,7 +48,7 @@ export function navigateToStage(stageNumber) {
     const isActive = num === stageNumber;
     const isCompleted = num < stageNumber;
     const isDisabled = num === 3 || (num === 4 && !appState.mission.res);
-    return `<button type="button" data-st="${num}" class="${isActive ? 'on' : isCompleted ? 'done' : ''}" ${isDisabled ? 'disabled' : ''}>${num} ${label}</button>`;
+    return `<button type="button" data-st="${num}" class="${isActive ? 'on' : isCompleted ? 'done' : ''}" ${isDisabled ? 'disabled' : ''}>${label}</button>`;
   }).join('');
 
   if (stageNumber === 1) renderObjectiveStage();
