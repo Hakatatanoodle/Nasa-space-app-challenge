@@ -1,6 +1,6 @@
 /* File: js/api/mockData.js
  * Owner: Person A (Ashmin - structure), Person C (Yochan - values)
- * AI-assisted: YES — Gemini, 2026-11-14. Reviewed by a human: NO.
+ * AI-assisted: YES — Gemini, 2026-11-14; Claude, 2026-11-14. Reviewed by a human: NO.
  * Sources used: NASA_CUBESAT101, JPL_CML, NASA_SE_WEBINAR
  */
 
@@ -179,6 +179,26 @@ export const DATA = {
     src: 'JPL_CML (§V): a concept counts as mature when at least 80% of checklist items are complete.'
   },
 
+  /**
+   * Launch reliability and balance limits. Reliability is NOT a dice roll: it is a visible
+   * multiplier on the final score (see engine.js resolveFlight).
+   * reliability = launcher.rel x bus.rel - amber penalties - balance penalty
+   *               + sign-off bonus - failed-review penalty, kept between min and max.
+   */
+  flightModel: {
+    balanceGoodPx: 14,
+    balanceLimitPx: 40,
+    balancePenaltyAtLimit: 0.2,
+    amberPenaltyFactor: 0.8,
+    signOffBonus: 0.03,
+    reviewFailPenalty: 0.08,
+    reliabilityMin: 0.05,
+    reliabilityMax: 0.99,
+    src: 'SIMPLIFIED_FOR_GAMEPLAY',
+    verified: false,
+    note: 'Gameplay constants. Balance limits are in screen pixels between centre of mass and thrust line.'
+  },
+
   scoringWeights: {
     scienceMultiplier: 10,
     budgetSavingsMultiplier: 0.5,
@@ -189,33 +209,40 @@ export const DATA = {
     verified: false
   },
 
+  /**
+   * Deterministic flight events. An event happens whenever its `trigger` matches the chosen
+   * contract/orbit. It is skipped if the matching immunity part is on board (`imm`).
+   * Otherwise science is multiplied by `scienceFactor`. No dice are rolled.
+   *   trigger.dest       -> contract destination must match
+   *   trigger.orbitField -> orbit field (rad, contact...) compared with gte / lte
+   */
   events: [
     {
       id: 'solar_flare',
       imm: 'hard',
-      fa: 0.8,
-      pb: 0.5,
-      lb: 0.6,
+      scienceFactor: 0.8,
+      trigger: { orbitField: 'rad', gte: 1 },
       src: 'SIMPLIFIED_FOR_GAMEPLAY',
-      verified: false
+      verified: false,
+      note: 'Happens in radiation orbits. Immune with a hardened bus.'
     },
     {
       id: 'ground_outage',
       imm: 'rec',
-      fa: 0.85,
-      pb: 0.4,
-      lb: 0.5,
+      scienceFactor: 0.85,
+      trigger: { orbitField: 'contact', lte: 0.5 },
       src: 'SIMPLIFIED_FOR_GAMEPLAY',
-      verified: false
+      verified: false,
+      note: 'Happens when ground contact is half a day or less. Immune with a data recorder.'
     },
     {
       id: 'computer_glitch',
       imm: 'red',
-      fa: 0.75,
-      pb: 0.45,
-      lb: 0.7,
+      scienceFactor: 0.75,
+      trigger: { dest: 'mars' },
       src: 'SIMPLIFIED_FOR_GAMEPLAY',
-      verified: false
+      verified: false,
+      note: 'Happens on Mars missions, far from help. Immune with a backup computer.'
     }
   ],
 

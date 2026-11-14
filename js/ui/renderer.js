@@ -1,6 +1,6 @@
 /* File: js/ui/renderer.js
  * Owner: Person B (Saurav)
- * AI-assisted: YES — Gemini, 2026-11-14. Reviewed by a human: NO.
+ * AI-assisted: YES — Gemini, 2026-11-14; Claude, 2026-11-14. Reviewed by a human: NO.
  * Sources used: NASA_CUBESAT101, JPL_CML
  */
 import { DATA } from '../api/mockData.js';
@@ -15,7 +15,7 @@ import {
   AudioEngine
 } from '../core/state.js';
 import {
-  createSeededRng,
+  fillTemplate,
   findPartByUid,
   getPartSize,
   getNodeWorldPosition,
@@ -23,7 +23,7 @@ import {
   getOccupiedNodes,
   getConnectedPartUids,
   calculateTelemetry,
-  runMonteCarloSimulation,
+  resolveFlight,
   buildStarterSpacecraft
 } from '../core/engine.js';
 import { $, $$, toPercent, formatNumber, delay, showToast } from './domElements.js';
@@ -373,7 +373,7 @@ export function refreshBuilderView() {
     ${resourceBarsHtml}
     <p><b>Assembly checks</b></p>
     ${checksHtml}
-    <p>Predicted science <b>${telemetry.sciF.toFixed(0)}</b> / ${contract.target} pts. Transit ${formatNumber(telemetry.days)} days. Useful life ${Math.max(0, telemetry.life).toFixed(0)} months. Launch reliability <b>${toPercent(telemetry.prob)}%</b>.</p>
+    <p>Predicted science <b>${telemetry.sciF.toFixed(0)}</b> / ${contract.target} pts. Transit ${formatNumber(telemetry.days)} days. Useful life ${Math.max(0, telemetry.life).toFixed(0)} months. Launch reliability <b>${toPercent(telemetry.reliability)}%</b> (multiplies your final score).</p>
     <div class="row">${signOffChips}</div>
     <button type="button" class="go" id="gol" data-a="rev" style="width:100%"></button>
     <button type="button" data-a="go1" style="width:100%; margin-top:8px">&larr; Back to objective</button>
@@ -393,31 +393,41 @@ export function refreshBuilderView() {
 
 /* ---- Modals: Design Review, Trade Space, Share/Load Code ---- */
 
-const renderHistogram = buckets => buckets.map((val, idx) => `
-  <div class="bar">
-    <span style="width:190px">${CONTENT.monteCarloLabels[idx]}</span>
-    <i style="width:${val * 3}px"></i>
-    <b>${val}%</b>
-  </div>
-`).join('');
+/** Predicted flight: the same deterministic result the launch will play out. No dice. */
+const renderPredictedFlight = telemetry => {
+  const flight = resolveFlight(telemetry);
+  const text = CONTENT.predictedFlight;
+  const contract = telemetry.C;
+  const isFatal = flight.steps.some(step => step.fatal);
+
+  const eventItems = isFatal
+    ? `<li>${flight.reasons[0]}</li>`
+    : flight.events.length
+      ? flight.events.map(event => `<li>${CONTENT.eventText[event.id].n}: ${event.immune ? text.eventImmune : fillTemplate(text.eventHit, { lossPct: 1 - event.scienceFactor })}</li>`).join('')
+      : `<li>${text.noEvents}</li>`;
+
+  return `
+    <h3>${text.heading}</h3>
+    <p><small>${text.note}</small></p>
+    <p><b>${CONTENT.outcomeLabels[flight.outcome]}</b>: science ${flight.science.toFixed(0)} (threshold ${contract.thr}, baseline ${contract.target}), launch reliability ${toPercent(flight.reliability)}%, ${flight.stars}&#9733;, ${flight.score} pts.</p>
+    <ul>${eventItems}</ul>
+  `;
+};
 
 export function showReviewModal() {
   const telemetry = appState.mission.d;
-  const simulationResults = runMonteCarloSimulation(telemetry, 100, appState.mission.seed);
   const rev = telemetry.rev;
   const colors = ['r', 'y', 'g'];
 
   $('#rev').innerHTML = `
     <div class="box modal-box">
-      <h2>Design review (Seed: ${appState.mission.seed})</h2>
+      <h2>Design review</h2>
       <p>${appState.mission.hard ? 'NASA CML 4 policy: 35% reserve.' : 'Rookie policy: 10% reserve.'} A concept passes readiness review when at least ${toPercent(DATA.reviewThreshold.v)}% of items are green (${DATA.reviewThreshold.src}).</p>
       <p><b class="${rev.pass ? 'g' : 'r'}">${rev.pass ? '✓ REVIEW PASSED' : '✗ NOT READY'}</b> — ${rev.g} green, ${rev.y} amber, ${rev.r} red of ${rev.n} items (${toPercent(rev.pct)}%)</p>
       <div class="row">
         ${telemetry.revItems.map(([label, code]) => `<span class="chip ${code === 2 ? 'ok' : ''}"><span class="${colors[code]}">&#9679;</span> ${label}</span>`).join('')}
       </div>
-      <h3>Deterministic 100-flight Monte Carlo</h3>
-      <p><small>Same design + seed (${appState.mission.seed}) produces identical flight statistics.</small></p>
-      ${renderHistogram(simulationResults)}
+      ${renderPredictedFlight(telemetry)}
       <div class="row" style="margin-top:14px">
         <button type="button" class="go" id="rgo" style="margin:0">Launch now</button>
         <button type="button" id="rback">Back to design</button>
@@ -431,10 +441,10 @@ function evaluateCandidate(serializedJson) {
   const currentSnapshot = appState.mission;
   appState.mission = { ...currentSnapshot, ...JSON.parse(serializedJson), stage: 2 };
   const d = calculateTelemetry();
-  const b = runMonteCarloSimulation(d, 100, appState.mission.seed);
+  const flight = resolveFlight(d);
   appState.mission = currentSnapshot;
   calculateTelemetry();
-  return { d, b };
+  return { d, flight };
 }
 
 export function showCompareModal() {
@@ -450,8 +460,8 @@ export function showCompareModal() {
     ['Cost', x => `$${x.d.cost}M of $${x.d.C.cap}M`],
     ['Predicted science', x => `${x.d.sciF.toFixed(0)} pts (threshold ${x.d.C.thr}, baseline ${x.d.C.target})`],
     ['Design review', x => `${toPercent(x.d.rev.pct)}% green: ${x.d.rev.pass ? 'pass' : 'not ready'}`],
-    ['Launch reliability', x => `${toPercent(x.d.prob)}%`],
-    ['100 flights', x => `${x.b[3]}% baseline, ${x.b[2]}% threshold, ${x.b[1]}% weak, ${x.b[0]}% lost`]
+    ['Launch reliability', x => `${toPercent(x.d.reliability)}% (multiplies score)`],
+    ['Predicted flight', x => `${CONTENT.outcomeLabels[x.flight.outcome]}: ${x.flight.stars}\u2605, ${x.flight.score} pts`]
   ];
 
   $('#rev').innerHTML = `
@@ -523,16 +533,21 @@ function renderFlightSpacecraft() {
   return hullHtml + plumeHtml;
 }
 
-const promptDecision = (optionA, optionB) => new Promise(resolve => {
-  $('#ch').innerHTML = `<button type="button" id="ca">${optionA}</button><button type="button" id="cb">${optionB}</button>`;
-  $('#ca').onclick = () => { $('#ch').innerHTML = ''; resolve('a'); };
-  $('#cb').onclick = () => { $('#ch').innerHTML = ''; resolve('b'); };
-});
+/** Turns one engine flight step into a log line. The engine decides; this only describes. */
+function describeFlightStep(step) {
+  if (step.key === 'event') {
+    const text = CONTENT.eventText[step.values.eventId];
+    return `<b>Event: ${text.n}.</b> ${text.txt} ${step.ok ? text.immT : text.hitT}`;
+  }
+  return fillTemplate(CONTENT.flightLog[step.key], step.values);
+}
+
+const getFlightStepClass = step => (!step.ok ? 'bad' : ['ascent', 'arrival', 'event'].includes(step.key) ? 'ok' : '');
 
 export async function startLaunchSequence() {
   const mission = appState.mission;
   const telemetry = mission.d;
-  const rng = createSeededRng(mission.seed);
+  const flight = resolveFlight(telemetry);
   mission.res = null;
 
   navigateToStage(3);
@@ -542,9 +557,8 @@ export async function startLaunchSequence() {
     <div class="fl3">
       <div id="flv"><div class="flc" id="fl">${renderFlightSpacecraft()}</div></div>
       <div class="box" aria-live="polite">
-        <h2>3. Launch and operate (Seed: ${mission.seed})</h2>
+        <h2>3. Launch and operate</h2>
         <div id="log"></div>
-        <div id="ch"></div>
         <button type="button" class="go" id="fnext" hidden data-a="deb">See debrief &rarr;</button>
       </div>
     </div>
@@ -560,124 +574,49 @@ export async function startLaunchSequence() {
     await delay(900);
   };
 
-  const abortMission = async (headline, reason) => {
-    craftEl.classList.add('boom');
-    AudioEngine.fail();
-    await logMessage(headline, 'bad');
-    concludeMission('lost', [reason], 0);
-  };
-
   void craftEl.offsetWidth;
   craftEl.classList.add('fly');
   AudioEngine.launch();
 
-  await logMessage(`<b>Lift-off.</b> ${telemetry.L.n} carries ${formatNumber(telemetry.m0)} kg. Reliability ${toPercent(telemetry.prob)}%.`);
-
-  if (telemetry.off > 40) {
-    return abortMission(
-      `Thrust and mass are ${telemetry.off.toFixed(0)} px out of line. The rocket tumbles off the pad.`,
-      'Center of mass was offset from the engine thrust line by more than 40 px. Mirror heavy parts symmetrically left and right.'
-    );
-  }
-
-  const ascentRoll = rng();
-  if (ascentRoll > telemetry.prob) {
-    return abortMission(
-      `Seeded roll ${ascentRoll.toFixed(2)} exceeded ${telemetry.prob.toFixed(2)} reliability. Launch vehicle anomaly.`,
-      'Thin resource margins or a lower-reliability launcher increased launch risk. Improve amber margins or upgrade the launcher.'
-    );
-  }
-  await logMessage(`Roll ${ascentRoll.toFixed(2)} within ${telemetry.prob.toFixed(2)}. Orbit insertion nominal.`, 'ok');
-
-  await logMessage(`<b>Transfer burn.</b> Need ${formatNumber(telemetry.g('Delta-v').use)} m/s, spacecraft has ${formatNumber(telemetry.dv)} m/s.`);
-  if (telemetry.g('Delta-v').mg < 0) {
-    return abortMission(
-      `Propellant depleted ${formatNumber(telemetry.g('Delta-v').use - telemetry.dv)} m/s short of target orbit.`,
-      'Insufficient delta-v. Add a propellant tank, switch to a higher-Isp engine, or reduce dry mass.'
-    );
-  }
-  if (telemetry.E.pw && telemetry.g('Ion power').mg < 0) {
-    return abortMission(
-      'Ion thruster power below 1500 W threshold; orbit transfer incomplete.',
-      'Add solar wings to supply at least 1500 W for electric propulsion.'
-    );
-  }
-
-  craftEl.style.transition = 'none';
-  craftEl.classList.remove('fly');
-  void craftEl.offsetWidth;
-  craftEl.style.transition = '';
-  craftEl.classList.add('orbit');
-
-  await logMessage(`<b>Arrived</b> after ${formatNumber(telemetry.days)} days. Entering ${telemetry.O.n.toLowerCase()}.`, 'ok');
-
-  let scienceMultiplier = 1;
-  const event = DATA.events[Math.floor(rng() * DATA.events.length)];
-  const eventCopy = CONTENT.eventText[event.id];
-  const isImmune = event.imm === 'hard' ? telemetry.B.hard : event.imm === 'rec' ? telemetry.rec > 0 : telemetry.B.red;
-
-  await logMessage(`<b>Event: ${eventCopy.n}.</b> ${eventCopy.txt}`);
-  if (isImmune) {
-    await logMessage(eventCopy.immT, 'ok');
-  } else {
-    const choice = await promptDecision(eventCopy.a, eventCopy.b);
-    if (choice === 'a') {
-      scienceMultiplier = event.fa;
-      await logMessage('Safe mode engaged: science reduced.');
-    } else {
-      const gambleRoll = rng();
-      if (gambleRoll < event.pb) {
-        scienceMultiplier = 1 - event.lb;
-        await logMessage(`Roll ${gambleRoll.toFixed(2)} failed recovery. Science degraded.`, 'bad');
-      } else {
-        await logMessage(`Roll ${gambleRoll.toFixed(2)} succeeded. Full science preserved.`, 'ok');
-      }
+  for (const step of flight.steps) {
+    if (step.key === 'arrival') {
+      craftEl.style.transition = 'none';
+      craftEl.classList.remove('fly');
+      void craftEl.offsetWidth;
+      craftEl.style.transition = '';
+      craftEl.classList.add('orbit');
     }
+    if (step.fatal) {
+      craftEl.classList.add('boom');
+      AudioEngine.fail();
+    }
+    await logMessage(describeFlightStep(step), getFlightStepClass(step));
   }
 
-  const collectedScience = telemetry.sciF * scienceMultiplier;
-  await logMessage(`<b>Operations complete.</b> ${toPercent(telemetry.ret)}% of data downlinked. Science return: <b>${collectedScience.toFixed(0)}</b> / ${telemetry.C.target} pts.`);
-
-  const debriefReasons = telemetry.rows
-    .filter(r => r.mg < appState.marginThreshold)
-    .map(r => `${r.n}: ${r.why} Fix: ${r.fix} [${r.src}]`);
-
-  if (telemetry.ret < 1 && telemetry.data) {
-    debriefReasons.push(`Data downlink: only ${toPercent(telemetry.ret)}% reached Earth. Upgrade antenna or add data storage.`);
-  }
-
-  const outcome = collectedScience >= telemetry.C.target ? 'success' : collectedScience > 0 ? 'partial' : 'lost';
-  concludeMission(outcome, debriefReasons, collectedScience);
+  concludeMission(flight);
 }
 
-function concludeMission(outcome, reasons, scienceScore) {
+/** Stores the engine's result, plays the end sound and unlocks the debrief. */
+function concludeMission(flight) {
   const mission = appState.mission;
-  const telemetry = mission.d;
-  const contract = telemetry.C;
-  const weights = DATA.scoringWeights;
+  const contract = mission.d.C;
 
-  let stars = outcome === 'lost' ? 0 : 1;
-  if (scienceScore >= contract.target) stars = 2;
-  if (stars === 2 && telemetry.signed && telemetry.cost <= contract.cap * weights.threeStarBudgetFraction) stars = 3;
+  if (flight.outcome === 'success') AudioEngine.win();
+  else if (flight.outcome === 'partial') AudioEngine.partial();
 
-  const totalScore = outcome === 'lost'
-    ? 0
-    : Math.round(
-        (scienceScore * weights.scienceMultiplier +
-          (contract.cap - telemetry.cost) * weights.budgetSavingsMultiplier +
-          stars * weights.starBonus) *
-          (telemetry.signed ? weights.fullSignOffMultiplier : 1)
-      );
-
-  if (outcome === 'success') AudioEngine.win();
-  else if (outcome === 'partial') AudioEngine.partial();
-
-  appState.highScores[contract.id] = Math.max(appState.highScores[contract.id] || 0, totalScore);
+  appState.highScores[contract.id] = Math.max(appState.highScores[contract.id] || 0, flight.score);
   try {
     localStorage.tm = JSON.stringify(appState.highScores);
   } catch {}
 
-  mission.res = { out: outcome, why: reasons, sci: scienceScore || 0, st: stars, score: totalScore };
+  mission.res = {
+    out: flight.outcome,
+    why: flight.reasons,
+    sci: flight.science,
+    st: flight.stars,
+    score: flight.score,
+    rel: flight.reliability
+  };
   appState.isFlying = false;
 
   $('#fnext').hidden = false;
@@ -758,10 +697,10 @@ export function renderDebriefStage() {
     <div class="box">
       ${renderCustomEmblemSvg(out, st)}
       <h2>4. Post-Mission Report — ${'★'.repeat(st) + '☆'.repeat(3 - st)} (${score} pts)</h2>
-      <p><b>Outcome:</b> ${out === 'success' ? 'Mission accomplished.' : out === 'partial' ? 'Partial success.' : 'Mission lost.'}</p>
+      <p><b>Outcome:</b> ${CONTENT.outcomeLabels[out]}.</p>
       <p><b>Why it went this way &amp; what to change next</b></p>
       <ul>${(why.length ? why : ['All six resource budgets maintained healthy engineering margins.']).map(reason => `<li>${reason}</li>`).join('')}</ul>
-      <p><b>Star criteria:</b> 2&#9733; requires ${contract.target} science pts (achieved ${sci.toFixed(0)}). 3&#9733; also requires all four role sign-offs (${missingSignOffs}) and total cost under $${Math.round(contract.cap * 0.85)}M (spent $${telemetry.cost}M).</p>
+      <p><b>Star criteria:</b> 2&#9733; requires ${contract.target} science pts (achieved ${sci.toFixed(0)}). 3&#9733; also requires all four role sign-offs (${missingSignOffs}) and total cost under $${Math.round(contract.cap * DATA.scoringWeights.threeStarBudgetFraction)}M (spent $${telemetry.cost}M).</p>
       ${resourceMarginsTable}
       ${traceabilityTable}
       ${heritageList}
