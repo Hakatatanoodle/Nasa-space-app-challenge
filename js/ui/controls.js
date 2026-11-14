@@ -133,9 +133,20 @@ export function bindGlobalControls() {
     e.preventDefault();
   });
 
+  // Top-left APOGEE logo returns to the opening landing screen
+  $('#brand-home')?.addEventListener('click', e => {
+    e.preventDefault();
+    if (appState.isFlying) return;
+    closeOpenModals();
+    AudioEngine.click();
+    $('#title').hidden = false;
+    AudioEngine.setMusic('landing');
+  });
+
+  // Secret God Mode trigger: 5 quick clicks on the landing screen APOGEE title or typing "apogee"
   let logoClicks = 0;
   let logoClickTimer = null;
-  const registerLogoTap = () => {
+  $('#tt')?.addEventListener('click', () => {
     logoClicks++;
     clearTimeout(logoClickTimer);
     logoClickTimer = setTimeout(() => { logoClicks = 0; }, 2200);
@@ -143,12 +154,6 @@ export function bindGlobalControls() {
       logoClicks = 0;
       activateSecretGodMode();
     }
-  };
-
-  $('#tt')?.addEventListener('click', registerLogoTap);
-  $('#brand-home')?.addEventListener('click', e => {
-    e.preventDefault();
-    registerLogoTap();
   });
 
   let keyBuffer = '';
@@ -393,7 +398,6 @@ export function bindGlobalControls() {
   });
 
   document.addEventListener('click', e => {
-    // Sticky top-right X button or clicking dark backdrop closes any open modal
     if (e.target.closest('[data-close-modal]') || e.target.id === 'rev' || e.target.id === 'help') {
       AudioEngine.click();
       closeOpenModals();

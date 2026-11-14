@@ -6,8 +6,8 @@
 import { API_CONFIG } from '../config.js';
 import { DATA } from './mockData.js';
 
-const CACHE_KEY = 'apogeeNasaDonkiCache';
-const CACHE_TTL_MS = 30 * 60 * 1000; // 30 minutes to protect DEMO_KEY rate limits (30 req/hr)
+const CACHE_KEY = 'apogeeNasaDonkiCache_v2';
+const CACHE_TTL_MS = 30 * 60 * 1000;
 
 function formatIsoDate(dateObj) {
   return dateObj.toISOString().slice(0, 10);
@@ -33,17 +33,17 @@ function writeCachedWeather(spaceWeather) {
 
 /**
  * Fetches live space weather (Solar Flares & Coronal Mass Ejections) from NASA's
- * public DONKI API with local caching, strict timeout, and offline fallback.
+ * public DONKI API over a 30-day window with caching, timeout, and offline fallback.
  */
 export async function fetchMissionReferenceData() {
   const defaultSpaceWeather = {
     isLive: false,
-    flareClass: 'M1.4 (Baseline Sample)',
-    flareCount: 2,
-    cmeCount: 1,
+    flareClass: 'M1.4 (Baseline)',
+    flareCount: 3,
+    cmeCount: 2,
     stormLevel: 'Moderate',
     radiationMultiplier: 1.0,
-    summary: 'Nominal solar wind & moderate flare activity (offline reference profile).',
+    summary: 'Solar wind & flare baseline (offline fallback — check internet connection for live NASA DONKI telemetry).',
     src: 'SIMPLIFIED_FOR_GAMEPLAY'
   };
 
@@ -61,7 +61,7 @@ export async function fetchMissionReferenceData() {
 
   try {
     const end = new Date();
-    const start = new Date(end.getTime() - 14 * 24 * 60 * 60 * 1000);
+    const start = new Date(end.getTime() - 30 * 24 * 60 * 60 * 1000);
     const rangeQuery = `&startDate=${formatIsoDate(start)}&endDate=${formatIsoDate(end)}`;
 
     const [flrRes, cmeRes] = await Promise.all([
@@ -77,8 +77,8 @@ export async function fetchMissionReferenceData() {
     const flareList = Array.isArray(flares) ? flares : [];
     const cmeList = Array.isArray(cmes) ? cmes : [];
 
-    let peakClass = 'B5.0';
-    let peakRank = 1;
+    let peakClass = 'C1.0';
+    let peakRank = 2;
     flareList.forEach(f => {
       const cls = String(f.classType || '').toUpperCase();
       const rank = cls.startsWith('X') ? 4 : cls.startsWith('M') ? 3 : cls.startsWith('C') ? 2 : 1;
@@ -88,8 +88,8 @@ export async function fetchMissionReferenceData() {
       }
     });
 
-    const stormLevel = peakRank >= 4 ? 'Severe (X-Class)' : peakRank === 3 ? 'Elevated (M-Class)' : 'Quiet';
-    const radiationMultiplier = peakRank >= 4 ? 1.15 : peakRank === 3 ? 1.05 : 0.95;
+    const stormLevel = peakRank >= 4 ? `Severe (${peakClass})` : peakRank === 3 ? `Elevated (${peakClass})` : `Nominal (${peakClass})`;
+    const radiationMultiplier = peakRank >= 4 ? 1.15 : peakRank === 3 ? 1.05 : 0.96;
 
     const spaceWeather = {
       isLive: true,
@@ -98,8 +98,8 @@ export async function fetchMissionReferenceData() {
       cmeCount: cmeList.length,
       stormLevel,
       radiationMultiplier,
-      summary: `NASA DONKI (14-day window): ${flareList.length} solar flares (peak ${peakClass}) & ${cmeList.length} CMEs detected.`,
-      src: 'NASA DONKI Space Weather API (api.nasa.gov/DONKI)'
+      summary: `Live NASA DONKI (30-day telemetry): ${flareList.length} solar flares (peak ${peakClass}) & ${cmeList.length} CMEs tracked.`,
+      src: 'NASA DONKI Space Weather API'
     };
 
     writeCachedWeather(spaceWeather);
