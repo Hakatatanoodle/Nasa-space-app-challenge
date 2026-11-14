@@ -27,7 +27,14 @@ export const CONTENT = {
   contractBriefs: {
     earth: "Watch Earth's climate: clouds, heat and ice.",
     moon: 'Map lunar minerals and hunt for buried ice.',
-    mars: 'Map Mars and find where water hides.'
+    mars: 'Map Mars and find where water hides.',
+    mercury: 'Orbit the closest planet to the Sun. A furnace by day, a freezer by night.',
+    venus: 'Peer through the clouds of Earth’s hellish twin.',
+    jupiter: 'Orbit the giant. Sunlight is 27 times weaker and the radiation is brutal.',
+    saturn: 'Orbit the ringed giant. Distant, dim and slow to reach.',
+    uranus: 'Orbit the tipped-over ice giant. Almost no sunlight, a faint whisper of signal.',
+    neptune: 'Orbit the most distant planet. Sunlight is 900 times weaker than at home.',
+    sun: 'Fly to the Sun. (Spoiler: physics says no.)'
   },
   orbitDescriptions: {
     'Low polar orbit': 'Sharp views, short shadows, limited ground-station contact windows.',
@@ -36,7 +43,19 @@ export const CONTENT = {
     'Elliptical orbit': 'Balanced surface resolution and ground-station contact.',
     'Halo-type orbit': 'Low station-keeping cost and high contact, distant view.',
     'Low orbit': 'Sharp resolution, costly insertion, weak solar flux at Mars.',
-    'High orbit': 'Lower insertion delta-v, distant observation geometry.'
+    'High orbit': 'Lower insertion delta-v, distant observation geometry.',
+    'Elliptical orbit (12 h)': 'A MESSENGER-style compromise: brief hot passes, long cool ones.',
+    'Polar elliptical orbit (Juno-like)': 'Sharp view, brutal radiation near the planet.',
+    'Wide orbit among the moons': 'Visit Europa and Io, but live in the radiation belts.',
+    'Distant capture orbit': 'Cheapest. Safer, far from the worst radiation.',
+    'Ring-grazing polar orbit': 'Sharp view of the rings.',
+    'Titan-tour orbit': 'Use Titan’s gravity to reshape your path.',
+    'Distant orbit': 'Cheapest. Distant view.',
+    'Polar orbit': 'Sharp view. Needs a big push and lots of reserves.',
+    'Moon-tour orbit': 'Visit Titania, Oberon and Miranda.',
+    'Triton-tour orbit': 'Study the captured moon with its geysers.',
+    'Straight plunge': 'Cancel Earth’s sideways speed and fall in.',
+    'Close flyby, Parker-style': 'Skim the corona and swing back out.'
   },
   partDescriptions: {
     chem: 'Strong and quick, thirsty for fuel.',
@@ -44,7 +63,8 @@ export const CONTENT = {
     ion: 'Sips fuel, takes months, requires 1500 W of solar power.',
     bus_std: 'Low mass and cost; susceptible to radiation aging.',
     bus_rad: 'Radiation-shielded avionics for harsher orbits.',
-    bus_red: 'Shielded electronics plus redundant flight computer.'
+    bus_red: 'Shielded electronics plus redundant flight computer.',
+    rtg: 'Heat-powered. Works in the dark, far from the Sun.'
   },
   eventText: {
     solar_flare: {
@@ -77,6 +97,10 @@ export const CONTENT = {
     deltav_short: 'Propellant depleted {shortMs} m/s short of target orbit.',
     ion_short: 'Ion thruster power below {needW} W threshold; orbit transfer incomplete.',
     arrival: '<b>Arrived</b> after {days} days. Entering {orbit}.',
+    feasibility:
+      '<b>Feasibility check for {name}:</b> <span class="{cls}">{label}</span>. {notes}. Your craft has {haveMs} m/s of delta-v for {needMs} m/s needed, {haveW} W of power for {needW} W needed, and a trip of {days} days.',
+    sun_dive: '{text}',
+    sun_boom: '{text}',
     operations: '<b>Operations complete.</b> {returnedPct}% of data downlinked. Science return: <b>{science}</b> / {target} pts.'
   },
   flightFailures: {
@@ -114,7 +138,18 @@ export const CONTENT = {
     ARTEMIS: 'Two probes in stretched lunar orbits studying magnetic fields and solar wind.',
     'Mars Reconnaissance Orbiter': 'Low Mars orbiter with high-resolution camera, spectrometer, and subsurface radar.',
     'Mars Odyssey': 'Thermal imager and spectrometer mission that mapped near-surface water ice.',
-    MAVEN: 'Elliptical Mars orbiter studying upper-atmosphere loss with a magnetometer.'
+    MAVEN: 'Elliptical Mars orbiter studying upper-atmosphere loss with a magnetometer.',
+    MESSENGER: 'First orbiter at Mercury (2011 to 2015), in a 12-hour elliptical orbit with a sunshade.',
+    BepiColombo: 'European-Japanese pair of orbiters sent to Mercury after many gravity-assist flybys.',
+    Magellan: 'Radar orbiter that mapped nearly all of Venus through its clouds.',
+    'Venus Express': 'European orbiter studying the atmosphere and clouds of Venus.',
+    Akatsuki: 'Japanese climate orbiter watching Venus’s winds.',
+    Galileo: 'First Jupiter orbiter, and it sent a probe into the atmosphere.',
+    Juno: 'Solar-powered polar orbiter measuring Jupiter’s gravity, magnetic field and deep atmosphere.',
+    Cassini: 'Orbited Saturn for 13 years and toured Titan and Enceladus. Powered by radioisotope generators.',
+    'Voyager 2': 'The only spacecraft to visit Uranus (flyby 1986) and Neptune (flyby 1989).',
+    'Parker Solar Probe': 'Flies through the corona behind a carbon-composite heat shield.',
+    SOHO: 'Watches the Sun from a safe point 1.5 million km sunward of Earth.'
   },
   lessons: {
     Mass: {
@@ -154,6 +189,37 @@ export const CONTENT = {
       fix: 'Add solar wings until total generation meets 1500 W.'
     }
   },
+  /* Destination briefings: UNVERIFIED_MEMORY (recalled public values, not checked against a source). */
+  planetInfo: {
+    earth: { name: 'Earth', grav: '9.81', gx: 1, env: 'Liquid-water oceans cover about 71% of the surface. Active plate tectonics and a global magnetic field that shields everything from the solar wind.', temp: 'Average 15 °C (roughly -90 to 57 °C)', atm: '78% nitrogen, 21% oxygen, 1 bar of pressure', day: '24 h day, 365.25 day year', moons: '1 moon', uniq: 'The only world known to host life, and the yardstick for every other planet.' },
+    moon: { name: 'the Moon', grav: '1.62', gx: 0.165, env: 'Dusty regolith, craters and dark lava plains. Water ice hides in permanently shadowed polar craters. No global magnetic field, and it has moonquakes.', temp: '+127 °C in sunlight, -173 °C at night, below -230 °C in polar craters', atm: 'Practically none (a trace exosphere)', day: 'Turns once per orbit: one day-night cycle lasts 29.5 Earth days, and the same face always looks at Earth', moons: 'It is Earth’s moon', uniq: 'Gravity so low you could jump about six times higher. It raises Earth’s tides.' },
+    mars: { name: 'Mars', grav: '3.71', gx: 0.38, env: 'Cold desert of iron-oxide dust (why it looks red). Olympus Mons is about 22 km tall, Valles Marineris runs about 4,000 km, and ancient river valleys prove liquid water once flowed. Global dust storms. Only patchy remnant magnetism.', temp: 'Average -63 °C: about -125 °C at the poles in winter, up to 20 °C on summer days at the equator', atm: '95% carbon dioxide, but only 0.6% of Earth’s pressure: liquid water would boil or freeze', day: '24 h 37 min day, 687 Earth-day year', moons: '2 small moons, Phobos and Deimos', uniq: 'It once had lakes and rivers and may have hosted life. Polar caps of water ice and CO2 ice.' },
+    mercury: { name: 'Mercury', grav: '3.70', gx: 0.38, env: 'A scorched, cratered rock with a huge iron core (about 85% of its radius). Water ice hides in permanently shadowed polar craters.', temp: '+430 °C by day, -180 °C by night: the biggest swing of any planet', atm: 'Almost none, only a faint exosphere of atoms blasted off the surface', day: 'One sunrise to the next takes 176 Earth days; a year is only 88 days', moons: 'No moons, no rings', uniq: 'Smallest planet and fastest orbit. Its magnetic field is only about 1% as strong as Earth’s.' },
+    venus: { name: 'Venus', grav: '8.87', gx: 0.9, env: 'Volcanic plains under permanent cloud. No liquid water and no global magnetic field. Landers have survived only minutes to about two hours.', temp: '465 °C everywhere, day and night: hot enough to melt lead', atm: '96% carbon dioxide with clouds of sulfuric acid. Surface pressure is about 92 times Earth’s, like 900 m under the ocean', day: 'A day (243 Earth days) is longer than its year (225 days), and it spins backward', moons: 'No moons, no rings', uniq: 'Hottest planet, even though Mercury is closer. A runaway greenhouse effect.' },
+    jupiter: { name: 'Jupiter', grav: '24.79', gx: 2.53, env: 'A gas giant with no solid surface: hydrogen and helium getting denser until it becomes liquid metallic hydrogen. Storms bigger than Earth, and the Great Red Spot has been watched for centuries.', temp: '-110 °C at the cloud tops, thousands of degrees deeper down', atm: 'About 90% hydrogen, 10% helium, with ammonia clouds', day: '9 h 56 min day (fastest spinner); a year lasts 11.9 Earth years', moons: 'About 95 known moons, including Io (most volcanic world), Europa (ocean under the ice), Ganymede and Callisto, plus faint rings', uniq: 'More than twice the mass of all other planets combined. The strongest magnetic field of any planet traps radiation belts that fry electronics.', gnote: 'measured at the cloud tops; there is nothing to stand on' },
+    saturn: { name: 'Saturn', grav: '10.44', gx: 1.07, env: 'A gas giant with no solid surface, wrapped in rings of mostly water-ice chunks from dust grains to house-sized boulders. Winds reach about 1,800 km/h.', temp: '-140 °C at the cloud tops', atm: 'About 96% hydrogen and 3% helium', day: '10 h 33 min day; a year lasts 29.4 Earth years', moons: 'More than 140 known moons: Titan has a thick nitrogen atmosphere and methane lakes, Enceladus sprays water from an underground ocean', uniq: 'Less dense than water: it would float in a big enough bathtub. A hexagon-shaped storm sits at its north pole.', gnote: 'measured at the cloud tops; there is nothing to stand on' },
+    uranus: { name: 'Uranus', grav: '8.69', gx: 0.89, env: 'An ice giant: a deep slush of water, methane and ammonia ices around a small rocky core. Methane in the atmosphere absorbs red light, giving the blue-green color.', temp: '-195 °C typical; the coldest planetary atmosphere ever measured is about -224 °C', atm: 'About 83% hydrogen, 15% helium, 2% methane', day: '17 h day; a year lasts 84 Earth years', moons: 'About 28 moons and 13 faint rings', uniq: 'Tipped on its side (98 degrees), so each pole gets 42 years of sunlight and then 42 years of darkness. Its magnetic field is tilted about 59 degrees from its spin axis.', gnote: 'measured at the cloud tops; there is nothing to stand on' },
+    neptune: { name: 'Neptune', grav: '11.15', gx: 1.14, env: 'An ice giant with the fastest winds in the Solar System, over 2,000 km/h, and dark storm spots that come and go.', temp: '-200 °C', atm: 'About 80% hydrogen, 19% helium, 1% methane (blue)', day: '16 h day; a year lasts 165 Earth years', moons: '16 known moons and faint rings. Triton orbits backward, a captured Kuiper Belt world with nitrogen geysers', uniq: 'Found with mathematics in 1846 before anyone saw it. Sunlight is about 1/900 of Earth’s.', gnote: 'measured at the cloud tops; there is nothing to stand on' },
+    sun: { name: 'the Sun', grav: '274', gx: 27.9, env: 'A ball of glowing plasma with no surface to land on. It holds 99.86% of the Solar System’s mass and fuses hydrogen into helium in its core.', temp: '5,500 °C at the visible surface, 1 to 3 million °C in the corona, about 15 million °C in the core', atm: 'The corona, a thin plasma that streams out as the solar wind', day: 'Spins once in about 25 days at the equator, slower at the poles', moons: 'Eight planets orbit it', uniq: 'Sunlight delivers 1,361 W per square meter at Earth. Flares and coronal mass ejections can disable electronics.', gnote: 'if you could stand on it' }
+  },
+  /* The Sun mission always ends in the same way (contract.doom). Each line is [html, colour class]. */
+  sunDive: {
+    lines: [
+      ['<b>Transfer burn.</b> To fall toward the Sun you must cancel Earth’s 29.8 km/s sideways orbital speed. That takes about 24 km/s from low Earth orbit. Leaving the Solar System needs only about 9. You burn everything you have.', ''],
+      ['<b>0.39 AU</b> (Mercury’s orbit): sunlight is 6.5 times stronger than at Earth. The solar wings overheat and the radiators cannot keep up.', 'bad'],
+      ['<b>0.10 AU:</b> sunlight is 100 times stronger (about 136 kW per square meter). Surfaces reach roughly 1,000 °C. Aluminium melts at 660 °C, so antennas warp and the signal dies.', 'bad'],
+      ['<b>About 6 million km above the surface:</b> this is the closest NASA’s Parker Solar Probe has flown, and it needs a 11.5 cm carbon-composite shield and many Venus flybys to get there. Your craft has no such shield. The corona around you is over a million degrees.', 'bad'],
+      ['<b>1.5 million km:</b> sunlight is thousands of times stronger than at Earth. Metals melt and begin to boil, tanks vent, electronics are cooked by radiation.', 'bad']
+    ],
+    boom: '<b>BOOM.</b> The propellant tanks rupture and your spacecraft is torn apart and vaporized, long before it reaches the Sun. <b>You can’t enter the Sun.</b> It has no surface, only plasma, and nothing we can build survives its heat.',
+    why: [
+      'Energy: falling into the Sun needs about 24 km/s of delta-v from low Earth orbit, because Earth moves sideways at 29.8 km/s and you must cancel it. Escaping the Solar System needs only about 9 km/s, so the Sun is harder to hit than to leave.',
+      'Heat: sunlight intensity grows with the inverse square of distance. At the Sun’s surface it is about 46,000 times Earth’s, and the corona is a million degrees. No material we have survives that for long.',
+      'No surface: the Sun is a ball of plasma. There is nothing to land on or orbit at a low altitude.',
+      'Radiation: flares and coronal mass ejections fry electronics, even for hardened designs.',
+      'What real missions do: Parker Solar Probe uses a carbon-composite shield and many Venus flybys to brake, and still only skims the corona.'
+    ]
+  },
   helpHtml: `
     <h2 id="help-title">How to play</h2>
     <p><b>Four stages:</b> 1. Objective (mission, orbit, launcher) &rarr; 2. Build (assemble spacecraft) &rarr; 3. Launch (simulation) &rarr; 4. Debrief (engineering report).</p>
@@ -161,6 +227,7 @@ export const CONTENT = {
     <p><b>Center of mass &amp; thrust:</b> Keep the yellow Center of Mass aligned with the dashed green engine thrust line so the rocket does not tumble.</p>
     <p><b>Six resources:</b> Mass, Power, Budget, Data, Comms, and Time. Green = healthy reserve, Amber = thin reserve (lowers launch reliability and your final score), Red = critical failure.</p>
     <p><b>Design review &amp; trade space:</b> Before launch, a Concept Maturity checklist verifies readiness (80% green required to pass) and shows your predicted flight. No dice: the same design always flies the same way. Save up to 3 candidates to compare trade-offs.</p>
+    <p><b>Career mode:</b> Earth, the Moon and Mars start open. Safe arrivals unlock Venus, then the outer planets, Mercury and finally the Sun (a trap). Far from the Sun, solar wings give almost nothing: use radioisotope generators. Press the Career button to see levels and achievements; progress is saved in your browser.</p>
     <p><b>Stars:</b> 1&#9733; survive mission, 2&#9733; meet baseline science, 3&#9733; earn all four role sign-offs and spend under 85% of budget.</p>
     <button type="button" id="x">Start designing</button>
   `

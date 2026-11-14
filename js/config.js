@@ -19,6 +19,7 @@ export const PART_DIMENSIONS = {
   sol_s: [90, 45],
   sol_l: [150, 41],
   bat: [36, 28],
+  rtg: [40, 34],
   rec: [36, 29],
   ant_lg: [38, 32],
   ant_mg: [50, 35],

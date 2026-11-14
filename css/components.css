@@ -191,3 +191,46 @@
   font-family: monospace;
   font-size: 0.875rem;
 }
+/* Career mode: locked destinations, feasibility badges, destination briefings */
+.card.lkd {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+.card.lkd img {
+  filter: grayscale(1) brightness(0.6);
+}
+
+.lk {
+  display: block;
+  margin-top: 4px;
+  color: var(--accent);
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.fb {
+  display: inline-block;
+  margin: 4px 6px 0 0;
+  padding: 1px 8px;
+  font-size: 11px;
+  font-weight: 700;
+  border: 1px solid currentColor;
+  border-radius: 10px;
+}
+
+.card small.fn {
+  display: block;
+  margin-top: 3px;
+}
+
+.pin {
+  display: block;
+  margin-top: 4px;
+  padding: 8px 10px;
+  font-size: 14px;
+  line-height: 1.55;
+  background: #0b203899;
+  border-left: 3px solid var(--accent);
+  border-radius: 6px;
+}

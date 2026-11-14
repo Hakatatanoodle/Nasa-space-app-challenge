@@ -2,6 +2,8 @@
  * Owner: Person A (Ashmin - structure), Person C (Yochan - values)
  * AI-assisted: YES — Gemini, 2026-11-14; Claude, 2026-11-14. Reviewed by a human: NO.
  * Sources used: NASA_CUBESAT101, JPL_CML, NASA_SE_WEBINAR
+ * Career destinations (Mercury to Neptune, the Sun) and the radioisotope generator were ported from the
+ * Apogee-temp-asmin feature branch; their values keep the same SIMPLIFIED_FOR_GAMEPLAY / UNVERIFIED_MEMORY tags.
  */
 
 /**
@@ -119,6 +121,7 @@ export const DATA = {
     sol_s: { g: 'pow', n: 'Small solar wing', m: 60, gen: 500, c: 4, max: 3, src: 'SIMPLIFIED_FOR_GAMEPLAY', verified: false },
     sol_l: { g: 'pow', n: 'Large solar wing', m: 140, gen: 1100, c: 9, max: 3, src: 'SIMPLIFIED_FOR_GAMEPLAY', verified: false },
     bat: { g: 'pow', n: 'Battery', m: 45, wh: 600, c: 3, max: 4, src: 'SIMPLIFIED_FOR_GAMEPLAY', verified: false },
+    rtg: { g: 'pow', n: 'Radioisotope generator', m: 56, gen: 300, rtg: 1, c: 40, max: 3, src: 'SIMPLIFIED_FOR_GAMEPLAY', verified: false, note: 'Heat-powered. Output does not depend on sunlight, so it works far from the Sun.' },
     ant_lg: { g: 'com', n: 'Low-gain antenna', m: 8, pw: 20, mb: 5, c: 2, max: 1, src: 'SIMPLIFIED_FOR_GAMEPLAY', verified: false },
     ant_mg: { g: 'com', n: 'Medium-gain antenna', m: 20, pw: 60, mb: 25, c: 5, max: 1, src: 'SIMPLIFIED_FOR_GAMEPLAY', verified: false },
     ant_hg: { g: 'com', n: 'High-gain dish', m: 45, pw: 120, mb: 100, c: 12, max: 1, src: 'SIMPLIFIED_FOR_GAMEPLAY', verified: false },
@@ -274,8 +277,124 @@ const OBJECTIVES_BY_MISSION = {
     { n: 'Surface geology maps', ins: ['i_cam', 'i_therm'] },
     { n: 'Subsurface water', ins: ['i_radar', 'i_spec'] },
     { n: 'Magnetic field remnants', ins: ['i_mag'] }
+  ],
+  mercury: [
+    { n: 'Surface composition', ins: ['i_spec', 'i_cam'] },
+    { n: 'Ice in shadowed polar craters', ins: ['i_radar', 'i_therm'] },
+    { n: 'Magnetic field', ins: ['i_mag'] }
+  ],
+  venus: [
+    { n: 'Cloud and atmosphere chemistry', ins: ['i_spec', 'i_cam'] },
+    { n: 'Surface mapped through the clouds', ins: ['i_radar'] },
+    { n: 'Heat and volcanism', ins: ['i_therm'] }
+  ],
+  jupiter: [
+    { n: 'Cloud and storm imaging', ins: ['i_cam', 'i_spec'] },
+    { n: 'Atmospheric heat', ins: ['i_therm'] },
+    { n: 'Giant magnetic field', ins: ['i_mag'] }
+  ],
+  saturn: [
+    { n: 'Rings and moons imaging', ins: ['i_cam', 'i_spec'] },
+    { n: 'Atmospheric heat', ins: ['i_therm'] },
+    { n: 'Magnetic field', ins: ['i_mag'] }
+  ],
+  uranus: [
+    { n: 'Atmosphere and cloud imaging', ins: ['i_cam', 'i_spec'] },
+    { n: 'Heat balance', ins: ['i_therm'] },
+    { n: 'Odd magnetic field', ins: ['i_mag'] }
+  ],
+  neptune: [
+    { n: 'Storm imaging', ins: ['i_cam', 'i_spec'] },
+    { n: 'Heat balance', ins: ['i_therm'] },
+    { n: 'Magnetic field', ins: ['i_mag'] }
+  ],
+  sun: [
+    { n: 'Corona sampling', ins: ['i_spec', 'i_mag'] },
+    { n: 'Solar surface imaging', ins: ['i_cam'] }
   ]
 };
+
+/* ---- Career-mode destinations (ported from the Apogee-temp-asmin feature branch, v3.2) ----
+ * Appended AFTER the three original contracts, so contract indices 0-2 (Earth, Moon, Mars), saved
+ * candidates and shared design codes keep working. `ord` is the solar-system display order.
+ * `life` is the design life in months for that destination (falls back to constants.designLifeMonths).
+ * Far planets need more than the default life because the trip alone takes years. */
+const GAMEPLAY = { src: 'SIMPLIFIED_FOR_GAMEPLAY', verified: false };
+const recalled = note => ({ src: 'UNVERIFIED_MEMORY', verified: false, note });
+
+const makeOrbit = (n, dv, ecl, per, contact, res, rad) => ({ n, dv, ecl, per, contact, res, rad, ...GAMEPLAY });
+const makeDestination = (id, ord, n, target, cap, life, orbits, extra = {}) => ({
+  id, months: 24, n, dest: id, target, cap, ord, life, orbits, ...GAMEPLAY, ...extra
+});
+
+const CONTRACT_ORDER = { earth: 3, moon: 3.5, mars: 4 };
+DATA.contracts.forEach(contract => { contract.ord = CONTRACT_ORDER[contract.id]; });
+
+DATA.contracts.push(
+  makeDestination('mercury', 1, 'Hot Rock', 70, 1200, 60, [
+    makeOrbit('Low polar orbit', 13.4, 0.3, 2.3, 0.4, 1.0, 2),
+    makeOrbit('Elliptical orbit (12 h)', 12.6, 0.1, 12, 0.6, 0.6, 2),
+    makeOrbit('High orbit', 11.8, 0.03, 24, 0.8, 0.3, 2)
+  ]),
+  makeDestination('venus', 2, 'Veiled Sister', 75, 850, 48, [
+    makeOrbit('Low polar orbit', 6.4, 0.35, 2.2, 0.5, 1.0, 1),
+    makeOrbit('Elliptical orbit', 5.3, 0.1, 24, 0.6, 0.6, 1),
+    makeOrbit('High orbit', 4.9, 0.05, 48, 0.8, 0.3, 1)
+  ]),
+  makeDestination('jupiter', 5, 'King’s Gamble', 30, 1000, 96, [
+    makeOrbit('Polar elliptical orbit (Juno-like)', 7.6, 0.03, 100, 0.5, 1.0, 2),
+    makeOrbit('Wide orbit among the moons', 7.2, 0.02, 150, 0.6, 0.6, 2),
+    makeOrbit('Distant capture orbit', 6.9, 0.01, 200, 0.8, 0.3, 1)
+  ]),
+  makeDestination('saturn', 6, 'Ring Lord', 34, 1000, 168, [
+    makeOrbit('Ring-grazing polar orbit', 8.6, 0.02, 100, 0.5, 1.0, 1),
+    makeOrbit('Titan-tour orbit', 8.2, 0.02, 150, 0.6, 0.6, 1),
+    makeOrbit('Distant orbit', 7.9, 0.01, 200, 0.8, 0.3, 1)
+  ]),
+  makeDestination('uranus', 7, 'Sideways World', 22, 1100, 276, [
+    makeOrbit('Polar orbit', 9.9, 0.02, 100, 0.5, 1.0, 1),
+    makeOrbit('Moon-tour orbit', 9.5, 0.02, 150, 0.6, 0.6, 1),
+    makeOrbit('Distant orbit', 9.1, 0.01, 200, 0.8, 0.3, 1)
+  ]),
+  makeDestination('neptune', 8, 'Edge of the Map', 22, 1200, 336, [
+    makeOrbit('Polar orbit', 10.6, 0.02, 100, 0.5, 1.0, 1),
+    makeOrbit('Triton-tour orbit', 10.3, 0.02, 150, 0.6, 0.6, 1),
+    makeOrbit('Distant orbit', 10.0, 0.01, 200, 0.8, 0.3, 1)
+  ]),
+  // The Sun cannot be completed: doom = true makes resolveFlight play the dive sequence (see content.js sunDive).
+  makeDestination('sun', 10, 'Solar Dive', 50, 1000, 48, [
+    makeOrbit('Straight plunge', 24, 0, 1, 1.0, 1.0, 2),
+    makeOrbit('Close flyby, Parker-style', 18, 0, 3, 1.0, 1.0, 2)
+  ], { doom: true })
+);
+
+/* Per-destination environment tables for the new targets. Same shape as the original three entries. */
+const addFactors = (table, values, extra) => {
+  Object.entries(values).forEach(([dest, value]) => {
+    table[dest] = { value, ...extra(dest) };
+  });
+};
+addFactors(DATA.solarFluxFactor, { mercury: 3, venus: 1.9, jupiter: 0.037, saturn: 0.011, uranus: 0.0027, neptune: 0.0011, sun: 1 },
+  () => recalled('Approximate sunlight relative to Earth at that distance (inverse-square).'));
+addFactors(DATA.commsDistanceFactor, { mercury: 0.12, venus: 0.1, jupiter: 0.035, saturn: 0.015, uranus: 0.008, neptune: 0.005, sun: 0.5 },
+  () => ({ ...GAMEPLAY, note: 'Simplified data-rate penalty from distance (real physics is roughly 1 / distance squared).' }));
+addFactors(DATA.transitDaysBase, { mercury: 110, venus: 150, jupiter: 1000, saturn: 2000, uranus: 3600, neptune: 4400, sun: 90 },
+  () => ({ unit: 'days', ...GAMEPLAY, note: 'Simplified one-way trip time with a chemical engine.' }));
+
+DATA.realMissions.push(
+  { dest: 'mercury', n: 'MESSENGER', yr: 2004, ins: ['i_cam', 'i_spec', 'i_mag'], oi: 1, verified: false, src: 'UNVERIFIED_MEMORY' },
+  { dest: 'mercury', n: 'BepiColombo', yr: 2018, ins: ['i_cam', 'i_spec', 'i_mag'], oi: 1, verified: false, src: 'UNVERIFIED_MEMORY' },
+  { dest: 'venus', n: 'Magellan', yr: 1989, ins: ['i_radar'], oi: 0, verified: false, src: 'UNVERIFIED_MEMORY' },
+  { dest: 'venus', n: 'Venus Express', yr: 2005, ins: ['i_spec', 'i_cam', 'i_mag'], oi: 1, verified: false, src: 'UNVERIFIED_MEMORY' },
+  { dest: 'venus', n: 'Akatsuki', yr: 2010, ins: ['i_cam', 'i_therm'], oi: 1, verified: false, src: 'UNVERIFIED_MEMORY' },
+  { dest: 'jupiter', n: 'Galileo', yr: 1989, ins: ['i_cam', 'i_spec', 'i_mag'], oi: 1, verified: false, src: 'UNVERIFIED_MEMORY' },
+  { dest: 'jupiter', n: 'Juno', yr: 2011, ins: ['i_mag', 'i_spec'], oi: 0, verified: false, src: 'UNVERIFIED_MEMORY' },
+  { dest: 'saturn', n: 'Cassini', yr: 1997, ins: ['i_cam', 'i_spec', 'i_radar', 'i_mag', 'i_therm'], oi: 1, verified: false, src: 'UNVERIFIED_MEMORY' },
+  { dest: 'uranus', n: 'Voyager 2', yr: 1977, ins: ['i_cam', 'i_mag'], oi: 2, verified: false, src: 'UNVERIFIED_MEMORY' },
+  { dest: 'neptune', n: 'Voyager 2', yr: 1977, ins: ['i_cam', 'i_mag'], oi: 2, verified: false, src: 'UNVERIFIED_MEMORY' },
+  { dest: 'sun', n: 'Parker Solar Probe', yr: 2018, ins: ['i_mag', 'i_spec'], oi: 1, verified: false, src: 'UNVERIFIED_MEMORY' },
+  { dest: 'sun', n: 'SOHO', yr: 1995, ins: ['i_cam', 'i_spec'], oi: 1, verified: false, src: 'UNVERIFIED_MEMORY' }
+);
 
 DATA.contracts.forEach(contract => {
   contract.thr = Math.round(contract.target * 0.6);

@@ -33,7 +33,9 @@ Nasa-space-app-challenge/
 │   │
 │   ├── core/                   # Application state & simulation engine
 │   │   ├── state.js            # Centralized shared state
-│   │   └── engine.js           # Core logic, math, and render/update loop
+│   │   ├── engine.js           # Core logic, math, and render/update loop
+│   │   ├── planets.js          # Destination feasibility ratings and planet briefings
+│   │   └── career.js           # Career mode: unlock chain, achievements, saved progress
 │   │
 │   └── ui/                     # DOM interaction & rendering
 │       ├── domElements.js      # Cached DOM element selectors
@@ -43,3 +45,13 @@ Nasa-space-app-challenge/
 └── data/                       # Static local datasets (JSON, GeoJSON, CSV)
     └── sample-dataset.json
 ~~~
+
+
+## Career mode and all planets
+
+Earth, the Moon and Mars start open. Safe arrivals unlock Venus, Jupiter, Saturn, Uranus, Neptune, Mercury and finally the Sun, which can never be reached (the launch plays out why). Progress and achievements are saved in the browser (`localStorage.apogeeCareer`).
+
+- New destinations are appended after the original three contracts in `js/api/mockData.js`, so contract indices, saved candidates and share codes keep working. Values are tagged `SIMPLIFIED_FOR_GAMEPLAY` or `UNVERIFIED_MEMORY`, not official NASA data.
+- Far from the Sun, solar wings give almost nothing: the radioisotope generator (`rtg`) makes power regardless of sunlight.
+- Each destination can set its own design life (`contract.life`); the original three still use the 36-month default.
+- Planet briefing text and the Sun dive text live in `js/content.js`.
