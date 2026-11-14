@@ -355,3 +355,13 @@ b.bad { color: var(--bad); }
     height: 380px;
   }
 }
+/* Sun mission: the dive sequence heats the whole launch view */
+#flv.sunhit {
+  background: radial-gradient(circle at 50% -10%, #fff3b0, #ffb347 25%, #ff5a1f 55%, #3a0d05) !important;
+  transition: background 3s;
+}
+
+.flc.burn {
+  filter: sepia(1) saturate(8) brightness(1.5);
+  transition: filter 1.5s;
+}

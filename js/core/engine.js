@@ -5,6 +5,7 @@
  */
 import { DATA } from '../api/mockData.js';
 import { CONTENT } from '../content.js';
+import { getFeasibility } from './planets.js';
 import { PART_DIMENSIONS, ATTACHMENT_NODES, MAX_PARTS, DEFAULT_SEED } from '../config.js';
 import {
   appState,
@@ -317,6 +318,7 @@ export function calculateTelemetry(missionInput = appState.mission) {
     dry: busSpec.m + engineParts.length * engineSpec.m,
     load: busSpec.pw,
     gen: 0,
+    rg: 0, // radioisotope generator power: does not depend on sunlight
     wh: 0,
     mb: 0,
     gb: DATA.constants.baseStorageGb.value,
@@ -353,7 +355,8 @@ export function calculateTelemetry(missionInput = appState.mission) {
       telemetry.dry += spec.m;
       telemetry.cost += spec.c;
       telemetry.load += spec.pw || 0;
-      telemetry.gen += spec.gen || 0;
+      if (spec.rtg) telemetry.rg += spec.gen || 0;
+      else telemetry.gen += spec.gen || 0;
       telemetry.wh += spec.wh || 0;
       telemetry.mb = Math.max(telemetry.mb, spec.mb || 0);
 
@@ -383,14 +386,16 @@ export function calculateTelemetry(missionInput = appState.mission) {
 
   telemetry.m0 = telemetry.dry + propellantMass;
   telemetry.dv = engineSpec.isp * DATA.constants.g0.value * Math.log(telemetry.m0 / telemetry.dry);
-  telemetry.sun = telemetry.gen * DATA.solarFluxFactor[contract.dest].value * (1 - orbit.ecl);
+  telemetry.sun = telemetry.gen * DATA.solarFluxFactor[contract.dest].value * (1 - orbit.ecl) + telemetry.rg;
   telemetry.ecH = orbit.ecl * orbit.per;
   telemetry.down = telemetry.mb * DATA.commsDistanceFactor[contract.dest].value * orbit.contact * 86.4;
   telemetry.days = Math.max(
     DATA.transitDaysBase[contract.dest].value * engineSpec.tf,
     engineSpec.dvDay ? (orbit.dv * 1000) / engineSpec.dvDay : 0
   );
-  telemetry.life = DATA.constants.designLifeMonths.value * (orbit.rad && !busSpec.hard ? 0.6 : 1) - telemetry.days / 30;
+  // Far destinations carry their own design life (the trip alone can take years). Harsh radiation (rad 2) wears even hardened buses.
+  telemetry.baseLife = contract.life || DATA.constants.designLifeMonths.value;
+  telemetry.life = telemetry.baseLife * (orbit.rad && !busSpec.hard ? 0.6 : orbit.rad > 1 ? 0.7 : 1) - telemetry.days / 30;
 
   // Section 6.2 margin convention: margin = (capacity - predictedUse) / predictedUse
   const buildCheckRow = (name, category, used, capacity, unit, src, verified) => {
@@ -430,7 +435,7 @@ export function calculateTelemetry(missionInput = appState.mission) {
 
   if (engineSpec.pw) {
     telemetry.rows.push(
-      buildCheckRow('Ion power', 'power', engineSpec.pw, telemetry.gen, 'W', engineSpec.src, engineSpec.verified)
+      buildCheckRow('Ion power', 'power', engineSpec.pw, telemetry.gen + telemetry.rg, 'W', engineSpec.src, engineSpec.verified)
     );
   }
 
@@ -477,7 +482,7 @@ export function calculateTelemetry(missionInput = appState.mission) {
     telemetry.sci *
     orbit.res *
     dataReturnRatio *
-    (Math.max(0, telemetry.life) / DATA.constants.designLifeMonths.value) *
+    (Math.max(0, telemetry.life) / telemetry.baseLife) *
     (getRow('Power').mg < 0 ? 0.5 : 1) *
     (getRow('Battery').mg < 0 ? 0.6 : 1);
 
@@ -644,6 +649,35 @@ export function resolveFlight(telemetry) {
   }
   steps.push({ key: 'ascent', ok: true, values: { reliabilityPct: telemetry.reliability } });
 
+  const feasibility = getFeasibility(contract);
+  steps.push({
+    key: 'feasibility',
+    ok: true,
+    values: {
+      name: contract.n,
+      cls: feasibility.cls,
+      label: feasibility.lab,
+      notes: feasibility.notes.join('; '),
+      haveMs: telemetry.dv,
+      needMs: deltaV.use,
+      haveW: telemetry.sun,
+      needW: telemetry.load,
+      days: telemetry.days
+    }
+  });
+
+  if (contract.doom) {
+    // The Sun cannot be reached by any design, so this branch never depends on the numbers above.
+    CONTENT.sunDive.lines.forEach(([text, cls]) => {
+      steps.push({ key: 'sun_dive', ok: cls !== 'bad', values: { text } });
+    });
+    steps.push({ key: 'sun_boom', ok: false, fatal: true, values: { text: CONTENT.sunDive.boom } });
+    const sunReasons = CONTENT.sunDive.why.map((line, index) =>
+      index === 0 ? `${line} Your craft had ${Math.round(telemetry.dv).toLocaleString()} m/s.` : line
+    );
+    return finish('lost', 0, [], sunReasons);
+  }
+
   steps.push({ key: 'transfer', ok: deltaV.mg >= 0, values: { needMs: deltaV.use, haveMs: telemetry.dv } });
   if (deltaV.mg < 0) {
     return lose('deltav_short', { shortMs: deltaV.use - telemetry.dv }, 'deltav');
@@ -653,6 +687,7 @@ export function resolveFlight(telemetry) {
   }
 
   steps.push({ key: 'arrival', ok: true, values: { days: telemetry.days, orbit: telemetry.O.n.toLowerCase() } });
+  steps.push({ key: 'briefing', ok: true, values: { contractId: contract.id } });
 
   const events = getTriggeredEvents(telemetry);
   events.forEach(event => {

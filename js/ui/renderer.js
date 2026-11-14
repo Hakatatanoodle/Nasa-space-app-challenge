@@ -26,6 +26,22 @@ import {
   resolveFlight,
   buildStarterSpacecraft
 } from '../core/engine.js';
+import { getFeasibility, buildPlanetBriefing } from '../core/planets.js';
+import {
+  ACHIEVEMENTS,
+  GATES,
+  getCareer,
+  isContractOpen,
+  getContractSortKey,
+  getLockInfo,
+  getPlanetName,
+  getCareerLevel,
+  getCareerRank,
+  getCareerButtonLabel,
+  getNextGate,
+  describeGateNeed,
+  recordMission
+} from '../core/career.js';
 import { $, $$, toPercent, formatNumber, delay, showToast } from './domElements.js';
 
 const renderDataBadge = isVerified =>
@@ -57,6 +73,11 @@ export function navigateToStage(stageNumber) {
 
   $('#pass').hidden = !appState.isTeamMode;
   $('#pass').textContent = `Role: ${appState.activeRole} — pass keyboard`;
+  updateCareerButton();
+}
+
+export function updateCareerButton() {
+  $('#car').textContent = getCareerButtonLabel();
 }
 
 /* ---- Stage 1: Objective Selection ---- */
@@ -68,16 +89,27 @@ export function renderObjectiveStage() {
   const mission = appState.mission;
   const contract = DATA.contracts[mission.ci];
 
-  const contractCards = DATA.contracts.map((c, index) => `
-    <div class="card ${index === mission.ci ? 'sel' : ''}" role="button" tabindex="0" data-a="ci" data-v="${index}">
+  // Career mode: unlocked planets sit in solar-system order, locked ones wait at the end (still listed, not selectable).
+  const contractCards = DATA.contracts
+    .map((c, index) => [c, index])
+    .sort((a, b) => getContractSortKey(a[0]) - getContractSortKey(b[0]))
+    .map(([c, index]) => {
+      const open = isContractOpen(c.id);
+      const feasibility = getFeasibility(c);
+      const lock = open ? null : getLockInfo(c);
+      return `
+    <div class="card ${index === mission.ci ? 'sel' : ''} ${open ? '' : 'lkd'}" role="button" ${open ? `tabindex="0" data-a="ci" data-v="${index}"` : 'aria-disabled="true"'}>
       <img src="assets/dest_${c.dest}.svg" alt="${c.n}">
       <div>
         <b>${c.n}</b> ${renderDataBadge(c.verified)}
         <p>${CONTENT.contractBriefs[c.id]}</p>
         <small>Baseline science ${c.target} (threshold ${c.thr}) · budget $${c.cap}M · ${c.months} months${appState.highScores[c.id] ? ' · best ' + appState.highScores[c.id] : ''}</small>
+        <span class="fb ${feasibility.cls}">${feasibility.lab}</span><small class="fn">${feasibility.notes.join(' · ')}</small>
+        ${lock ? `<span class="lk">LOCKED - Level ${lock.level}: ${lock.need}</span>` : ''}
       </div>
     </div>
-  `).join('');
+  `;
+    }).join('');
 
   const orbitCards = contract.orbits.map((o, index) => `
     <div class="card o ${index === mission.oi ? 'sel' : ''}" role="button" tabindex="0" data-a="oi" data-v="${index}">
@@ -539,6 +571,7 @@ function describeFlightStep(step) {
     const text = CONTENT.eventText[step.values.eventId];
     return `<b>Event: ${text.n}.</b> ${text.txt} ${step.ok ? text.immT : text.hitT}`;
   }
+  if (step.key === 'briefing') return buildPlanetBriefing(step.values.contractId, true);
   return fillTemplate(CONTENT.flightLog[step.key], step.values);
 }
 
@@ -586,6 +619,11 @@ export async function startLaunchSequence() {
       craftEl.style.transition = '';
       craftEl.classList.add('orbit');
     }
+    if (step.key === 'sun_dive') $('#flv').classList.add('sunhit');
+    if (step.key === 'sun_boom') {
+      craftEl.classList.add('burn');
+      await delay(1500);
+    }
     if (step.fatal) {
       craftEl.classList.add('boom');
       AudioEngine.fail();
@@ -609,15 +647,31 @@ function concludeMission(flight) {
     localStorage.tm = JSON.stringify(appState.highScores);
   } catch {}
 
+  const connectedUids = getConnectedPartUids();
+  const news = recordMission({
+    out: flight.outcome,
+    C: contract,
+    d: mission.d,
+    st: flight.stars,
+    rtg: mission.parts.some(p => p.id === 'rtg' && connectedUids.has(p.u)),
+    sci: flight.science,
+    hard: mission.hard
+  });
+
   mission.res = {
     out: flight.outcome,
     why: flight.reasons,
     sci: flight.science,
     st: flight.stars,
     score: flight.score,
-    rel: flight.reliability
+    rel: flight.reliability,
+    news
   };
   appState.isFlying = false;
+
+  const levelUp = news.find(item => item.k === 'lv');
+  if (levelUp) showToast(`Level up! Level ${levelUp.lv}: ${levelUp.title}. ${levelUp.planet} unlocked.`);
+  updateCareerButton();
 
   $('#fnext').hidden = false;
   $('#fnext').onclick = () => navigateToStage(4);
@@ -644,7 +698,7 @@ export function renderDebriefStage() {
   const mission = appState.mission;
   const telemetry = mission.d;
   const contract = telemetry.C;
-  const { out, why, sci, st, score } = mission.res;
+  const { out, why, sci, st, score, news } = mission.res;
 
   const installedIds = new Set(
     mission.parts.filter(p => getConnectedPartUids().has(p.u)).map(p => p.id)
@@ -698,16 +752,67 @@ export function renderDebriefStage() {
       ${renderCustomEmblemSvg(out, st)}
       <h2>4. Post-Mission Report — ${'★'.repeat(st) + '☆'.repeat(3 - st)} (${score} pts)</h2>
       <p><b>Outcome:</b> ${CONTENT.outcomeLabels[out]}.</p>
+      ${renderCareerNews(news)}
       <p><b>Why it went this way &amp; what to change next</b></p>
       <ul>${(why.length ? why : ['All six resource budgets maintained healthy engineering margins.']).map(reason => `<li>${reason}</li>`).join('')}</ul>
       <p><b>Star criteria:</b> 2&#9733; requires ${contract.target} science pts (achieved ${sci.toFixed(0)}). 3&#9733; also requires all four role sign-offs (${missingSignOffs}) and total cost under $${Math.round(contract.cap * DATA.scoringWeights.threeStarBudgetFraction)}M (spent $${telemetry.cost}M).</p>
       ${resourceMarginsTable}
       ${traceabilityTable}
       ${heritageList}
+      <p><b>Destination briefing: ${contract.n}</b></p>
+      ${buildPlanetBriefing(contract.id, true)}
       <div class="row" style="margin-top:12px;">
         <button type="button" data-a="go2">Edit and re-simulate</button>
         <button type="button" data-a="go1">New mission</button>
       </div>
     </div>
   `;
+}
+
+/* ---- Career mode: debrief news and the Career window ---- */
+
+function renderCareerNews(news = []) {
+  const career = getCareer();
+  const next = getNextGate();
+  const items = news.map(item => item.k === 'lv'
+    ? `<b class="g">LEVEL UP! Level ${item.lv}: ${item.title}</b><br>Unlocked: ${item.planet}. The destination list is back in solar-system order.<br>`
+    : `<b class="y">Achievement:</b> ${item.n} - ${item.t}<br>`
+  ).join('');
+
+  const nextLine = next
+    ? `Next unlock: ${getPlanetName(next.id)} (Level ${next.lv}): ${describeGateNeed(next)}.`
+    : 'Every destination is unlocked.';
+
+  const tip = career.streak >= 2
+    ? `<br><b class="y">Mission Control tip:</b> ${career.streak} losses in a row. Press Starter ship in the Build screen (it reaches Earth and the Moon safely; Mars and beyond need extra tanks and a bigger launcher), keep the Rookie 10% margin, and fix every red meter before you launch. Each red meter explains how to fix it.`
+    : '';
+
+  return `<div class="pin">${items}<b>Career:</b> Level ${getCareerLevel()} - ${getCareerRank()}. ${nextLine}${tip}</div>`;
+}
+
+export function showCareerModal() {
+  const career = getCareer();
+  const achievementCount = Object.keys(career.ach).length;
+
+  $('#rev').innerHTML = `
+    <div class="box modal-box" style="width: min(900px, 96vw);">
+      <h2>Career: Level ${getCareerLevel()} - ${getCareerRank()}</h2>
+      <p>Safe arrivals: ${career.tot} - Missions lost: ${career.lost}. A safe arrival is any mission that is not lost. Levels go up in steps of 2. A good arrival is a safe arrival that also collects at least the threshold science.</p>
+      <table class="rt">
+        <tr><th>Level</th><th>Title</th><th>Unlocks</th><th>Requirement</th><th></th></tr>
+        <tr><td>0</td><td>Launch Pad Rookie</td><td>Earth, Moon, Mars</td><td>Start here</td><td class="g">Unlocked</td></tr>
+        ${GATES.map(gate => {
+          const unlocked = career.un.includes(gate.id);
+          return `<tr><td>${gate.lv}</td><td>${gate.title}</td><td>${getPlanetName(gate.id)}</td><td>${describeGateNeed(gate)}</td><td class="${unlocked ? 'g' : 'y'}">${unlocked ? 'Unlocked' : 'Locked'}</td></tr>`;
+        }).join('')}
+      </table>
+      <h3>Achievements (${achievementCount}/${ACHIEVEMENTS.length})</h3>
+      ${ACHIEVEMENTS.map(a => `<div class="chk ${career.ach[a.id] ? 'ok' : ''}">${career.ach[a.id] ? '&#9733;' : '&#9734;'} <b>${a.n}</b> - ${a.t}</div>`).join('')}
+      <div class="row" style="margin-top:12px;">
+        <button type="button" id="rback">Close</button>
+        <button type="button" id="creset">Reset career</button>
+      </div>
+    </div>
+  `;
+  $('#rev').hidden = false;
 }

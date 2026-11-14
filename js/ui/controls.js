@@ -4,6 +4,7 @@
  * Sources used: none
  */
 import { DATA } from '../api/mockData.js';
+import { isContractOpen, resetCareer } from '../core/career.js';
 import { ROLES, ATTACHMENT_NODES, MAX_PARTS, SNAP_RADIUS_PX } from '../config.js';
 import {
   appState,
@@ -34,6 +35,7 @@ import {
   showReviewModal,
   showCompareModal,
   showDesignCodeModal,
+  showCareerModal,
   startLaunchSequence
 } from './renderer.js';
 
@@ -375,7 +377,12 @@ export function bindGlobalControls() {
       const { st, a, v } = actionEl.dataset;
 
       if (st) return navigateToStage(+st);
-      if (a === 'ci') { appState.mission.ci = +v; appState.mission.oi = 0; return renderObjectiveStage(); }
+      if (a === 'ci') {
+        if (!isContractOpen(DATA.contracts[+v].id)) return showToast('That destination is locked. Check Career for the requirement.');
+        appState.mission.ci = +v;
+        appState.mission.oi = 0;
+        return renderObjectiveStage();
+      }
       if (a === 'oi') { appState.mission.oi = +v; return renderObjectiveStage(); }
       if (a === 'L') { appState.mission.L = v; return renderObjectiveStage(); }
       if (a === 'hd') { appState.mission.hard = +v; return renderObjectiveStage(); }
@@ -397,6 +404,13 @@ export function bindGlobalControls() {
     }
     if (e.target.id === 'rback') {
       $('#rev').hidden = true;
+    }
+
+    if (e.target.id === 'car') showCareerModal();
+
+    if (e.target.id === 'creset' && confirm('Erase all unlocked planets and achievements?')) {
+      resetCareer();
+      location.reload();
     }
 
     const loadCandidateBtn = e.target.closest('[data-c]');
@@ -458,6 +472,9 @@ export function bindGlobalControls() {
       try {
         const raw = $('#design-code-input').value.trim();
         const decoded = JSON.parse(atob(raw));
+        if (DATA.contracts[decoded.ci] && !isContractOpen(DATA.contracts[decoded.ci].id)) {
+          return showToast('That design flies to a destination that is still locked in Career mode.');
+        }
         const isValid =
           DATA.contracts[decoded.ci] &&
           DATA.launchers[decoded.L] &&
