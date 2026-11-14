@@ -1,6 +1,6 @@
 /* File: js/core/engine.js
  * Owner: Person A (Ashmin)
- * AI-assisted: YES — Gemini, 2026-11-14. Reviewed by a human: NO.
+ * AI-assisted: YES — Gemini, 2026-11-14; Claude, 2026-11-14. Reviewed by a human: NO.
  * Sources used: NASA_CUBESAT101, JPL_CML
  */
 import { DATA } from '../api/mockData.js';
@@ -16,6 +16,8 @@ import {
 
 /**
  * Deterministic Mulberry32 PRNG (Rule 8: Same inputs + same seed = same output).
+ * COSMETIC USE ONLY (e.g. jitter in the launch visuals). It must never decide win or loss:
+ * flight outcomes are fully decided by resolveFlight() from the design's numbers.
  */
 export function createSeededRng(seed = DEFAULT_SEED) {
   let state = seed >>> 0;
@@ -435,6 +437,7 @@ export function calculateTelemetry(missionInput = appState.mission) {
   const getRow = name => telemetry.rows.find(r => r.n === name);
   telemetry.g = getRow;
 
+  const flightModel = DATA.flightModel;
   const floatingCount = missionInput.parts.length - connectedParts.length;
   const isEngineValid = busPart && engineParts.length === 1 && engineParts[0].rot === 0 && engineParts[0].y > busPart.y;
 
@@ -459,8 +462,8 @@ export function calculateTelemetry(missionInput = appState.mission) {
     },
     {
       t: 'Balanced: thrust line through the center of mass',
-      st: telemetry.off <= 14 ? 2 : telemetry.off <= 40 ? 1 : 0,
-      why: `Center of mass is ${telemetry.off.toFixed(0)} px off the thrust line (tumbles above 40 px).`,
+      st: telemetry.off <= flightModel.balanceGoodPx ? 2 : telemetry.off <= flightModel.balanceLimitPx ? 1 : 0,
+      why: `Center of mass is ${telemetry.off.toFixed(0)} px off the thrust line (tumbles above ${flightModel.balanceLimitPx} px).`,
       fix: 'Mirror heavy parts symmetrically left and right of the centerline.'
     }
   ];
@@ -511,51 +514,181 @@ export function calculateTelemetry(missionInput = appState.mission) {
     pass: countStatus(2) / itemCount >= DATA.reviewThreshold.v
   };
 
-  let riskPenalty = Math.min(0.3, (telemetry.off / 40) * 0.2);
-  telemetry.rows.forEach(r => {
-    if (r.mg >= 0 && r.mg < threshold) {
-      riskPenalty += (threshold - r.mg) * 0.8;
-    }
-  });
+  // Launch reliability: a visible number that scales the final score. It is never rolled against.
+  const marginPenalty = telemetry.rows.reduce(
+    (sum, r) => (r.mg >= 0 && r.mg < threshold ? sum + (threshold - r.mg) * flightModel.amberPenaltyFactor : sum),
+    0
+  );
+  const balancePenalty = Math.min(
+    flightModel.balancePenaltyAtLimit,
+    (telemetry.off / flightModel.balanceLimitPx) * flightModel.balancePenaltyAtLimit
+  );
+  const signOffBonus = telemetry.signed ? flightModel.signOffBonus : 0;
+  const reviewPenalty = telemetry.rev.pass ? 0 : flightModel.reviewFailPenalty;
+  const baseReliability = launcher.rel * busSpec.rel;
+  const adjustment = -marginPenalty - balancePenalty + signOffBonus - reviewPenalty;
 
-  telemetry.prob = Math.max(
-    0.05,
-    Math.min(0.99, launcher.rel * busSpec.rel - riskPenalty + (telemetry.signed ? 0.03 : 0) + (telemetry.rev.pass ? 0 : -0.08))
+  telemetry.reliabilityParts = { launcher: launcher.rel, bus: busSpec.rel, adjustment };
+  telemetry.reliability = Math.max(
+    flightModel.reliabilityMin,
+    Math.min(flightModel.reliabilityMax, baseReliability + adjustment)
   );
   telemetry.bad = telemetry.checks.slice(0, 3).find(c => c.st === 0);
 
   return telemetry;
 }
 
+/* ---- Deterministic Flight Resolution (no dice) ---- */
+
 /**
- * Deterministic Monte Carlo simulation using seeded PRNG (Rule 8).
+ * Fills {placeholders} in a CONTENT template. Numbers are rounded for display.
+ * A key ending in "Pct" is a fraction shown as a whole percent (0.94 -> 94).
  */
-export function runMonteCarloSimulation(telemetry, iterations = 100, seed = appState.mission.seed) {
-  const rng = createSeededRng(seed);
-  const outcomes = [0, 0, 0, 0];
+export function fillTemplate(template, values = {}) {
+  return template.replace(/\{(\w+)\}/g, (match, key) => {
+    const value = values[key];
+    if (typeof value !== 'number') return value === undefined ? match : String(value);
+    return key.endsWith('Pct') ? String(Math.round(value * 100)) : Math.round(value).toLocaleString();
+  });
+}
+
+function doesEventTrigger(event, telemetry) {
+  const { trigger } = event;
+  if (trigger.dest !== undefined) return telemetry.C.dest === trigger.dest;
+  const value = telemetry.O[trigger.orbitField];
+  if (trigger.gte !== undefined && value < trigger.gte) return false;
+  if (trigger.lte !== undefined && value > trigger.lte) return false;
+  return true;
+}
+
+function isEventImmune(event, telemetry) {
+  if (event.imm === 'hard') return !!telemetry.B.hard;
+  if (event.imm === 'rec') return telemetry.rec > 0;
+  return !!telemetry.B.red;
+}
+
+/**
+ * Every event this contract and orbit will cause, and whether the design is immune.
+ * Same design = same list, every time.
+ */
+export function getTriggeredEvents(telemetry) {
+  return DATA.events
+    .filter(event => doesEventTrigger(event, telemetry))
+    .map(event => ({
+      id: event.id,
+      immune: isEventImmune(event, telemetry),
+      scienceFactor: isEventImmune(event, telemetry) ? 1 : event.scienceFactor
+    }));
+}
+
+function scoreFlight(telemetry, outcome, science) {
+  const weights = DATA.scoringWeights;
   const contract = telemetry.C;
 
-  for (let i = 0; i < iterations; i++) {
-    const failedAscent =
-      telemetry.off > 40 ||
-      rng() > telemetry.prob ||
-      telemetry.g('Delta-v').mg < 0 ||
-      (telemetry.E.pw && telemetry.g('Ion power').mg < 0);
+  let stars = outcome === 'lost' ? 0 : 1;
+  if (science >= contract.target) stars = 2;
+  if (stars === 2 && telemetry.signed && telemetry.cost <= contract.cap * weights.threeStarBudgetFraction) stars = 3;
 
-    if (failedAscent) {
-      outcomes[0]++;
-      continue;
-    }
+  const score = outcome === 'lost'
+    ? 0
+    : Math.round(
+        (science * weights.scienceMultiplier +
+          (contract.cap - telemetry.cost) * weights.budgetSavingsMultiplier +
+          stars * weights.starBonus) *
+          (telemetry.signed ? weights.fullSignOffMultiplier : 1) *
+          telemetry.reliability
+      );
 
-    const event = DATA.events[Math.floor(rng() * DATA.events.length)];
-    const isImmune =
-      event.imm === 'hard' ? telemetry.B.hard : event.imm === 'rec' ? telemetry.rec > 0 : telemetry.B.red;
-    const finalScience = telemetry.sciF * (isImmune ? 1 : event.fa);
+  return { stars, score };
+}
 
-    if (finalScience >= contract.target) outcomes[3]++;
-    else if (finalScience >= contract.thr) outcomes[2]++;
-    else outcomes[1]++;
+/**
+ * Resolves a whole flight from the design's numbers. Pure and deterministic.
+ * The launch screen (text today, a visual simulation later) only PLAYS the returned
+ * `steps`; it never decides the outcome.
+ *
+ * steps: ordered [{ key, ok, fatal, values }]. `key` names a CONTENT.flightLog template,
+ * `values` holds the raw numbers for it, `fatal` means the mission ends on that step.
+ */
+export function resolveFlight(telemetry) {
+  const model = DATA.flightModel;
+  const contract = telemetry.C;
+  const steps = [];
+
+  const finish = (outcome, science, events, reasons) => ({
+    outcome,
+    science,
+    events,
+    reasons,
+    steps,
+    reliability: telemetry.reliability,
+    ...scoreFlight(telemetry, outcome, science)
+  });
+
+  const lose = (key, values, reasonKey) => {
+    steps.push({ key, ok: false, fatal: true, values });
+    const reason = CONTENT.flightFailures[reasonKey];
+    return finish('lost', 0, [], [`${reason.why} Fix: ${reason.fix}`]);
+  };
+
+  const deltaV = telemetry.g('Delta-v');
+
+  steps.push({
+    key: 'liftoff',
+    ok: true,
+    values: { launcher: telemetry.L.n, massKg: telemetry.m0, reliabilityPct: telemetry.reliability }
+  });
+
+  if (telemetry.off > model.balanceLimitPx) {
+    return lose('tumble', { offPx: telemetry.off, limitPx: model.balanceLimitPx }, 'tumble');
+  }
+  steps.push({ key: 'ascent', ok: true, values: { reliabilityPct: telemetry.reliability } });
+
+  steps.push({ key: 'transfer', ok: deltaV.mg >= 0, values: { needMs: deltaV.use, haveMs: telemetry.dv } });
+  if (deltaV.mg < 0) {
+    return lose('deltav_short', { shortMs: deltaV.use - telemetry.dv }, 'deltav');
+  }
+  if (telemetry.E.pw && telemetry.g('Ion power').mg < 0) {
+    return lose('ion_short', { needW: telemetry.E.pw }, 'ion');
   }
 
-  return outcomes;
+  steps.push({ key: 'arrival', ok: true, values: { days: telemetry.days, orbit: telemetry.O.n.toLowerCase() } });
+
+  const events = getTriggeredEvents(telemetry);
+  events.forEach(event => {
+    steps.push({ key: 'event', ok: event.immune, values: { eventId: event.id, scienceFactor: event.scienceFactor } });
+  });
+
+  const science = events.reduce((total, event) => total * event.scienceFactor, telemetry.sciF);
+  steps.push({
+    key: 'operations',
+    ok: true,
+    values: { returnedPct: telemetry.ret, science, target: contract.target }
+  });
+
+  const outcome = science >= contract.target ? 'success' : science > 0 ? 'partial' : 'lost';
+
+  // Debrief reasons: every thin row, every lost-data note, every event that hurt, and the reliability maths.
+  const reasons = telemetry.rows
+    .filter(r => r.mg < appState.marginThreshold)
+    .map(r => `${r.n}: ${r.why} Fix: ${r.fix} [${r.src}]`);
+
+  if (telemetry.ret < 1 && telemetry.data) {
+    reasons.push(fillTemplate(CONTENT.flightFailures.dataReturn, { returnedPct: telemetry.ret }));
+  }
+
+  events.filter(event => !event.immune).forEach(event => {
+    const text = CONTENT.eventText[event.id];
+    reasons.push(`${text.n}: ${text.hitT} ${fillTemplate(CONTENT.flightFailures.eventLoss, { lossPct: 1 - event.scienceFactor })} Fix: ${text.fix}`);
+  });
+
+  const reliabilityLine = fillTemplate(CONTENT.flightFailures.reliability, {
+    reliabilityPct: telemetry.reliability,
+    launcherPct: telemetry.reliabilityParts.launcher,
+    busPct: telemetry.reliabilityParts.bus,
+    adjustmentPct: telemetry.reliabilityParts.adjustment
+  });
+  reasons.push(reliabilityLine + (telemetry.reliabilityParts.adjustment < 0 ? CONTENT.flightFailures.reliabilityFix : ''));
+
+  return finish(outcome, science, events, reasons);
 }
