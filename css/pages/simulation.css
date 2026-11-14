@@ -1,11 +1,11 @@
 /* File: css/pages/simulation.css
  * Owner: Person B (Saurav)
- * AI-assisted: YES — Gemini, 2026-11-14. Reviewed by a human: NO.
+ * AI-assisted: YES — Gemini, 2026-11-15. Reviewed by a human: NO.
  * Sources used: none
  */
 #b3 {
   display: grid;
-  grid-template-columns: clamp(220px, 19vw, 270px) minmax(420px, 1fr) clamp(300px, 25vw, 380px);
+  grid-template-columns: clamp(220px, 19vw, 270px) minmax(400px, 1fr) clamp(300px, 25vw, 380px);
   gap: 14px;
   align-items: start;
 }
@@ -13,11 +13,13 @@
 #pal,
 #mt {
   padding: 12px 14px;
-  background: #12304fe6;
+  background: #102a46eb;
+  backdrop-filter: blur(8px);
   border: 1px solid var(--line);
   border-radius: 12px;
   max-height: calc(100vh - 88px);
   overflow-y: auto;
+  box-shadow: 0 8px 28px #040d1866;
 }
 
 #pal h3 {
@@ -71,14 +73,16 @@
 #cv {
   position: relative;
   width: 100%;
-  height: calc(100vh - 210px);
+  height: calc(100vh - 208px);
   min-height: 480px;
   margin: 0;
   overflow: auto;
   background:
-    radial-gradient(circle at 50% 42%, #1a436e55, #071526cc 78%);
-  border: 1.5px solid #3c78b5;
-  box-shadow: inset 0 0 36px #040d18cc, 0 4px 20px #00000055;
+    radial-gradient(circle at 50% 48%, #1d4b7a66, #08182be0 76%),
+    radial-gradient(circle at 22% 20%, #7fe3b812 0%, transparent 45%),
+    radial-gradient(circle at 78% 75%, #ffc85710 0%, transparent 48%);
+  border: 1.5px solid #4484c4;
+  box-shadow: inset 0 0 42px #040d18dd, 0 8px 28px #00000066;
   border-radius: 12px;
   touch-action: none;
   cursor: grab;
@@ -99,11 +103,27 @@
   height: 1100px;
   transform-origin: 0 0;
   background-image:
-    linear-gradient(#5da9ff18 1px, transparent 1px),
-    linear-gradient(90deg, #5da9ff18 1px, transparent 1px),
-    linear-gradient(#5da9ff0a 1px, transparent 1px),
-    linear-gradient(90deg, #5da9ff0a 1px, transparent 1px);
-  background-size: 80px 80px, 80px 80px, 20px 20px, 20px 20px;
+    radial-gradient(2px 2px at 140px 180px, #ffffff55, transparent),
+    radial-gradient(1.5px 1.5px at 780px 240px, #7fe3b866, transparent),
+    radial-gradient(2px 2px at 260px 620px, #ffc85755, transparent),
+    radial-gradient(1.5px 1.5px at 720px 760px, #ffffff44, transparent),
+    radial-gradient(1.5px 1.5px at 480px 120px, #ffffff44, transparent),
+    linear-gradient(90deg, transparent 479px, #ffc85726 479px, #ffc85726 481px, transparent 481px),
+    linear-gradient(#5da9ff1a 1px, transparent 1px),
+    linear-gradient(90deg, #5da9ff1a 1px, transparent 1px),
+    linear-gradient(#5da9ff0b 1px, transparent 1px),
+    linear-gradient(90deg, #5da9ff0b 1px, transparent 1px);
+  background-size:
+    960px 1100px,
+    960px 1100px,
+    960px 1100px,
+    960px 1100px,
+    960px 1100px,
+    960px 1100px,
+    80px 80px,
+    80px 80px,
+    20px 20px,
+    20px 20px;
 }
 
 .pt {
@@ -121,6 +141,11 @@
 
 #world .pt:hover {
   filter: drop-shadow(0 3px 6px #040d18aa) drop-shadow(0 0 8px #7fe3b8aa);
+}
+
+.pt.dragging {
+  cursor: grabbing !important;
+  filter: drop-shadow(0 8px 16px #040d18dd) drop-shadow(0 0 10px #ffc857aa);
 }
 
 .pt.sel {
@@ -193,7 +218,7 @@
   min-height: 46px;
   padding: 8px 10px;
   margin-top: 6px;
-  background: #12304fcc;
+  background: #102a46eb;
   border: 1px solid var(--line);
   border-radius: 8px;
   display: flex;
@@ -216,7 +241,7 @@
 .resource-card,
 .panel-card {
   margin-top: 8px;
-  background: #0b203899;
+  background: #0b2038a8;
   border: 1px solid var(--line);
   border-radius: 8px;
   overflow: hidden;
@@ -593,10 +618,21 @@ b.bad { color: var(--bad); }
     max-height: none;
   }
   #cv {
-    height: 460px;
+    height: 420px;
+    min-height: 360px;
   }
   #flv {
     height: 380px;
+  }
+}
+
+@media (max-width: 480px) {
+  #cv {
+    height: 360px;
+    min-height: 320px;
+  }
+  .m {
+    grid-template-columns: 102px 1fr 48px;
   }
 }
 

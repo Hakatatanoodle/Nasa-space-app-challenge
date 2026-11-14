@@ -1,6 +1,6 @@
 /* File: js/ui/renderer.js
  * Owner: Person B (Saurav)
- * AI-assisted: YES — Gemini, 2026-11-14; Claude, 2026-11-14. Reviewed by a human: NO.
+ * AI-assisted: YES — Gemini, 2026-11-15. Reviewed by a human: NO.
  * Sources used: NASA_CUBESAT101, JPL_CML
  */
 import { DATA } from '../api/mockData.js';
@@ -10,8 +10,8 @@ import {
   appState,
   getNodeCategory,
   getAssetFilename,
-  getLockClass,
   saveUndoSnapshot,
+  saveMissionProgress,
   AudioEngine
 } from '../core/state.js';
 import {
@@ -31,6 +31,7 @@ import {
   ACHIEVEMENTS,
   GATES,
   getCareer,
+  isGodMode,
   isContractOpen,
   getContractSortKey,
   getLockInfo,
@@ -54,6 +55,7 @@ const renderDataBadge = isVerified =>
 export function navigateToStage(stageNumber) {
   if (appState.isFlying) return;
   appState.mission.stage = stageNumber;
+  saveMissionProgress();
 
   const isTitleVisible = $('#title') && !$('#title').hidden;
   if (isTitleVisible) {
@@ -78,8 +80,6 @@ export function navigateToStage(stageNumber) {
   if (stageNumber === 2) renderBuilderStage();
   if (stageNumber === 4) renderDebriefStage();
 
-  $('#pass').hidden = !appState.isTeamMode;
-  $('#pass').textContent = `Role: ${appState.activeRole} — pass keyboard`;
   updateCareerButton();
 }
 
@@ -141,8 +141,8 @@ export function renderObjectiveStage() {
   }).join('');
 
   $('#s1').innerHTML = `
-    <div class="${getLockClass('plan')}">
-      <h2>1. Choose your mission objective <small style="font-size:0.85rem;font-weight:400;">(${appState.dataSourceLabel})</small></h2>
+    <div>
+      <h2>1. Choose your mission objective <small style="font-size:0.85rem;font-weight:400;">(${appState.dataSourceLabel}${isGodMode() ? ' · Director Override' : ''})</small></h2>
       <div class="row">${contractCards}</div>
       <h3>Orbit: where will it work?</h3>
       <div class="row">${orbitCards}</div>
@@ -206,18 +206,18 @@ function renderPaletteTile(partId) {
 const getPartsByGroup = group => Object.keys(DATA.parts).filter(id => DATA.parts[id].g === group);
 
 export function renderBuilderStage() {
-  const renderSection = (group, title, ids) => `
-    <div class="${getLockClass(group)}">
+  const renderSection = (title, ids) => `
+    <div>
       <h3>${title}</h3>
       ${ids.map(renderPaletteTile).join('')}
     </div>
   `;
 
   const paletteHtml =
-    renderSection('stk', 'Structure', [...getPartsByGroup('bus'), 'tank', ...Object.keys(DATA.engines)]) +
-    renderSection('pow', 'Power', getPartsByGroup('pow')) +
-    renderSection('com', 'Communications', getPartsByGroup('com')) +
-    renderSection('sci', 'Science instruments', getPartsByGroup('sci'));
+    renderSection('Structure', [...getPartsByGroup('bus'), 'tank', ...Object.keys(DATA.engines)]) +
+    renderSection('Power', getPartsByGroup('pow')) +
+    renderSection('Communications', getPartsByGroup('com')) +
+    renderSection('Science instruments', getPartsByGroup('sci'));
 
   const launcherOptions = Object.keys(DATA.launchers)
     .map(k => `<option value="${k}">${DATA.launchers[k].n}</option>`)
@@ -255,7 +255,7 @@ export function renderBuilderStage() {
 
   $('#sl').onchange = e => { appState.mission.L = e.target.value; refreshBuilderView(); };
   $('#so').onchange = e => { appState.mission.oi = +e.target.value; refreshBuilderView(); };
-  $('#mir').onchange = e => { appState.mission.mirror = e.target.checked; };
+  $('#mir').onchange = e => { appState.mission.mirror = e.target.checked; saveMissionProgress(); };
 
   $('#clr').onclick = () => {
     saveUndoSnapshot();
@@ -270,6 +270,7 @@ export function renderBuilderStage() {
     }
     const { parts, nu, L, oi, ci, hard, seed } = appState.mission;
     appState.candidates.push(JSON.stringify({ parts, nu, L, oi, ci, hard, seed }));
+    saveMissionProgress();
     showToast(`Saved as candidate ${'ABC'[appState.candidates.length - 1]}`);
   };
 
@@ -278,45 +279,25 @@ export function renderBuilderStage() {
     saveUndoSnapshot();
     buildStarterSpacecraft();
     appState.selectedPartUid = null;
-    refreshBuilderView();
+    autoFitBuilderCanvas();
   };
 
   autoFitBuilderCanvas();
 }
 
-// Layer parts cleanly: radial wings/dishes behind, engine bell behind tank skirt, main bus/tanks in front
 const getPartZIndex = part => {
   const cat = getNodeCategory(part.id);
   const base = cat === 'bus' ? 20 : cat === 'tank' ? 18 : cat === 'eng' ? 14 : 10;
   return part.u === appState.selectedPartUid ? 35 : base;
 };
 
-function renderSpacecraftCanvas(telemetry) {
-  const connected = getConnectedPartUids();
+function renderAttachmentNodesHtml() {
   const occupied = getOccupiedNodes();
   const drag = appState.activeDrag;
   const isDragging = drag && drag.mv;
-
-  const sortedParts = [...appState.mission.parts].sort((a, b) => getPartZIndex(a) - getPartZIndex(b));
-
-  let html = sortedParts.map(part => {
-    const [w, h] = getPartSize(part);
-    const selectedClass = part.u === appState.selectedPartUid ? ' sel' : '';
-    const floatingClass = connected.has(part.u) ? '' : ' float';
-    const zIndex = getPartZIndex(part);
-    return `
-      <img class="pt${selectedClass}${floatingClass}"
-           tabindex="0"
-           role="button"
-           aria-label="${getPartDisplayName(part.id)}"
-           data-u="${part.u}"
-           src="assets/${getAssetFilename(part.id)}.svg"
-           style="left:${part.x - w / 2}px; top:${part.y - h / 2}px; width:${w}px; height:${h}px; z-index:${zIndex}; transform:rotate(${part.rot}deg) scaleX(${part.flip ? -1 : 1});"
-           draggable="false">
-    `;
-  }).join('');
-
   const draggedSubtree = isDragging ? new Set(getSubtreeUids(drag.u)) : new Set();
+
+  let html = '';
   appState.mission.parts.forEach(part => {
     ATTACHMENT_NODES[getNodeCategory(part.id)].forEach(([nodeName]) => {
       if (occupied.has(`${part.u}:${nodeName}`)) return;
@@ -330,6 +311,36 @@ function renderSpacecraftCanvas(telemetry) {
     const [snapX, snapY] = getNodeWorldPosition(findPartByUid(drag.sn.h), drag.sn.hn);
     html += `<i class="nd hot" style="left:${snapX}px; top:${snapY}px;"></i>`;
   }
+  return html;
+}
+
+function renderSpacecraftCanvas(telemetry) {
+  const connected = getConnectedPartUids();
+  const drag = appState.activeDrag;
+  const isDragging = drag && drag.mv;
+  const draggedSet = isDragging ? new Set(getSubtreeUids(drag.u)) : new Set();
+
+  const sortedParts = [...appState.mission.parts].sort((a, b) => getPartZIndex(a) - getPartZIndex(b));
+
+  let html = sortedParts.map(part => {
+    const [w, h] = getPartSize(part);
+    const selectedClass = part.u === appState.selectedPartUid ? ' sel' : '';
+    const floatingClass = connected.has(part.u) ? '' : ' float';
+    const draggingClass = draggedSet.has(part.u) ? ' dragging' : '';
+    const zIndex = draggedSet.has(part.u) ? 45 : getPartZIndex(part);
+    return `
+      <img class="pt${selectedClass}${floatingClass}${draggingClass}"
+           tabindex="0"
+           role="button"
+           aria-label="${getPartDisplayName(part.id)}"
+           data-u="${part.u}"
+           src="assets/${getAssetFilename(part.id)}.svg"
+           style="left:${part.x - w / 2}px; top:${part.y - h / 2}px; width:${w}px; height:${h}px; z-index:${zIndex}; transform:rotate(${part.rot}deg) scaleX(${part.flip ? -1 : 1});"
+           draggable="false">
+    `;
+  }).join('');
+
+  html += `<div id="world-nodes">${renderAttachmentNodesHtml()}</div>`;
 
   if (connected.size > 0) {
     html += `
@@ -341,20 +352,58 @@ function renderSpacecraftCanvas(telemetry) {
   return html;
 }
 
+/**
+ * Fast, jitter-free DOM position update during active pointer dragging.
+ * Avoids wiping #world.innerHTML while the pointer is held down.
+ */
+export function updateBuilderLiveDrag() {
+  const drag = appState.activeDrag;
+  if (!drag || !drag.mv) return;
+
+  const draggedSet = new Set(getSubtreeUids(drag.u));
+  appState.mission.parts.forEach(part => {
+    const el = $(`#world .pt[data-u="${part.u}"]`);
+    if (!el) return;
+    const [w, h] = getPartSize(part);
+    el.style.left = `${part.x - w / 2}px`;
+    el.style.top = `${part.y - h / 2}px`;
+    el.style.transform = `rotate(${part.rot}deg) scaleX(${part.flip ? -1 : 1})`;
+    el.classList.toggle('dragging', draggedSet.has(part.u));
+  });
+
+  const nodesLayer = $('#world-nodes');
+  if (nodesLayer) {
+    nodesLayer.innerHTML = renderAttachmentNodesHtml();
+  }
+}
+
 function autoFitBuilderCanvas() {
   const cv = $('#cv');
   if (!cv) return;
-  const idealZoom = Math.max(0.75, Math.min(1.05, +(cv.clientWidth / 920).toFixed(2)));
+  const idealZoom = Math.max(0.7, Math.min(1.05, +(cv.clientWidth / 900).toFixed(2)));
   appState.canvasZoom = idealZoom;
   refreshBuilderView();
-  cv.scrollLeft = Math.max(0, (960 * idealZoom - cv.clientWidth) / 2);
-  cv.scrollTop = 90;
+
+  // Center both horizontally and vertically around the spacecraft's bounding box
+  const parts = appState.mission.parts;
+  if (parts.length) {
+    const xs = parts.map(p => p.x);
+    const ys = parts.map(p => p.y);
+    const midX = ((Math.min(...xs) + Math.max(...xs)) / 2) * idealZoom;
+    const midY = ((Math.min(...ys) + Math.max(...ys)) / 2) * idealZoom;
+    cv.scrollLeft = Math.max(0, midX - cv.clientWidth / 2);
+    cv.scrollTop = Math.max(0, midY - cv.clientHeight / 2);
+  } else {
+    cv.scrollLeft = Math.max(0, (960 * idealZoom - cv.clientWidth) / 2);
+    cv.scrollTop = Math.max(0, (1100 * idealZoom - cv.clientHeight) / 2);
+  }
 }
 
 export function refreshBuilderView() {
   const mission = appState.mission;
   const telemetry = (mission.d = calculateTelemetry());
   const contract = telemetry.C;
+  saveMissionProgress();
 
   const errorCount =
     telemetry.rows.filter(r => r.mg < 0).length +
@@ -534,7 +583,7 @@ export function refreshBuilderView() {
   `).join('');
 
   const signOffChips = Object.keys(telemetry.sign).map(role => `
-    <span class="chip ${telemetry.sign[role] ? 'ok' : ''} ${appState.isTeamMode && role === appState.activeRole ? 'me' : ''}">
+    <span class="chip ${telemetry.sign[role] ? 'ok' : ''}">
       ${telemetry.sign[role] ? '✓ Signed' : '○ Pending'}: ${role}
     </span>
   `).join('');
@@ -825,6 +874,7 @@ function concludeMission(flight) {
     news
   };
   appState.isFlying = false;
+  saveMissionProgress();
 
   const levelUp = news.find(item => item.k === 'lv');
   if (levelUp) showToast(`Level up! Level ${levelUp.lv}: ${levelUp.title}. ${levelUp.planet} unlocked.`);
@@ -954,12 +1004,12 @@ export function showCareerModal() {
   $('#rev').innerHTML = `
     <div class="box modal-box" style="width: min(900px, 96vw);">
       <h2>Career: Level ${getCareerLevel()} - ${getCareerRank()}</h2>
-      <p>Safe arrivals: ${career.tot} - Missions lost: ${career.lost}. A safe arrival is any mission that is not lost. Levels go up in steps of 2. A good arrival is a safe arrival that also collects at least the threshold science.</p>
+      <p>Safe arrivals: ${career.tot} - Missions lost: ${career.lost}. Your career and spacecraft build save automatically in this browser.</p>
       <table class="rt">
         <tr><th>Level</th><th>Title</th><th>Unlocks</th><th>Requirement</th><th></th></tr>
         <tr><td>0</td><td>Launch Pad Rookie</td><td>Earth, Moon, Mars</td><td>Start here</td><td class="g">Unlocked</td></tr>
         ${GATES.map(gate => {
-          const unlocked = career.un.includes(gate.id);
+          const unlocked = isContractOpen(gate.id);
           return `<tr><td>${gate.lv}</td><td>${gate.title}</td><td>${getPlanetName(gate.id)}</td><td>${describeGateNeed(gate)}</td><td class="${unlocked ? 'g' : 'y'}">${unlocked ? 'Unlocked' : 'Locked'}</td></tr>`;
         }).join('')}
       </table>
@@ -967,7 +1017,7 @@ export function showCareerModal() {
       ${ACHIEVEMENTS.map(a => `<div class="chk ${career.ach[a.id] ? 'ok' : ''}">${career.ach[a.id] ? '&#9733;' : '&#9734;'} <b>${a.n}</b> - ${a.t}</div>`).join('')}
       <div class="row" style="margin-top:12px;">
         <button type="button" id="rback">Close</button>
-        <button type="button" id="creset">Reset career</button>
+        <button type="button" id="creset">Reset progress</button>
       </div>
     </div>
   `;

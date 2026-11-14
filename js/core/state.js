@@ -1,11 +1,13 @@
 /* File: js/core/state.js
  * Owner: Person A (Ashmin)
- * AI-assisted: YES — Gemini, 2026-11-14. Reviewed by a human: NO.
+ * AI-assisted: YES — Gemini, 2026-11-15. Reviewed by a human: NO.
  * Sources used: none
  */
 import { DATA } from '../api/mockData.js';
 import { CONTENT } from '../content.js';
-import { ROLES, MAX_HISTORY, DEFAULT_SEED } from '../config.js';
+import { MAX_HISTORY, DEFAULT_SEED } from '../config.js';
+
+const MISSION_STORAGE_KEY = 'apogeeMissionState';
 
 export function createInitialMission(contractIndex = 1) {
   return {
@@ -26,8 +28,6 @@ export const appState = {
   marginThreshold: 0.1,
   candidates: [],
   previousErrorCount: 0,
-  isTeamMode: false,
-  activeRole: 'Director',
   highScores: {},
   isFlying: false,
   selectedPartUid: null,
@@ -41,6 +41,37 @@ try {
   appState.highScores = JSON.parse(localStorage.tm || '{}');
 } catch {
   appState.highScores = {};
+}
+
+export function saveMissionProgress() {
+  try {
+    const { d, res, ...serializable } = appState.mission;
+    localStorage[MISSION_STORAGE_KEY] = JSON.stringify({
+      mission: serializable,
+      candidates: appState.candidates
+    });
+  } catch {}
+}
+
+export function loadSavedMissionProgress() {
+  try {
+    const raw = localStorage[MISSION_STORAGE_KEY];
+    if (!raw) return false;
+    const saved = JSON.parse(raw);
+    if (saved && saved.mission && Array.isArray(saved.mission.parts) && saved.mission.parts.length > 0) {
+      const validParts = saved.mission.parts.every(
+        p => p.id === 'tank' || DATA.parts[p.id] || DATA.engines[p.id]
+      );
+      if (validParts && DATA.contracts[saved.mission.ci] && DATA.launchers[saved.mission.L]) {
+        appState.mission = { ...createInitialMission(saved.mission.ci), ...saved.mission };
+        if (Array.isArray(saved.candidates)) {
+          appState.candidates = saved.candidates.slice(0, 3);
+        }
+        return true;
+      }
+    }
+  } catch {}
+  return false;
 }
 
 export function getNodeCategory(partId) {
@@ -59,25 +90,10 @@ export function getDimensionKey(partId) {
   return partId;
 }
 
-export function getSubsystemGroup(partId) {
-  const category = getNodeCategory(partId);
-  return ['tank', 'eng', 'bus'].includes(category) ? 'stk' : DATA.parts[partId].g;
-}
-
 export function getAssetFilename(partId) {
   if (partId === 'tank') return 'part_tank';
   if (DATA.engines[partId]) return DATA.engines[partId].img;
   return partId;
-}
-
-export function canCurrentRoleEditPart(partId) {
-  if (!appState.isTeamMode) return true;
-  return ROLES[appState.activeRole].includes(getSubsystemGroup(partId));
-}
-
-export function getLockClass(subsystemGroup) {
-  if (!appState.isTeamMode) return '';
-  return ROLES[appState.activeRole].includes(subsystemGroup) ? '' : 'lock';
 }
 
 export function saveUndoSnapshot() {
@@ -94,7 +110,7 @@ export const AudioEngine = (() => {
 
   let ctx = null;
   let masterGain = null;
-  let isSoundOn = true; // Enabled by default per user request
+  let isSoundOn = true;
   let activeTrackKey = 'landing';
   let activeAudioEl = null;
   let unlockBound = false;
@@ -112,7 +128,6 @@ export const AudioEngine = (() => {
 
     const step = now => {
       const progress = Math.min(1, (now - startTime) / durationMs);
-      // Smooth ease-in-out curve for unnoticeable transitions
       const eased = progress < 0.5
         ? 2 * progress * progress
         : 1 - Math.pow(-2 * progress + 2, 2) / 2;
@@ -210,7 +225,6 @@ export const AudioEngine = (() => {
       return;
     }
 
-    // Already playing this exact track smoothly — do not interrupt or restart it
     if (activeAudioEl === nextEl && !nextEl.paused && !forceRestart) {
       fadeAudio(nextEl, TARGET_VOLUME, CROSSFADE_MS);
       return;

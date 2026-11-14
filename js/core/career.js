@@ -1,18 +1,11 @@
 /* File: js/core/career.js
  * Owner: ported from the Apogee-temp-asmin feature branch (lib/career.js, v3.2)
- * AI-assisted: YES — Claude, 2026-11-14. Reviewed by a human: NO.
+ * AI-assisted: YES — Claude, 2026-11-14; Gemini, 2026-11-15. Reviewed by a human: NO.
  * Sources used: none (game design, not NASA data)
  */
 import { DATA } from '../api/mockData.js';
 import { CONTENT } from '../content.js';
 
-/**
- * Career: planets unlock in a chain. Levels go up in steps of 2. A "safe arrival" is any mission that is not lost.
- * A "good arrival" is a safe arrival that also collected at least the threshold science (contract.thr).
- * `need` entries are [planet, count] for safe arrivals, or [planet, count, 1] for good arrivals.
- * The chain follows real difficulty (delta-v): Venus, Jupiter, Saturn, Uranus, Neptune, Mercury, Sun.
- * Progress is saved in localStorage (key apogeeCareer).
- */
 export const HOME_IDS = ['earth', 'moon', 'mars'];
 
 export const GATES = [
@@ -27,7 +20,7 @@ export const GATES = [
 
 const GRAND_TOUR = ['mercury', 'venus', 'earth', 'mars', 'jupiter', 'saturn', 'uranus', 'neptune'];
 const STORAGE_KEY = 'apogeeCareer';
-const emptyCareer = () => ({ arr: {}, good: {}, lost: 0, tot: 0, un: [], ach: {}, streak: 0 });
+const emptyCareer = () => ({ arr: {}, good: {}, lost: 0, tot: 0, un: [], ach: {}, streak: 0, god: false });
 
 let career = emptyCareer();
 try {
@@ -42,7 +35,6 @@ const saveCareer = () => {
   } catch {}
 };
 
-/** Achievements. `test(x)` receives { ok, out, C, d, st, rtg, wasLost, hard }. */
 export const ACHIEVEMENTS = [
   { id: 'first', n: 'First Light', t: 'Make your first safe arrival.', test: x => x.ok },
   { id: 'star3', n: 'Flawless', t: 'Earn 3 stars on a mission.', test: x => x.st >= 3 },
@@ -63,24 +55,28 @@ export const ACHIEVEMENTS = [
 /* ---- Queries ---- */
 
 export const getCareer = () => career;
-export const isContractOpen = id => HOME_IDS.includes(id) || career.un.includes(id);
+export const isGodMode = () => !!career.god;
+export const isContractOpen = id => isGodMode() || HOME_IDS.includes(id) || career.un.includes(id);
 
-/** Unlocked planets sit in solar-system order; locked ones wait at the end in unlock order. */
+export function toggleGodMode() {
+  career.god = !career.god;
+  saveCareer();
+  return career.god;
+}
+
 export const getContractSortKey = contract =>
   isContractOpen(contract.id) ? contract.ord : 100 + GATES.findIndex(g => g.id === contract.id);
 
-/** Planet name without a leading "the " (CONTENT.planetInfo holds the display name). */
 export const getPlanetName = id => CONTENT.planetInfo[id].name.replace(/^the /, '');
 
-const getTopGate = () => GATES.filter(g => career.un.includes(g.id)).pop();
+const getTopGate = () => (isGodMode() ? GATES[GATES.length - 1] : GATES.filter(g => career.un.includes(g.id)).pop());
 export const getCareerLevel = () => (getTopGate() ? getTopGate().lv : 0);
-export const getCareerRank = () => (getTopGate() ? getTopGate().title : 'Launch Pad Rookie');
-export const getNextGate = () => GATES.find(g => !career.un.includes(g.id));
+export const getCareerRank = () => (isGodMode() ? 'Director Override (All Maps)' : getTopGate() ? getTopGate().title : 'Launch Pad Rookie');
+export const getNextGate = () => (isGodMode() ? null : GATES.find(g => !career.un.includes(g.id)));
 export const getCareerButtonLabel = () => `Career: Level ${getCareerLevel()} - ${getCareerRank()}`;
 
 const countArrivals = (id, good) => (good ? career.good : career.arr)[id] || 0;
 
-/** Human-readable requirement for one gate, with progress, e.g. "2 safe arrivals at Venus (1/2)". */
 export const describeGateNeed = gate =>
   gate.need.map(([id, count, good]) => {
     const kind = good ? 'good' : 'safe';
@@ -96,10 +92,6 @@ export const getLockInfo = contract => {
 
 /* ---- Updates ---- */
 
-/**
- * Records one finished mission, unlocks whatever it earned and returns the news to show in the debrief:
- * [{ k: 'lv', lv, title, planet } | { k: 'ach', n, t }].
- */
 export function recordMission({ out, C, d, st, rtg, sci, hard }) {
   const ok = out !== 'lost';
   const news = [];
@@ -144,6 +136,5 @@ export function resetCareer() {
   saveCareer();
 }
 
-/** Used by tests and tooling: number of destinations that exist in DATA but have no unlock rule (should be 0). */
 export const getUngatedDestinations = () =>
   DATA.contracts.filter(c => !HOME_IDS.includes(c.id) && !GATES.some(g => g.id === c.id)).map(c => c.id);
