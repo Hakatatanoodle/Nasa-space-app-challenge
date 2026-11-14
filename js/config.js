@@ -59,5 +59,5 @@ export const API_CONFIG = {
   enableLiveFetch: true,
   donkiFlareEndpoint: 'https://api.nasa.gov/DONKI/FLR?api_key=DEMO_KEY',
   donkiCmeEndpoint: 'https://api.nasa.gov/DONKI/CME?api_key=DEMO_KEY',
-  timeoutMs: 3500
+  timeoutMs: 6000
 };

@@ -32,8 +32,7 @@ header {
   align-items: center;
   gap: 8px;
   padding: 8px 14px;
-  background: #0d2640e6;
-  backdrop-filter: blur(8px);
+  background: #0d2640f2;
   border-bottom: 1px solid var(--line);
 }
 
@@ -186,8 +185,8 @@ button:disabled {
   object-fit: cover;
   z-index: 0;
   pointer-events: none;
-  opacity: 0.94;
-  filter: contrast(1.06) saturate(1.08);
+  opacity: 0.92;
+  transform: translateZ(0);
 }
 
 @media (max-width: 640px) {

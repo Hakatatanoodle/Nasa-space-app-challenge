@@ -128,7 +128,7 @@ export const DATA = {
 
   contracts: [
     {
-      id: 'earth', months: 24, n: 'Blue Sentinel', dest: 'earth', target: 65, cap: 320,
+      id: 'earth', months: 24, n: 'Earth · Blue Sentinel', dest: 'earth', target: 65, cap: 320,
       src: 'SIMPLIFIED_FOR_GAMEPLAY', verified: false,
       orbits: [
         { n: 'Low polar orbit', dv: 0.4, ecl: 0.35, per: 1.6, contact: 0.16, res: 1.0, rad: 0, src: 'SIMPLIFIED_FOR_GAMEPLAY', verified: false },
@@ -137,7 +137,7 @@ export const DATA = {
       ]
     },
     {
-      id: 'moon', months: 24, n: 'Selene Watch', dest: 'moon', target: 50, cap: 380,
+      id: 'moon', months: 24, n: 'Moon · Selene Watch', dest: 'moon', target: 50, cap: 380,
       src: 'SIMPLIFIED_FOR_GAMEPLAY', verified: false,
       orbits: [
         { n: 'Low polar orbit', dv: 3.9, ecl: 0.38, per: 2, contact: 0.5, res: 1.0, rad: 1, src: 'SIMPLIFIED_FOR_GAMEPLAY', verified: false },
@@ -146,7 +146,7 @@ export const DATA = {
       ]
     },
     {
-      id: 'mars', months: 24, n: 'Red Survey', dest: 'mars', target: 72, cap: 680,
+      id: 'mars', months: 24, n: 'Mars · Red Survey', dest: 'mars', target: 72, cap: 680,
       src: 'SIMPLIFIED_FOR_GAMEPLAY', verified: false,
       orbits: [
         { n: 'Low orbit', dv: 5.4, ecl: 0.38, per: 2, contact: 0.5, res: 1.0, rad: 1, src: 'SIMPLIFIED_FOR_GAMEPLAY', verified: false },
@@ -305,42 +305,38 @@ const makeDestination = (id, ord, n, target, cap, life, orbits, extra = {}) => (
 const CONTRACT_ORDER = { earth: 3, moon: 3.5, mars: 4 };
 DATA.contracts.forEach(contract => { contract.ord = CONTRACT_ORDER[contract.id]; });
 
-/*
- * Balanced outer-planet delta-v, budgets, and comms factors so every planetary
- * destination is cleanly solvable without impossible dead-ends.
- */
 DATA.contracts.push(
-  makeDestination('mercury', 1, 'Hot Rock', 60, 1250, 60, [
+  makeDestination('mercury', 1, 'Mercury · Hot Rock', 60, 1250, 60, [
     makeOrbit('Low polar orbit', 11.4, 0.3, 2.3, 0.45, 1.0, 2),
     makeOrbit('Elliptical orbit (12 h)', 10.6, 0.1, 12, 0.65, 0.65, 2),
     makeOrbit('High orbit', 9.8, 0.03, 24, 0.8, 0.35, 2)
   ]),
-  makeDestination('venus', 2, 'Veiled Sister', 68, 850, 48, [
+  makeDestination('venus', 2, 'Venus · Veiled Sister', 68, 850, 48, [
     makeOrbit('Low polar orbit', 6.2, 0.35, 2.2, 0.5, 1.0, 1),
     makeOrbit('Elliptical orbit', 5.2, 0.1, 24, 0.65, 0.65, 1),
     makeOrbit('High orbit', 4.8, 0.05, 48, 0.8, 0.35, 1)
   ]),
-  makeDestination('jupiter', 5, 'King’s Gamble', 32, 1050, 108, [
+  makeDestination('jupiter', 5, 'Jupiter · King’s Gamble', 32, 1050, 108, [
     makeOrbit('Polar elliptical orbit (Juno-like)', 7.4, 0.03, 100, 0.55, 1.0, 2),
     makeOrbit('Wide orbit among the moons', 7.0, 0.02, 150, 0.65, 0.65, 2),
     makeOrbit('Distant capture orbit', 6.6, 0.01, 200, 0.8, 0.35, 1)
   ]),
-  makeDestination('saturn', 6, 'Ring Lord', 32, 1100, 168, [
+  makeDestination('saturn', 6, 'Saturn · Ring Lord', 32, 1100, 168, [
     makeOrbit('Ring-grazing polar orbit', 8.4, 0.02, 100, 0.55, 1.0, 1),
     makeOrbit('Titan-tour orbit', 8.0, 0.02, 150, 0.65, 0.65, 1),
     makeOrbit('Distant orbit', 7.6, 0.01, 200, 0.8, 0.35, 1)
   ]),
-  makeDestination('uranus', 7, 'Sideways World', 24, 1200, 264, [
+  makeDestination('uranus', 7, 'Uranus · Sideways World', 24, 1200, 264, [
     makeOrbit('Polar orbit', 9.5, 0.02, 100, 0.55, 1.0, 1),
     makeOrbit('Moon-tour orbit', 9.1, 0.02, 150, 0.65, 0.65, 1),
     makeOrbit('Distant orbit', 8.7, 0.01, 200, 0.8, 0.35, 1)
   ]),
-  makeDestination('neptune', 8, 'Edge of the Map', 24, 1300, 324, [
+  makeDestination('neptune', 8, 'Neptune · Edge of the Map', 24, 1300, 324, [
     makeOrbit('Polar orbit', 10.2, 0.02, 100, 0.55, 1.0, 1),
     makeOrbit('Triton-tour orbit', 9.8, 0.02, 150, 0.65, 0.65, 1),
     makeOrbit('Distant orbit', 9.4, 0.01, 200, 0.8, 0.35, 1)
   ]),
-  makeDestination('sun', 10, 'Solar Dive', 50, 1000, 48, [
+  makeDestination('sun', 10, 'The Sun · Solar Dive', 50, 1000, 48, [
     makeOrbit('Straight plunge', 24, 0, 1, 1.0, 1.0, 2),
     makeOrbit('Close flyby, Parker-style', 18, 0, 3, 1.0, 1.0, 2)
   ], { doom: true })

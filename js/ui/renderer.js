@@ -49,7 +49,7 @@ import { $, $$, toPercent, formatNumber, delay, showToast } from './domElements.
 const renderDataBadge = isVerified =>
   isVerified
     ? ''
-    : '<span class="badge-simplified">simplified</span>';
+    : '<span class="badge-simplified" title="Simplified engineering model parameter for gameplay">Sim Model</span>';
 
 const renderModalHeader = (titleText, titleId = '') => `
   <div class="modal-header">
@@ -59,9 +59,17 @@ const renderModalHeader = (titleText, titleId = '') => `
 `;
 
 export function renderHelpModal() {
+  const paragraphs = CONTENT.helpHtml
+    .trim()
+    .split('\n')
+    .map(line => line.trim())
+    .filter(Boolean)
+    .map(pHtml => `<div class="help-card">${pHtml}</div>`)
+    .join('');
+
   $('#help-body').innerHTML = `
-    ${renderModalHeader('How to play', 'help-title')}
-    ${CONTENT.helpHtml}
+    ${renderModalHeader('Mission Control Field Guide', 'help-title')}
+    <div class="help-grid">${paragraphs}</div>
   `;
 }
 
@@ -99,7 +107,7 @@ export function navigateToStage(stageNumber) {
 }
 
 export function updateCareerButton() {
-  $('#car').textContent = getCareerButtonLabel();
+  $('#car').textContent = `★ ${getCareerButtonLabel()}`;
 }
 
 /* ---- Stage 1: Objective Selection ---- */
@@ -123,7 +131,7 @@ export function renderObjectiveStage() {
     <div class="card ${index === mission.ci ? 'sel' : ''} ${open ? '' : 'lkd'}" role="button" ${open ? `tabindex="0" data-a="ci" data-v="${index}"` : 'aria-disabled="true"'}>
       <img src="assets/dest_${c.dest}.svg" alt="${c.n}">
       <div>
-        <b>${c.n}</b> ${renderDataBadge(c.verified)}
+        <b>${c.n}</b>
         <p>${CONTENT.contractBriefs[c.id]}</p>
         <small>Baseline science ${c.target} (threshold ${c.thr}) · budget $${c.cap}M · ${c.months} months${appState.highScores[c.id] ? ' · best ' + appState.highScores[c.id] : ''}</small>
         <span class="fb ${feasibility.cls}">${feasibility.lab}</span><small class="fn">${feasibility.notes.join(' · ')}</small>
@@ -136,7 +144,7 @@ export function renderObjectiveStage() {
   const orbitCards = contract.orbits.map((o, index) => `
     <div class="card o ${index === mission.oi ? 'sel' : ''}" role="button" tabindex="0" data-a="oi" data-v="${index}">
       <div>
-        <b>${o.n}</b> — ${CONTENT.orbitDescriptions[o.n]} ${renderDataBadge(o.verified)}<br>
+        <b>${o.n}</b> — ${CONTENT.orbitDescriptions[o.n]}<br>
         <small>${formatOrbitSummary(o)}</small>
       </div>
     </div>
@@ -148,7 +156,7 @@ export function renderObjectiveStage() {
       <div class="card ${mission.L === key ? 'sel' : ''}" role="button" tabindex="0" data-a="L" data-v="${key}">
         <img src="assets/${l.img}.svg" alt="${l.n}">
         <div>
-          <b>${l.n}</b> ${renderDataBadge(l.verified)}
+          <b>${l.n}</b>
           <p>Lifts ${formatNumber(l.cap)} kg</p>
           <small>$${l.c}M · ${toPercent(l.rel)}% reliable</small>
         </div>
@@ -158,8 +166,8 @@ export function renderObjectiveStage() {
 
   $('#s1').innerHTML = `
     <div>
-      <h2>1. Choose your mission objective <span class="badge-source">${appState.dataSourceLabel}</span>${isGodMode() ? ' <span class="badge-simplified">Director Override</span>' : ''}</h2>
-      <div class="weather-banner">
+      <h2>1. Choose your mission objective <span class="badge-source ${weather.isLive ? '' : 'offline'}">${appState.dataSourceLabel}</span>${isGodMode() ? ' <span class="badge-simplified">Director Override</span>' : ''}</h2>
+      <div class="weather-banner ${weather.isLive ? '' : 'offline'}">
         <span><b>Space Weather Telemetry:</b> ${weather.summary}</span>
         <small>Solar Activity: <b>${weather.stormLevel}</b> (${weather.src})</small>
       </div>
@@ -176,10 +184,10 @@ export function renderObjectiveStage() {
     <p><small title="${CONTENT.marginFormulaTooltip}">${CONTENT.marginFormulaTooltip}</small></p>
     <div class="row">
       <div class="card o ${mission.hard ? '' : 'sel'}" role="button" tabindex="0" data-a="hd" data-v="0">
-        <div><b>Rookie: 10% reserve</b> ${renderDataBadge(DATA.marginPolicies.easy.verified)} — ${DATA.marginPolicies.easy.src}</div>
+        <div><b>Rookie: 10% reserve</b> — ${DATA.marginPolicies.easy.src}</div>
       </div>
       <div class="card o ${mission.hard ? 'sel' : ''}" role="button" tabindex="0" data-a="hd" data-v="1">
-        <div><b>NASA CML 4: 35% reserve</b> ${renderDataBadge(DATA.marginPolicies.hard.verified)} — ${DATA.marginPolicies.hard.src}</div>
+        <div><b>NASA CML 4: 35% reserve</b> — ${DATA.marginPolicies.hard.src}</div>
       </div>
     </div>
     <button type="button" class="go" data-a="go2">Design the spacecraft &rarr;</button>
@@ -432,6 +440,13 @@ export function refreshBuilderView() {
   $('#so').innerHTML = contract.orbits.map((o, i) => `<option value="${i}">${o.n}</option>`).join('');
   $('#so').value = mission.oi;
 
+  // Keep full-bleed blueprint grid scaled cleanly across the entire #cv viewport at all zoom levels
+  const cv = $('#cv');
+  if (cv) {
+    cv.style.setProperty('--grid-lg', `${(80 * appState.canvasZoom).toFixed(1)}px`);
+    cv.style.setProperty('--grid-sm', `${(20 * appState.canvasZoom).toFixed(1)}px`);
+  }
+
   $('#wr').style.width = `${960 * appState.canvasZoom}px`;
   $('#wr').style.height = `${1100 * appState.canvasZoom}px`;
   $('#world').style.transform = `scale(${appState.canvasZoom})`;
@@ -480,7 +495,7 @@ export function refreshBuilderView() {
         <b class="${status}">${statusLabel}</b>
         <em>
           ${formatNumber(row.use)} needed / ${formatNumber(row.cap)} ${row.u}
-          ${row.verified ? '' : '<span class="badge-simplified">simplified</span>'}
+          ${renderDataBadge(row.verified)}
         </em>
         ${row.mg < appState.marginThreshold ? `<p class="why">${row.why} <b>Fix:</b> ${row.fix}</p>` : ''}
       </div>
@@ -565,23 +580,27 @@ export function refreshBuilderView() {
 
   const redCount = alerts.filter(a => a.level === 'bad').length;
   const amberCount = alerts.filter(a => a.level === 'w').length;
-  const alertSummaryBadge = alerts.length
-    ? fillTemplate(CONTENT.uiLabels.alertsCount, { red: redCount, amber: amberCount })
-    : CONTENT.uiLabels.alertsClear;
   const alertHeaderClass = redCount > 0 ? 'bad' : amberCount > 0 ? 'w' : 'ok';
-  const isAlertsOpen = openMap.alerts !== undefined ? openMap.alerts : alerts.length > 0;
+  const isAlertsOpen = openMap.alerts === true;
+
+  const flagBadgesHtml = alerts.length
+    ? `<span class="alert-flags">
+        ${redCount > 0 ? `<span class="alert-flag bad" title="${redCount} critical alert(s)">&#9873; ${redCount}</span>` : ''}
+        ${amberCount > 0 ? `<span class="alert-flag w" title="${amberCount} thin margin alert(s)">&#9888; ${amberCount}</span>` : ''}
+      </span>`
+    : `<span class="alert-flag ok">&#10003; Clear</span>`;
 
   const alertsDropdownHtml = `
     <details class="alerts-box ${alertHeaderClass}" data-dd="alerts" ${isAlertsOpen ? 'open' : ''}>
       <summary>
         <span><b>${CONTENT.uiLabels.alertsHeading}</b></span>
-        <b class="topic-badge ${alertHeaderClass}">${alertSummaryBadge}</b>
+        ${flagBadgesHtml}
       </summary>
       <div class="alerts-list">
         ${alerts.length
           ? alerts.map(a => `
               <div class="alert-item ${a.level}">
-                <span class="alert-pill ${a.level}">${a.tag}</span>
+                <span class="alert-pill ${a.level}">${a.level === 'bad' ? '&#9873;' : '&#9888;'} ${a.tag}</span>
                 <b>${a.title}:</b> <span>${a.fix}</span>
               </div>
             `).join('')
@@ -642,7 +661,7 @@ export function refreshBuilderView() {
           : 'Design review and launch';
 }
 
-/* ---- Modals: Design Review, Trade Space, Share/Load Code (with sticky top-right X) ---- */
+/* ---- Modals: Design Review, Trade Space, Share/Load Code ---- */
 
 const renderPredictedFlight = telemetry => {
   const flight = resolveFlight(telemetry);
@@ -885,7 +904,6 @@ export async function startLaunchSequence() {
 
     await logMessage(describeFlightStep(step), getFlightStepClass(step));
 
-    // Interactive mid-flight trade-off when an unshielded anomaly strikes
     if (step.key === 'event' && !step.ok) {
       const chosen = await promptMidFlightDecision(logEl, step.values.eventId);
       if (chosen) {
@@ -1042,7 +1060,7 @@ export function renderDebriefStage() {
   `;
 }
 
-/* ---- Career Modal with Sticky Top-Right X Close Button ---- */
+/* ---- Career Modal ---- */
 
 function renderCareerNews(news = []) {
   const career = getCareer();
@@ -1070,9 +1088,14 @@ export function showCareerModal() {
   const progressPct = Math.round((unlockedCount / DATA.contracts.length) * 100);
 
   $('#rev').innerHTML = `
-    <div class="box modal-box" style="width: min(900px, 96vw);">
+    <div class="box modal-box" style="width: min(940px, 96vw);">
       ${renderModalHeader(`Career: Level ${getCareerLevel()} — ${getCareerRank()}`)}
-      <p>Safe arrivals: <b>${career.tot}</b> · Missions lost: <b>${career.lost}</b> · Destinations unlocked: <b>${unlockedCount}/${DATA.contracts.length}</b>. Progress saves automatically in your browser.</p>
+      <div class="career-stats">
+        <div class="career-stat-pill"><small>Safe Arrivals</small><b>${career.tot}</b></div>
+        <div class="career-stat-pill"><small>Missions Lost</small><b>${career.lost}</b></div>
+        <div class="career-stat-pill"><small>Worlds Unlocked</small><b>${unlockedCount} / ${DATA.contracts.length}</b></div>
+        <div class="career-stat-pill"><small>Achievements</small><b>${achievementCount} / ${ACHIEVEMENTS.length}</b></div>
+      </div>
       <div class="career-progress" title="${progressPct}% of Solar System unlocked"><i style="width:${progressPct}%"></i></div>
       <table class="rt">
         <tr><th>Level</th><th>Title</th><th>Unlocks</th><th>Requirement</th><th>Status</th></tr>
@@ -1083,7 +1106,9 @@ export function showCareerModal() {
         }).join('')}
       </table>
       <h3>Achievements (${achievementCount}/${ACHIEVEMENTS.length})</h3>
-      ${ACHIEVEMENTS.map(a => `<div class="chk ${career.ach[a.id] ? 'ok' : ''}">${career.ach[a.id] ? '&#9733;' : '&#9734;'} <b>${a.n}</b> — ${a.t}</div>`).join('')}
+      <div class="ach-grid">
+        ${ACHIEVEMENTS.map(a => `<div class="ach-card ${career.ach[a.id] ? 'ok' : ''}">${career.ach[a.id] ? '<span class="g">&#9733;</span>' : '&#9734;'} <b>${a.n}</b><br><small>${a.t}</small></div>`).join('')}
+      </div>
       <div class="row" style="margin-top:14px;">
         <button type="button" id="creset">Reset progress</button>
       </div>
