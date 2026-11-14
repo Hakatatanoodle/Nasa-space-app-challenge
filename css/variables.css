@@ -1,0 +1,15 @@
+/* File: css/variables.css
+ * Owner: Person B (Saurav)
+ * AI-assisted: YES — Gemini, 2026-11-14. Reviewed by a human: NO.
+ * Sources used: none
+ */
+:root {
+  --bg: #0b2038;
+  --panel: #12304f;
+  --line: #295c8f;
+  --accent: #ffc857;
+  --text: #f0f6fc;
+  --muted: #b8cde0;
+  --ok: #7fe3b8;
+  --bad: #ff856d;
+}

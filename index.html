@@ -1,15 +1,67 @@
+<!-- File: index.html
+  Owner: Person B (Saurav)
+  AI-assisted: YES — Gemini, 2026-11-14. Reviewed by a human: NO.
+  Sources used: SPACEAPPS_CHALLENGE
+-->
 <!DOCTYPE html>
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>NASA Space Apps Project</title>
+  <title>APOGEE — Space Mission Design Game</title>
   <link rel="stylesheet" href="./css/variables.css" />
   <link rel="stylesheet" href="./css/base.css" />
   <link rel="stylesheet" href="./css/components.css" />
+  <link rel="stylesheet" href="./css/pages/dashboard.css" />
+  <link rel="stylesheet" href="./css/pages/simulation.css" />
 </head>
 <body>
-  <div id="app"></div>
+  <video id="bg" muted loop playsinline></video>
+
+  <header>
+    <h1 id="hn"></h1>
+    <nav id="nav" aria-label="Mission stages"></nav>
+    <label class="team-toggle" for="team">
+      <input type="checkbox" id="team" /> Team of 4
+    </label>
+    <button type="button" id="pass" hidden></button>
+    <button type="button" id="mute">Sound: off</button>
+    <button type="button" id="copy">Share / Load code</button>
+    <button type="button" id="hp">How to play</button>
+  </header>
+
+  <main id="app">
+    <section class="st" id="s1" aria-label="Stage 1: Objective"></section>
+    <section class="st" id="s2" aria-label="Stage 2: Spacecraft Builder"></section>
+    <section class="st" id="s3" aria-label="Stage 3: Launch Simulation"></section>
+    <section class="st" id="s4" aria-label="Stage 4: Post-Mission Report"></section>
+  </main>
+
+  <div id="title" role="dialog" aria-modal="true" aria-labelledby="tt">
+    <div class="tbox">
+      <img class="trk" src="assets/launcher_heavy.svg" alt="Heavy launch vehicle illustration" />
+      <img class="tmars" src="assets/dest_mars.svg" alt="Planet destination illustration" />
+      <h1 id="tt"></h1>
+      <p id="tg"></p>
+      <div class="row">
+        <button type="button" id="start">Start mission</button>
+        <button type="button" id="demo-ok">Quick Demo (Passing)</button>
+        <button type="button" id="demo-fail">Try a Failing Design</button>
+        <button type="button" id="hp2">How to play</button>
+      </div>
+      <p id="cr"></p>
+      <small id="title-disclaimer"></small>
+    </div>
+  </div>
+
+  <div id="help" role="dialog" aria-modal="true" aria-labelledby="help-title" hidden>
+    <div class="box modal-box" id="help-body"></div>
+  </div>
+
+  <div id="rev" role="dialog" aria-modal="true" hidden></div>
+  <div id="toast" role="status" aria-live="polite" hidden></div>
+  <img id="gh" hidden alt="" />
+
   <script type="module" src="./js/main.js"></script>
 </body>
 </html>

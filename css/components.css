@@ -1,0 +1,193 @@
+/* File: css/components.css
+ * Owner: Person B (Saurav)
+ * AI-assisted: YES — Gemini, 2026-11-14. Reviewed by a human: NO.
+ * Sources used: none
+ */
+.card {
+  display: flex;
+  gap: 10px;
+  width: 100%;
+  max-width: 310px;
+  min-height: 44px;
+  padding: 12px;
+  background: #12304fdd;
+  border: 2px solid var(--line);
+  border-radius: 10px;
+  cursor: pointer;
+}
+
+.card:hover {
+  border-color: #4c8fd1;
+}
+
+.card.sel {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 1px var(--accent);
+}
+
+.card img {
+  width: 60px;
+  height: 60px;
+  object-fit: contain;
+  flex: none;
+}
+
+.card p {
+  margin: 2px 0 4px;
+}
+
+.card small {
+  color: var(--muted);
+}
+
+.card.o {
+  max-width: 860px;
+  align-items: center;
+}
+
+.card.o img {
+  display: none;
+}
+
+.go {
+  margin-top: 18px;
+  padding: 12px 22px;
+  font-size: 1rem;
+  font-weight: 700;
+  color: #0b2038;
+  background: var(--accent);
+  border: 0;
+}
+
+.go:hover:not(:disabled) {
+  background: #ffd373;
+}
+
+.chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 10px;
+  font-size: 0.875rem;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+}
+
+.chip.ok {
+  border-color: var(--ok);
+  color: var(--ok);
+}
+
+.chip.me {
+  background: var(--line);
+}
+
+.badge-simplified {
+  display: inline-block;
+  margin-left: 6px;
+  padding: 1px 6px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--accent);
+  background: #ffc85722;
+  border: 1px solid var(--accent);
+  border-radius: 4px;
+  vertical-align: middle;
+}
+
+.badge-source {
+  display: inline-block;
+  margin-left: 6px;
+  padding: 1px 6px;
+  font-size: 0.75rem;
+  color: var(--ok);
+  background: #7fe3b81a;
+  border: 1px solid var(--ok);
+  border-radius: 4px;
+}
+
+.box {
+  padding: 16px 20px;
+  background: #12304ff0;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+}
+
+.modal-box {
+  width: min(720px, 95vw);
+  max-height: 90vh;
+  overflow: auto;
+}
+
+#toast {
+  position: fixed;
+  left: 50%;
+  bottom: 20px;
+  transform: translateX(-50%);
+  max-width: 92vw;
+  padding: 10px 16px;
+  font-weight: 600;
+  color: #0b2038;
+  background: var(--accent);
+  border-radius: 8px;
+  z-index: 40;
+}
+
+#help,
+#rev {
+  position: fixed;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 12px;
+  overflow: auto;
+  background: #0b2038e0;
+  z-index: 20;
+}
+
+#help {
+  z-index: 25;
+}
+
+.rt {
+  width: 100%;
+  margin: 8px 0;
+  font-size: 0.9rem;
+  border-collapse: collapse;
+}
+
+.rt th,
+.rt td {
+  padding: 6px 8px;
+  text-align: left;
+  vertical-align: top;
+  border: 1px solid var(--line);
+}
+
+.bar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 4px 0;
+}
+
+.bar i {
+  display: block;
+  min-width: 2px;
+  height: 16px;
+  background: var(--accent);
+  border-radius: 4px;
+}
+
+.g { color: var(--ok); }
+.y { color: var(--accent); }
+.r { color: var(--bad); }
+
+.code-box {
+  width: 100%;
+  min-height: 84px;
+  margin: 8px 0;
+  font-family: monospace;
+  font-size: 0.875rem;
+}
