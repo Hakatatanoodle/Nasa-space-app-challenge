@@ -46,7 +46,7 @@ import { $, $$, toPercent, formatNumber, delay, showToast } from './domElements.
 
 const renderDataBadge = isVerified =>
   isVerified
-    ? '<span class="badge-source">verified source</span>'
+    ? ''
     : '<span class="badge-simplified">simplified</span>';
 
 /* ---- Stage Navigation ---- */
@@ -366,26 +366,108 @@ export function refreshBuilderView() {
     ? `<b>${getPartDisplayName(selectedPart.id)}</b> <small>${formatPartSpecs(selectedPart.id)}</small> <button type="button" data-a="rot">Rotate (R)</button><button type="button" data-a="flp">Flip (F)</button><button type="button" data-a="del">Delete</button>`
     : '<small>Drag parts onto glowing dots, or click/Enter a part to auto-attach. Click a placed part to rotate, flip, or delete.</small>';
 
-  const getStatusClass = row => (row.mg < 0 ? 'bad' : row.mg < appState.marginThreshold ? 'w' : 'ok');
-  let resourceIndex = 0;
 
-  const resourceBarsHtml = telemetry.rows.map(r => {
-    const isSub = CONTENT.subResources.includes(r.n);
-    if (!isSub) resourceIndex++;
-    const status = getStatusClass(r);
-    const fillPct = r.cap > 0 ? Math.min(100, (r.use / r.cap) * 100) : 100;
-    const statusLabel = r.mg < 0 ? 'FAIL' : r.mg < appState.marginThreshold ? 'THIN' : 'OK';
+
+  const getStatusClass = row =>
+    row.mg < 0 ? 'bad' :
+    row.mg < appState.marginThreshold ? 'w' : 'ok';
+
+  // Render one resource row.
+  const renderResourceRow = (row, number = null) => {
+    if (!row) return '';
+
+    const status = getStatusClass(row);
+
+    const fillPct = row.cap > 0
+      ? Math.min(100, (row.use / row.cap) * 100)
+      : 100;
+
+    const statusLabel =
+      row.mg < 0 ? 'FAIL' :
+      row.mg < appState.marginThreshold ? 'THIN' : 'OK';
 
     return `
-      <div class="m ${isSub ? 'sub' : ''}">
-        <span>${isSub ? '' : `<b>${resourceIndex}</b> `}${r.n}</span>
-        <i class="${status}"><u style="width:${fillPct}%"></u></i>
+      <div class="m">
+        <span>
+         ${number !== null ? `<span class="resource-number">${number}.</span> ` : ''} 
+          ${row.n}
+        </span>
+
+        <i class="${status}">
+          <u style="width:${fillPct}%"></u>
+        </i>
+
         <b class="${status}">${statusLabel}</b>
-        <em>${formatNumber(r.use)} needed / ${formatNumber(r.cap)} ${r.u} ${r.verified ? '' : '<span class="badge-simplified">simplified</span>'}</em>
-        ${r.mg < appState.marginThreshold ? `<p class="why">${r.why} <b>Fix:</b> ${r.fix}</p>` : ''}
+
+        <em>
+          ${formatNumber(row.use)} needed /
+          ${formatNumber(row.cap)} ${row.u}
+          ${row.verified
+            ? ''
+            : '<span class="badge-simplified">simplified</span>'}
+        </em>
+
+        ${row.mg < appState.marginThreshold
+          ? `<p class="why">${row.why} <b>Fix:</b> ${row.fix}</p>`
+          : ''}
       </div>
     `;
-  }).join('');
+  };
+
+  // Find existing telemetry rows.
+  const findResource = name =>
+    telemetry.rows.find(row => row.n === name);
+
+  // 1. Mass System: Mass and Delta-v.
+  const massSystemHtml = `
+    <details class="resource-system">
+      <summary>
+        <b>1.</b> Mass System
+      </summary>
+
+      <div class="resource-system-content">
+        ${renderResourceRow(findResource('Mass'))}
+        ${renderResourceRow(findResource('Delta-v'))}
+      </div>
+    </details>
+  `;
+
+  // 2. Power System: Power, Battery and Ion power.
+  const powerSystemHtml = `
+    <details class="resource-system">
+      <summary>
+        <b>2.</b> Power System
+      </summary>
+
+      <div class="resource-system-content">
+        ${renderResourceRow(findResource('Power'))}
+        ${renderResourceRow(findResource('Battery'))}
+        ${renderResourceRow(findResource('Ion power'))}
+      </div>
+    </details>
+  `;
+
+  // Remaining resources.
+  const otherResourceNames = [
+    'Budget',
+    'Data storage',
+    'Comms',
+    'Time'
+  ];
+
+  const otherResourcesHtml = otherResourceNames
+    .map((name, index) =>
+      renderResourceRow(findResource(name), index + 3)
+    )
+    .join('');
+
+  // Complete resource panel.
+  const resourceBarsHtml = `
+    ${massSystemHtml}
+    ${powerSystemHtml}
+    ${otherResourcesHtml}
+  `;
+
 
   const checksHtml = telemetry.checks.map(c => `
     <div class="chk ${['bad', 'w', 'ok'][c.st]}">
