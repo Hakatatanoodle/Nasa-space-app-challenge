@@ -1,11 +1,16 @@
 /* File: js/main.js
  * Owner: Person B (Saurav)
- * AI-assisted: YES — Gemini, 2026-11-14. Reviewed by a human: NO.
+ * AI-assisted: YES — Gemini, 2026-11-15. Reviewed by a human: NO.
  * Sources used: none
  */
 import { CONTENT } from './content.js';
 import { fetchMissionReferenceData } from './api/nasaService.js';
-import { appState, createInitialMission, AudioEngine } from './core/state.js';
+import {
+  appState,
+  createInitialMission,
+  loadSavedMissionProgress,
+  AudioEngine
+} from './core/state.js';
 import { buildStarterSpacecraft } from './core/engine.js';
 import { $ } from './ui/domElements.js';
 import { navigateToStage } from './ui/renderer.js';
@@ -36,11 +41,15 @@ async function initApp() {
   $('#tg').textContent = CONTENT.tagline;
   $('#help-body').innerHTML = CONTENT.helpHtml;
 
-  appState.mission = createInitialMission(1);
-  buildStarterSpacecraft();
+  const restored = loadSavedMissionProgress();
+  if (!restored) {
+    appState.mission = createInitialMission(1);
+    buildStarterSpacecraft();
+  }
+
   bindGlobalControls();
   AudioEngine.setMusic('landing');
-  navigateToStage(1);
+  navigateToStage(appState.mission.stage || 1);
 }
 
 initApp();

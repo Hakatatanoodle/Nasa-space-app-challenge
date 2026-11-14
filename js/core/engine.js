@@ -1,6 +1,6 @@
 /* File: js/core/engine.js
  * Owner: Person A (Ashmin)
- * AI-assisted: YES — Gemini, 2026-11-14. Reviewed by a human: NO.
+ * AI-assisted: YES — Gemini, 2026-11-15. Reviewed by a human: NO.
  * Sources used: NASA_CUBESAT101, JPL_CML
  */
 import { DATA } from '../api/mockData.js';
@@ -11,15 +11,9 @@ import {
   appState,
   getNodeCategory,
   getDimensionKey,
-  canCurrentRoleEditPart,
   saveUndoSnapshot
 } from './state.js';
 
-/**
- * Deterministic Mulberry32 PRNG (Rule 8: Same inputs + same seed = same output).
- * COSMETIC USE ONLY (e.g. jitter in the launch visuals). It must never decide win or loss:
- * flight outcomes are fully decided by resolveFlight() from the design's numbers.
- */
 export function createSeededRng(seed = DEFAULT_SEED) {
   let state = seed >>> 0;
   return function nextRandom() {
@@ -156,18 +150,17 @@ export function mirrorPartIfEnabled(childPart) {
 }
 
 /**
- * Centers the starter rocket on the 960x1100 world canvas (x = 480) and omits
- * the communications antenna so the craft starts slightly incomplete (un-flyable
- * due to zero downlink) until the player finishes building it.
+ * Centers the starter spacecraft both horizontally (x = 480) and vertically (around y = 520)
+ * on the 960x1100 world canvas, omitting the antenna so players finish building before launch.
  */
 export function buildStarterSpacecraft() {
   appState.mission.parts = [];
   appState.mission.nu = 1;
 
   const centerX = 480;
-  const bus = createPartInstance('bus_rad', centerX, 240);
-  const tank = createPartInstance('tank', centerX, 370);
-  const engine = createPartInstance('chem', centerX, 490);
+  const bus = createPartInstance('bus_rad', centerX, 430);
+  const tank = createPartInstance('tank', centerX, 550);
+  const engine = createPartInstance('chem', centerX, 660);
 
   attachParts(tank, 'top', bus, 'bottom');
   attachParts(engine, 'top', tank, 'bottom');
@@ -184,22 +177,19 @@ export function buildStarterSpacecraft() {
   mountPart('bat', tank, 'R1');
 }
 
-/**
- * Loads an intentionally overweight / under-fueled preset for the "Try a Failing Design" demo.
- */
 export function buildFailingDemoSpacecraft() {
-  appState.mission.ci = 2; // Mars mission
-  appState.mission.oi = 0; // Low Mars orbit (5.6 km/s delta-v)
-  appState.mission.L = 'medium'; // 9,000 kg limit
+  appState.mission.ci = 2;
+  appState.mission.oi = 0;
+  appState.mission.L = 'medium';
   appState.mission.hard = 1;
   appState.mission.parts = [];
   appState.mission.nu = 1;
 
   const centerX = 480;
-  const bus = createPartInstance('bus_std', centerX, 220);
-  const tank1 = createPartInstance('tank', centerX, 350);
-  const tank2 = createPartInstance('tank', centerX, 480);
-  const engine = createPartInstance('chem', centerX, 600);
+  const bus = createPartInstance('bus_std', centerX, 380);
+  const tank1 = createPartInstance('tank', centerX, 500);
+  const tank2 = createPartInstance('tank', centerX, 620);
+  const engine = createPartInstance('chem', centerX, 730);
 
   attachParts(tank1, 'top', bus, 'bottom');
   attachParts(tank2, 'top', tank1, 'bottom');
@@ -210,10 +200,6 @@ export function buildFailingDemoSpacecraft() {
 }
 
 export function autoAttachPart(partId) {
-  if (!canCurrentRoleEditPart(partId)) {
-    return { ok: false, message: 'That part belongs to another role. Pass the keyboard.' };
-  }
-
   const category = getNodeCategory(partId);
   const connected = getConnectedPartUids();
   const hosts = appState.mission.parts
@@ -226,7 +212,7 @@ export function autoAttachPart(partId) {
       bus.id = partId;
     } else {
       saveUndoSnapshot();
-      createPartInstance(partId, 480, 240);
+      createPartInstance(partId, 480, 430);
     }
     return { ok: true };
   }
@@ -324,7 +310,7 @@ export function calculateTelemetry(missionInput = appState.mission) {
     dry: busSpec.m + engineParts.length * engineSpec.m,
     load: busSpec.pw,
     gen: 0,
-    rg: 0, // radioisotope generator power: does not depend on sunlight
+    rg: 0,
     wh: 0,
     mb: 0,
     gb: DATA.constants.baseStorageGb.value,
@@ -399,11 +385,9 @@ export function calculateTelemetry(missionInput = appState.mission) {
     DATA.transitDaysBase[contract.dest].value * engineSpec.tf,
     engineSpec.dvDay ? (orbit.dv * 1000) / engineSpec.dvDay : 0
   );
-  // Far destinations carry their own design life (the trip alone can take years). Harsh radiation (rad 2) wears even hardened buses.
   telemetry.baseLife = contract.life || DATA.constants.designLifeMonths.value;
   telemetry.life = telemetry.baseLife * (orbit.rad && !busSpec.hard ? 0.6 : orbit.rad > 1 ? 0.7 : 1) - telemetry.days / 30;
 
-  // Section 6.2 margin convention: margin = (capacity - predictedUse) / predictedUse
   const buildCheckRow = (name, category, used, capacity, unit, src, verified) => {
     const margin = used <= 0 ? 1 : capacity > 0 ? (capacity - used) / used : -1;
     const lesson = CONTENT.lessons[name];
@@ -525,7 +509,6 @@ export function calculateTelemetry(missionInput = appState.mission) {
     pass: countStatus(2) / itemCount >= DATA.reviewThreshold.v
   };
 
-  // Launch reliability: a visible number that scales the final score. It is never rolled against.
   const marginPenalty = telemetry.rows.reduce(
     (sum, r) => (r.mg >= 0 && r.mg < threshold ? sum + (threshold - r.mg) * flightModel.amberPenaltyFactor : sum),
     0
@@ -549,12 +532,8 @@ export function calculateTelemetry(missionInput = appState.mission) {
   return telemetry;
 }
 
-/* ---- Deterministic Flight Resolution (no dice) ---- */
+/* ---- Deterministic Flight Resolution ---- */
 
-/**
- * Fills {placeholders} in a CONTENT template. Numbers are rounded for display.
- * A key ending in "Pct" is a fraction shown as a whole percent (0.94 -> 94).
- */
 export function fillTemplate(template, values = {}) {
   return template.replace(/\{(\w+)\}/g, (match, key) => {
     const value = values[key];
@@ -578,10 +557,6 @@ function isEventImmune(event, telemetry) {
   return !!telemetry.B.red;
 }
 
-/**
- * Every event this contract and orbit will cause, and whether the design is immune.
- * Same design = same list, every time.
- */
 export function getTriggeredEvents(telemetry) {
   return DATA.events
     .filter(event => doesEventTrigger(event, telemetry))
@@ -613,14 +588,6 @@ function scoreFlight(telemetry, outcome, science) {
   return { stars, score };
 }
 
-/**
- * Resolves a whole flight from the design's numbers. Pure and deterministic.
- * The launch screen (text today, a visual simulation later) only PLAYS the returned
- * `steps`; it never decides the outcome.
- *
- * steps: ordered [{ key, ok, fatal, values }]. `key` names a CONTENT.flightLog template,
- * `values` holds the raw numbers for it, `fatal` means the mission ends on that step.
- */
 export function resolveFlight(telemetry) {
   const model = DATA.flightModel;
   const contract = telemetry.C;
@@ -673,7 +640,6 @@ export function resolveFlight(telemetry) {
   });
 
   if (contract.doom) {
-    // The Sun cannot be reached by any design, so this branch never depends on the numbers above.
     CONTENT.sunDive.lines.forEach(([text, cls]) => {
       steps.push({ key: 'sun_dive', ok: cls !== 'bad', values: { text } });
     });
@@ -709,7 +675,6 @@ export function resolveFlight(telemetry) {
 
   const outcome = science >= contract.target ? 'success' : science > 0 ? 'partial' : 'lost';
 
-  // Debrief reasons: every thin row, every lost-data note, every event that hurt, and the reliability maths.
   const reasons = telemetry.rows
     .filter(r => r.mg < appState.marginThreshold)
     .map(r => `${r.n}: ${r.why} Fix: ${r.fix} [${r.src}]`);

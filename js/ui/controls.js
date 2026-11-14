@@ -1,16 +1,16 @@
 /* File: js/ui/controls.js
  * Owner: Person B (Saurav)
- * AI-assisted: YES — Gemini, 2026-11-14. Reviewed by a human: NO.
+ * AI-assisted: YES — Gemini, 2026-11-15. Reviewed by a human: NO.
  * Sources used: none
  */
 import { DATA } from '../api/mockData.js';
-import { isContractOpen, resetCareer } from '../core/career.js';
-import { ROLES, ATTACHMENT_NODES, MAX_PARTS, SNAP_RADIUS_PX } from '../config.js';
+import { isContractOpen, toggleGodMode, resetCareer } from '../core/career.js';
+import { ATTACHMENT_NODES, MAX_PARTS, SNAP_RADIUS_PX } from '../config.js';
 import {
   appState,
   getNodeCategory,
-  canCurrentRoleEditPart,
   saveUndoSnapshot,
+  saveMissionProgress,
   AudioEngine
 } from '../core/state.js';
 import {
@@ -32,6 +32,8 @@ import {
   navigateToStage,
   renderObjectiveStage,
   refreshBuilderView,
+  updateBuilderLiveDrag,
+  updateCareerButton,
   showReviewModal,
   showCompareModal,
   showDesignCodeModal,
@@ -50,7 +52,7 @@ function clientToWorldCoords(event) {
 
 function rotateSelectedPart(direction) {
   const part = appState.selectedPartUid && findPartByUid(appState.selectedPartUid);
-  if (!part || !canCurrentRoleEditPart(part.id)) return;
+  if (!part) return;
 
   saveUndoSnapshot();
   const angle = direction * 90;
@@ -74,7 +76,7 @@ function rotateSelectedPart(direction) {
 
 function flipSelectedPart() {
   const part = appState.selectedPartUid && findPartByUid(appState.selectedPartUid);
-  if (!part || !canCurrentRoleEditPart(part.id)) return;
+  if (!part) return;
 
   saveUndoSnapshot();
   const pivotX = part.par != null ? getNodeWorldPosition(part, part.cn)[0] : part.x;
@@ -92,7 +94,7 @@ function flipSelectedPart() {
 
 function deleteSelectedPart() {
   const part = appState.selectedPartUid && findPartByUid(appState.selectedPartUid);
-  if (!part || !canCurrentRoleEditPart(part.id)) return;
+  if (!part) return;
 
   saveUndoSnapshot();
   deletePartSubtree(part.u);
@@ -110,7 +112,54 @@ function undoLastAction() {
   refreshBuilderView();
 }
 
+function activateSecretGodMode() {
+  const enabled = toggleGodMode();
+  updateCareerButton();
+  if (appState.mission.stage === 1) renderObjectiveStage();
+  showToast(
+    enabled
+      ? 'Director Override active: all Solar System destinations unlocked.'
+      : 'Director Override off: standard Career locks restored.'
+  );
+}
+
 export function bindGlobalControls() {
+  // Block native browser HTML5 ghost-dragging on all images/buttons across the entire app
+  document.addEventListener('dragstart', e => {
+    e.preventDefault();
+  });
+
+  let logoClicks = 0;
+  let logoClickTimer = null;
+  const registerLogoTap = () => {
+    logoClicks++;
+    clearTimeout(logoClickTimer);
+    logoClickTimer = setTimeout(() => { logoClicks = 0; }, 2200);
+    if (logoClicks >= 5) {
+      logoClicks = 0;
+      activateSecretGodMode();
+    }
+  };
+
+  $('#tt')?.addEventListener('click', registerLogoTap);
+  $('#brand-home')?.addEventListener('click', e => {
+    e.preventDefault();
+    registerLogoTap();
+  });
+
+  let keyBuffer = '';
+  document.addEventListener('keydown', e => {
+    if (/SELECT|TEXTAREA|INPUT/.test(e.target.tagName)) return;
+    if (e.key && e.key.length === 1) {
+      keyBuffer = (keyBuffer + e.key.toLowerCase()).slice(-6);
+      if (keyBuffer === 'apogee') {
+        keyBuffer = '';
+        activateSecretGodMode();
+      }
+    }
+  });
+
+  // Placed parts stay locked in place during click / long-press; only palette parts drag onto nodes
   document.addEventListener('pointerdown', e => {
     if (appState.mission.stage !== 2) return;
 
@@ -120,72 +169,61 @@ export function bindGlobalControls() {
     e.preventDefault();
 
     if (paletteEl) {
-      appState.activeDrag = { nid: paletteEl.dataset.p, x: e.clientX, y: e.clientY, mv: false };
+      appState.activeDrag = {
+        nid: paletteEl.dataset.p,
+        pointerId: e.pointerId,
+        x: e.clientX,
+        y: e.clientY,
+        mv: false
+      };
       return;
     }
 
     const part = findPartByUid(+placedEl.dataset.u);
-    appState.selectedPartUid = part.u;
-    if (!canCurrentRoleEditPart(part.id)) {
-      showToast('That part belongs to another role. Pass the keyboard.');
+    if (part && appState.selectedPartUid !== part.u) {
+      appState.selectedPartUid = part.u;
+      AudioEngine.click();
       refreshBuilderView();
-      return;
     }
-
-    appState.activeDrag = {
-      u: part.u,
-      w0: clientToWorldCoords(e),
-      x: e.clientX,
-      y: e.clientY,
-      mv: false
-    };
-    refreshBuilderView();
   });
 
   document.addEventListener('pointermove', e => {
     const drag = appState.activeDrag;
-    if (!drag) return;
+    if (!drag || !drag.nid || e.pointerId !== drag.pointerId) return;
 
     if (!drag.mv) {
-      if (Math.hypot(e.clientX - drag.x, e.clientY - drag.y) < 5) return;
+      if (Math.hypot(e.clientX - drag.x, e.clientY - drag.y) < 10) return;
 
-      if (drag.nid) {
-        const partId = drag.nid;
-        const hasCategory = cat => appState.mission.parts.some(p => getNodeCategory(p.id) === cat);
+      const partId = drag.nid;
+      const hasCategory = cat => appState.mission.parts.some(p => getNodeCategory(p.id) === cat);
 
-        if (!canCurrentRoleEditPart(partId)) {
-          appState.activeDrag = null;
-          return showToast('That part belongs to another role. Pass the keyboard.');
-        }
-        if (hasCategory('bus') && getNodeCategory(partId) === 'bus') {
-          appState.activeDrag = null;
-          return showToast('One bus per ship. Click a different bus in the list to swap it.');
-        }
-        if (hasCategory('eng') && getNodeCategory(partId) === 'eng') {
-          appState.activeDrag = null;
-          return showToast('One main engine. Click a different engine in the list to swap it.');
-        }
-        if (appState.mission.parts.length >= MAX_PARTS) {
-          appState.activeDrag = null;
-          return showToast(`Part limit reached (${MAX_PARTS}).`);
-        }
-
-        saveUndoSnapshot();
-        const worldPos = clientToWorldCoords(e);
-        const newPart = createPartInstance(partId, worldPos[0], worldPos[1]);
-        appState.selectedPartUid = newPart.u;
-        appState.activeDrag = { u: newPart.u, w0: worldPos, x: e.clientX, y: e.clientY, mv: true };
-      } else {
-        saveUndoSnapshot();
-        findPartByUid(drag.u).par = null;
-        drag.mv = true;
+      if (hasCategory('bus') && getNodeCategory(partId) === 'bus') {
+        appState.activeDrag = null;
+        return showToast('One bus per ship. Click a different bus in the list to swap it.');
+      }
+      if (hasCategory('eng') && getNodeCategory(partId) === 'eng') {
+        appState.activeDrag = null;
+        return showToast('One main engine. Click a different engine in the list to swap it.');
+      }
+      if (appState.mission.parts.length >= MAX_PARTS) {
+        appState.activeDrag = null;
+        return showToast(`Part limit reached (${MAX_PARTS}).`);
       }
 
-      appState.activeDrag.orig = {};
-      getSubtreeUids(appState.activeDrag.u).forEach(uid => {
-        const q = findPartByUid(uid);
-        appState.activeDrag.orig[uid] = [q.x, q.y];
-      });
+      saveUndoSnapshot();
+      const worldPos = clientToWorldCoords(e);
+      const newPart = createPartInstance(partId, worldPos[0], worldPos[1]);
+      appState.selectedPartUid = newPart.u;
+      appState.activeDrag = {
+        u: newPart.u,
+        pointerId: e.pointerId,
+        w0: worldPos,
+        x: e.clientX,
+        y: e.clientY,
+        mv: true,
+        orig: { [newPart.u]: [newPart.x, newPart.y] }
+      };
+      refreshBuilderView();
       AudioEngine.click();
     }
 
@@ -194,12 +232,10 @@ export function bindGlobalControls() {
     const dx = worldPos[0] - activeDrag.w0[0];
     const dy = worldPos[1] - activeDrag.w0[1];
     const draggedPart = findPartByUid(activeDrag.u);
+    if (!draggedPart) return;
 
-    getSubtreeUids(activeDrag.u).forEach(uid => {
-      const q = findPartByUid(uid);
-      q.x = activeDrag.orig[uid][0] + dx;
-      q.y = activeDrag.orig[uid][1] + dy;
-    });
+    draggedPart.x = activeDrag.orig[draggedPart.u][0] + dx;
+    draggedPart.y = activeDrag.orig[draggedPart.u][1] + dy;
 
     activeDrag.sn = null;
     if (getNodeCategory(draggedPart.id) !== 'bus') {
@@ -207,7 +243,6 @@ export function bindGlobalControls() {
       const draggedTree = new Set(getSubtreeUids(activeDrag.u));
       let closestDist = SNAP_RADIUS_PX;
 
-      const hasChildren = appState.mission.parts.some(q => q.par === draggedPart.u);
       const origFlip = draggedPart.flip;
       const origRot = draggedPart.rot;
 
@@ -220,7 +255,7 @@ export function bindGlobalControls() {
           ATTACHMENT_NODES[getNodeCategory(host.id)].forEach(([hostNode]) => {
             if (occupied.has(`${host.u}:${hostNode}`) || isStackNode(childNode) !== isStackNode(hostNode)) return;
 
-            if (!isStackNode(childNode) && !hasChildren) {
+            if (!isStackNode(childNode)) {
               draggedPart.rot = 0;
               draggedPart.flip = hostNode.startsWith('L') ? 1 : 0;
             }
@@ -246,12 +281,12 @@ export function bindGlobalControls() {
       }
     }
 
-    refreshBuilderView();
+    updateBuilderLiveDrag();
   });
 
-  document.addEventListener('pointerup', e => {
+  const finishPointerDrag = e => {
     const drag = appState.activeDrag;
-    if (!drag) return;
+    if (!drag || (e.pointerId !== undefined && e.pointerId !== drag.pointerId)) return;
     appState.activeDrag = null;
 
     if (!drag.mv) {
@@ -283,7 +318,10 @@ export function bindGlobalControls() {
     }
 
     refreshBuilderView();
-  });
+  };
+
+  document.addEventListener('pointerup', finishPointerDrag);
+  document.addEventListener('pointercancel', finishPointerDrag);
 
   document.addEventListener('keydown', e => {
     if (e.key === 'Enter' || e.key === ' ') {
@@ -359,11 +397,12 @@ export function bindGlobalControls() {
         if (!isContractOpen(DATA.contracts[+v].id)) return showToast('That destination is locked. Check Career for the requirement.');
         appState.mission.ci = +v;
         appState.mission.oi = 0;
+        saveMissionProgress();
         return renderObjectiveStage();
       }
-      if (a === 'oi') { appState.mission.oi = +v; return renderObjectiveStage(); }
-      if (a === 'L') { appState.mission.L = v; return renderObjectiveStage(); }
-      if (a === 'hd') { appState.mission.hard = +v; return renderObjectiveStage(); }
+      if (a === 'oi') { appState.mission.oi = +v; saveMissionProgress(); return renderObjectiveStage(); }
+      if (a === 'L') { appState.mission.L = v; saveMissionProgress(); return renderObjectiveStage(); }
+      if (a === 'hd') { appState.mission.hard = +v; saveMissionProgress(); return renderObjectiveStage(); }
       if (a === 'go2') return navigateToStage(2);
       if (a === 'go1') return navigateToStage(1);
       if (a === 'rot') return rotateSelectedPart(1);
@@ -386,8 +425,9 @@ export function bindGlobalControls() {
 
     if (e.target.id === 'car') showCareerModal();
 
-    if (e.target.id === 'creset' && confirm('Erase all unlocked planets and achievements?')) {
+    if (e.target.id === 'creset') {
       resetCareer();
+      localStorage.removeItem('apogeeMissionState');
       location.reload();
     }
 
@@ -398,24 +438,27 @@ export function bindGlobalControls() {
       saveUndoSnapshot();
       appState.mission = { ...appState.mission, ...candidateData, stage: 2 };
       appState.selectedPartUid = null;
+      saveMissionProgress();
       $('#rev').hidden = true;
       navigateToStage(2);
     }
     if (deleteCandidateBtn) {
       appState.candidates.splice(+deleteCandidateBtn.dataset.x, 1);
+      saveMissionProgress();
       appState.candidates.length ? showCompareModal() : ($('#rev').hidden = true);
     }
 
     if (e.target.id === 'start') {
       $('#title').hidden = true;
       AudioEngine.setMusic('design');
-      navigateToStage(1);
+      navigateToStage(appState.mission.stage || 1);
     }
 
     if (e.target.id === 'demo-ok') {
       $('#title').hidden = true;
       buildStarterSpacecraft();
       autoAttachPart('ant_lg');
+      saveMissionProgress();
       AudioEngine.setMusic('design');
       navigateToStage(2);
       showToast('Loaded complete starter spacecraft. Click "Design review and launch" to simulate.');
@@ -424,6 +467,7 @@ export function bindGlobalControls() {
     if (e.target.id === 'demo-fail') {
       $('#title').hidden = true;
       buildFailingDemoSpacecraft();
+      saveMissionProgress();
       AudioEngine.setMusic('design');
       navigateToStage(2);
       showToast('Loaded overweight/under-fueled Mars design to inspect failure diagnostics.');
@@ -431,12 +475,6 @@ export function bindGlobalControls() {
 
     if (['x', 'hp', 'hp2'].includes(e.target.id)) {
       $('#help').hidden = e.target.id === 'x';
-    }
-
-    if (e.target.id === 'pass') {
-      const roles = Object.keys(ROLES);
-      appState.activeRole = roles[(roles.indexOf(appState.activeRole) + 1) % roles.length];
-      navigateToStage(appState.mission.stage);
     }
 
     if (e.target.id === 'copy-code-btn') {
@@ -465,6 +503,7 @@ export function bindGlobalControls() {
 
         if (isValid) {
           appState.mission = { ...appState.mission, ...decoded, stage: 2 };
+          saveMissionProgress();
           $('#rev').hidden = true;
           navigateToStage(2);
           showToast('Design loaded successfully.');
@@ -477,11 +516,6 @@ export function bindGlobalControls() {
     }
   });
 
-  $('#team').addEventListener('change', e => {
-    appState.isTeamMode = e.target.checked;
-    navigateToStage(appState.mission.stage);
-  });
-
   $('#mute').addEventListener('click', e => {
     const isNowOn = AudioEngine.toggleMute();
     e.target.textContent = `Sound: ${isNowOn ? 'on' : 'off'}`;
@@ -491,4 +525,4 @@ export function bindGlobalControls() {
   $('#copy').addEventListener('click', () => {
     showDesignCodeModal();
   });
-}
+} 
