@@ -9,9 +9,25 @@ export const CONTENT = {
   tagline: 'Every kilogram is a decision.',
   bgVideo: 'assets/bg/space.mp4',
   bgCredit: '',
+  audioTracks: {
+    landing: 'assets/audio/Landing.mp3',
+    design: 'assets/audio/design.mp3',
+    win: 'assets/audio/win.mp3',
+    loss: 'assets/audio/loss.mp3'
+  },
   disclaimer: 'Mission design simulation — simplified engineering model. Reference tags shown per parameter.',
   stageNames: ['Objective', 'Build', 'Launch', 'Debrief'],
   subResources: ['Delta-v', 'Battery', 'Ion power'],
+  uiLabels: {
+    alertsHeading: 'Engineering alerts',
+    alertsClear: 'All margins & checks clear',
+    alertsCount: '{red} critical · {amber} thin',
+    alertCriticalTag: 'CRITICAL',
+    alertAmberTag: 'THIN MARGIN',
+    massTopic: 'Mass & Propulsion',
+    powerTopic: 'Power & Energy',
+    commsEmptyHint: 'No antenna installed — attach an antenna to transmit science data.'
+  },
   outcomeLabels: {
     success: 'Mission accomplished',
     partial: 'Partial success',
