@@ -30,7 +30,7 @@ export const appState = {
   highScores: {},
   isFlying: false,
   selectedPartUid: null,
-  canvasZoom: 0.8,
+  canvasZoom: 0.9,
   undoHistory: [],
   activeDrag: null,
   dataSourceLabel: 'Offline sample'

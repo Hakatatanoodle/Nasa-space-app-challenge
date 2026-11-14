@@ -243,7 +243,7 @@ export function renderBuilderStage() {
     refreshBuilderView();
   };
 
-  refreshBuilderView();
+  autoFitBuilderCanvas();
 }
 
 function renderSpacecraftCanvas(telemetry) {
@@ -268,16 +268,15 @@ function renderSpacecraftCanvas(telemetry) {
     `;
   }).join('');
 
-  if (isDragging) {
-    const draggedSubtree = new Set(getSubtreeUids(drag.u));
-    appState.mission.parts.forEach(part => {
-      ATTACHMENT_NODES[getNodeCategory(part.id)].forEach(([nodeName]) => {
-        if (occupied.has(`${part.u}:${nodeName}`)) return;
-        const [x, y] = getNodeWorldPosition(part, nodeName);
-        html += `<i class="nd ${draggedSubtree.has(part.u) ? 'own' : ''}" style="left:${x}px; top:${y}px;"></i>`;
-      });
+  const draggedSubtree = isDragging ? new Set(getSubtreeUids(drag.u)) : new Set();
+  appState.mission.parts.forEach(part => {
+    ATTACHMENT_NODES[getNodeCategory(part.id)].forEach(([nodeName]) => {
+      if (occupied.has(`${part.u}:${nodeName}`)) return;
+      const [x, y] = getNodeWorldPosition(part, nodeName);
+      const nodeCls = isDragging ? (draggedSubtree.has(part.u) ? 'own' : '') : 'idle';
+      html += `<i class="nd ${nodeCls}" style="left:${x}px; top:${y}px;"></i>`;
     });
-  }
+  });
 
   if (isDragging && drag.sn) {
     const [snapX, snapY] = getNodeWorldPosition(findPartByUid(drag.sn.h), drag.sn.hn);
@@ -292,6 +291,20 @@ function renderSpacecraftCanvas(telemetry) {
   }
 
   return html;
+}
+
+
+
+
+
+function autoFitBuilderCanvas() {
+  const cv = $('#cv');
+  if (!cv) return;
+  const idealZoom = Math.max(0.75, Math.min(1.05, +(cv.clientWidth / 920).toFixed(2)));
+  appState.canvasZoom = idealZoom;
+  refreshBuilderView();
+  cv.scrollLeft = Math.max(0, (960 * idealZoom - cv.clientWidth) / 2);
+  cv.scrollTop = 40;
 }
 
 export function refreshBuilderView() {
@@ -311,8 +324,8 @@ export function refreshBuilderView() {
   $('#so').innerHTML = contract.orbits.map((o, i) => `<option value="${i}">${o.n}</option>`).join('');
   $('#so').value = mission.oi;
 
-  $('#wr').style.width = `${800 * appState.canvasZoom}px`;
-  $('#wr').style.height = `${1000 * appState.canvasZoom}px`;
+  $('#wr').style.width = `${960 * appState.canvasZoom}px`;
+  $('#wr').style.height = `${1100 * appState.canvasZoom}px`;
   $('#world').style.transform = `scale(${appState.canvasZoom})`;
   $('#world').innerHTML = renderSpacecraftCanvas(telemetry);
 
