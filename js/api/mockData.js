@@ -1,6 +1,9 @@
 /* File: js/api/mockData.js
  * Owner: Person A (Ashmin - structure), Person C (Yochan - values)
- * AI-assisted: YES — Gemini, 2026-11-14; Gemini, 2026-11-15; Claude, 2026-11-14; Claude, 2026-11-15 (two manual burns). Reviewed by a human: NO.
+ * AI-assisted: YES — Gemini, 2026-11-14; Gemini, 2026-11-15; Claude, 2026-11-14; Claude, 2026-11-15 (two manual burns). Reviewed by a human:  modified:   js/core/career.js
+        modified:   js/core/engine.js
+        modified:   js/core/planets.js
+        modified:   js/core/state.js
  * Sources used: NASA_CUBESAT101, JPL_CML, NASA_SE_WEBINAR
  */
 

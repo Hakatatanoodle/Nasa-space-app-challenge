@@ -1,6 +1,6 @@
 /* File: js/ui/renderer.js
  * Owner: Person B (Saurav)
- * AI-assisted: YES — Gemini, 2026-11-14; Gemini, 2026-11-15; Claude, 2026-11-14; Claude, 2026-11-15 (two manual burns). Reviewed by a human: NO.
+ * AI-assisted: YES — Gemini, 2026-11-14; Gemini, 2026-11-15; Claude, 2026-11-14; Claude, 2026-11-15 (two manual burns). Reviewed by a human:YES Reviewd by Person C (Yochan)
  * Sources used: NASA_CUBESAT101, JPL_CML
  */
 import { DATA } from '../api/mockData.js';

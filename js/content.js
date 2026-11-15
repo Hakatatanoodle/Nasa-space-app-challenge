@@ -1,6 +1,6 @@
 /* File: js/content.js
  * Owner: Person C (Yochan)
- * AI-assisted: YES — Gemini, 2026-11-14; Gemini, 2026-11-15; Claude, 2026-11-14; Claude, 2026-11-15 (two manual burns). Reviewed by a human: NO.
+ * AI-assisted: YES — Gemini, 2026-11-14; Gemini, 2026-11-15; Claude, 2026-11-14; Claude, 2026-11-15 (two manual burns). Reviewed by a human: YES Reviewd by Person C (Yochan)
  * Sources used: NASA_CUBESAT101, JPL_CML
  */
 
