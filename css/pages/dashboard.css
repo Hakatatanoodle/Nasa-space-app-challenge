@@ -13,8 +13,7 @@
   padding: 16px;
   text-align: center;
   overflow: hidden;
-  background: radial-gradient(circle at 68% 32%, #14365a33, #07162994 75%);
-  transform: translateZ(0);
+  background: radial-gradient(circle at 68% 32%, #14365a33, #07162994 72%);
 }
 
 .tbox {
@@ -26,10 +25,10 @@
   gap: 10px;
   max-width: 740px;
   padding: 24px 28px;
-  background: #091b30cc;
-  border: 1px solid #3c78b588;
+  background: #091b30c4;
+  border: 1px solid #3c78b577;
   border-radius: 18px;
-  box-shadow: 0 14px 36px #030a1499;
+  box-shadow: 0 18px 48px #030a14aa;
 }
 
 .tbox .row {
@@ -42,6 +41,7 @@
   margin: 0;
   font-size: clamp(2.4rem, 8vw, 4.5rem);
   letter-spacing: 8px;
+  text-shadow: 0 4px 22px #040d18cc;
   cursor: pointer;
   user-select: none;
 }
@@ -50,6 +50,7 @@
   margin: 0 0 10px;
   font-size: 1.1rem;
   color: #dce9f7;
+  text-shadow: 0 2px 10px #040d18cc;
 }
 
 #start {
@@ -63,6 +64,7 @@
   background: #ffd475;
 }
 
+/* Pure GPU translate3d animation without drop-shadow repaints */
 .trk {
   height: 165px;
   will-change: transform;
@@ -75,13 +77,13 @@
   bottom: -45px;
   width: 240px;
   z-index: 1;
-  opacity: 0.88;
+  opacity: 0.85;
   pointer-events: none;
 }
 
 @keyframes bob {
   0%, 100% { transform: translate3d(0, 0, 0); }
-  50% { transform: translate3d(0, -9px, 0); }
+  50% { transform: translate3d(0, -10px, 0); }
 }
 
 body:has(#title:not([hidden])) header,

@@ -8,6 +8,9 @@ import { CONTENT } from '../content.js';
 import { MAX_HISTORY, DEFAULT_SEED } from '../config.js';
 
 const MISSION_STORAGE_KEY = 'apogeeMissionState';
+const SAVED_BUILDS_KEY = 'apogeeSavedBuilds';
+const VOLUME_STORAGE_KEY = 'apogeeVolume';
+const MAX_SAVED_BUILDS = 12;
 
 export function createInitialMission(contractIndex = 1) {
   return {
@@ -28,6 +31,7 @@ export const appState = {
   mission: createInitialMission(1),
   marginThreshold: 0.1,
   candidates: [],
+  savedBuilds: [],
   previousErrorCount: 0,
   highScores: {},
   isFlying: false,
@@ -54,6 +58,54 @@ try {
   appState.highScores = {};
 }
 
+try {
+  const rawBuilds = JSON.parse(localStorage[SAVED_BUILDS_KEY] || '[]');
+  if (Array.isArray(rawBuilds)) appState.savedBuilds = rawBuilds;
+} catch {
+  appState.savedBuilds = [];
+}
+
+function persistSavedBuilds() {
+  try {
+    localStorage[SAVED_BUILDS_KEY] = JSON.stringify(appState.savedBuilds);
+  } catch {}
+}
+
+export function saveNamedBuild(customName = '') {
+  const { parts, nu, L, oi, ci, hard, seed, d } = appState.mission;
+  if (!parts.length) return { ok: false, message: 'Add at least one part before saving a build.' };
+
+  const contractName = DATA.contracts[ci]?.n || 'Mission';
+  const name = customName.trim() || `${contractName} Build #${appState.savedBuilds.length + 1}`;
+  const entry = {
+    id: `build_${Date.now()}`,
+    name,
+    savedAt: new Date().toLocaleDateString(undefined, { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }),
+    mission: { parts: JSON.parse(JSON.stringify(parts)), nu, L, oi, ci, hard, seed },
+    summary: {
+      contract: contractName,
+      orbit: DATA.contracts[ci]?.orbits[oi]?.n || '',
+      launcher: DATA.launchers[L]?.n || L,
+      massKg: d ? Math.round(d.m0) : 0,
+      dvMs: d ? Math.round(d.dv) : 0,
+      costM: d ? Math.round(d.cost) : 0,
+      partCount: parts.length
+    }
+  };
+
+  appState.savedBuilds.unshift(entry);
+  if (appState.savedBuilds.length > MAX_SAVED_BUILDS) {
+    appState.savedBuilds.length = MAX_SAVED_BUILDS;
+  }
+  persistSavedBuilds();
+  return { ok: true, entry };
+}
+
+export function deleteSavedBuild(buildId) {
+  appState.savedBuilds = appState.savedBuilds.filter(b => b.id !== buildId);
+  persistSavedBuilds();
+}
+
 export function saveMissionProgress() {
   try {
     const { d, res, ...serializable } = appState.mission;
@@ -74,7 +126,7 @@ export function loadSavedMissionProgress() {
         p => p.id === 'tank' || DATA.parts[p.id] || DATA.engines[p.id]
       );
       if (validParts && DATA.contracts[saved.mission.ci] && DATA.launchers[saved.mission.L]) {
-        appState.mission = { ...createInitialMission(saved.mission.ci), ...saved.mission };
+        appState.mission = { ...createInitialMission(saved.mission.ci), ...saved.mission, stage: 1 };
         if (Array.isArray(saved.candidates)) {
           appState.candidates = saved.candidates.slice(0, 3);
         }
@@ -116,18 +168,36 @@ export function saveUndoSnapshot() {
 
 /* ---- Web Audio Synthesizer & Smooth Crossfading Screen Music Controller ---- */
 export const AudioEngine = (() => {
-  const TARGET_VOLUME = 0.36;
+  const MAX_MUSIC_VOL = 0.48;
+  const MAX_SFX_GAIN = 0.6;
   const CROSSFADE_MS = 700;
+
+  let savedLevel = 0.75;
+  try {
+    const raw = parseFloat(localStorage[VOLUME_STORAGE_KEY]);
+    if (!Number.isNaN(raw) && raw >= 0 && raw <= 1) savedLevel = raw;
+  } catch {}
 
   let ctx = null;
   let masterGain = null;
-  let isSoundOn = true;
+  let masterLevel = savedLevel;
+  let lastNonZeroLevel = savedLevel > 0 ? savedLevel : 0.75;
+  let isSoundOn = savedLevel > 0;
   let activeTrackKey = 'landing';
   let activeAudioEl = null;
   let unlockBound = false;
 
   const trackElements = {};
   const fadeTimers = new WeakMap();
+
+  const getMusicTargetVolume = () => (isSoundOn ? MAX_MUSIC_VOL * masterLevel : 0);
+  const getSfxTargetGain = () => (isSoundOn ? MAX_SFX_GAIN * masterLevel : 0);
+
+  const persistVolume = () => {
+    try {
+      localStorage[VOLUME_STORAGE_KEY] = String(masterLevel);
+    } catch {}
+  };
 
   const fadeAudio = (audio, targetVol, durationMs, onDone = null) => {
     if (!audio) return;
@@ -192,7 +262,7 @@ export const AudioEngine = (() => {
           el.volume = 0;
           el.play()
             .then(() => {
-              fadeAudio(el, TARGET_VOLUME, CROSSFADE_MS);
+              fadeAudio(el, getMusicTargetVolume(), CROSSFADE_MS);
               cleanup();
             })
             .catch(() => {});
@@ -237,7 +307,7 @@ export const AudioEngine = (() => {
     }
 
     if (activeAudioEl === nextEl && !nextEl.paused && !forceRestart) {
-      fadeAudio(nextEl, TARGET_VOLUME, CROSSFADE_MS);
+      fadeAudio(nextEl, getMusicTargetVolume(), CROSSFADE_MS);
       return;
     }
 
@@ -249,7 +319,7 @@ export const AudioEngine = (() => {
     if (forceRestart) nextEl.currentTime = 0;
     nextEl.volume = 0;
     nextEl.play()
-      .then(() => fadeAudio(nextEl, TARGET_VOLUME, CROSSFADE_MS))
+      .then(() => fadeAudio(nextEl, getMusicTargetVolume(), CROSSFADE_MS))
       .catch(() => bindAutoplayUnlock());
   };
 
@@ -259,7 +329,7 @@ export const AudioEngine = (() => {
       if (AudioCtx) {
         ctx = new AudioCtx();
         masterGain = ctx.createGain();
-        masterGain.gain.value = isSoundOn ? 0.45 : 0;
+        masterGain.gain.value = getSfxTargetGain();
         masterGain.connect(ctx.destination);
       }
     }
@@ -269,7 +339,7 @@ export const AudioEngine = (() => {
   };
 
   const playTone = (freq, delay, duration, type = 'sine', volume = 0.2, endFreq = null) => {
-    if (!isSoundOn) return;
+    if (!isSoundOn || masterLevel <= 0) return;
     init();
     if (!ctx) return;
     const osc = ctx.createOscillator();
@@ -292,18 +362,50 @@ export const AudioEngine = (() => {
   return {
     init,
     isEnabled: () => isSoundOn,
+    getVolume: () => Math.round(masterLevel * 100),
+    setVolume(percent) {
+      const clamped = Math.max(0, Math.min(100, Number(percent) || 0)) / 100;
+      masterLevel = clamped;
+      if (clamped > 0) {
+        lastNonZeroLevel = clamped;
+        isSoundOn = true;
+      } else {
+        isSoundOn = false;
+      }
+      persistVolume();
+      init();
+      if (masterGain) masterGain.gain.value = getSfxTargetGain();
+
+      if (isSoundOn) {
+        if (activeAudioEl && !activeAudioEl.paused) {
+          const prevRaf = fadeTimers.get(activeAudioEl);
+          if (prevRaf) cancelAnimationFrame(prevRaf);
+          activeAudioEl.volume = getMusicTargetVolume();
+        } else {
+          playTrack(activeTrackKey || 'landing');
+        }
+      } else if (activeAudioEl) {
+        fadeOutAndStop(activeAudioEl);
+        activeAudioEl = null;
+      }
+      return { isSoundOn, volumePct: Math.round(masterLevel * 100) };
+    },
     setMusic: (key, forceRestart = false) => playTrack(key, forceRestart),
     toggleMute() {
       isSoundOn = !isSoundOn;
+      if (isSoundOn && masterLevel <= 0) {
+        masterLevel = lastNonZeroLevel;
+      }
+      persistVolume();
       init();
-      if (masterGain) masterGain.gain.value = isSoundOn ? 0.45 : 0;
+      if (masterGain) masterGain.gain.value = getSfxTargetGain();
       if (isSoundOn) {
         playTrack(activeTrackKey || 'landing');
       } else if (activeAudioEl) {
         fadeOutAndStop(activeAudioEl);
         activeAudioEl = null;
       }
-      return isSoundOn;
+      return { isSoundOn, volumePct: Math.round(masterLevel * 100) };
     },
     click: () => playTone(660, 0, 0.05, 'square', 0.06),
     attach: () => {

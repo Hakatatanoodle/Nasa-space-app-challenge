@@ -11,6 +11,8 @@ import {
   getNodeCategory,
   saveUndoSnapshot,
   saveMissionProgress,
+  saveNamedBuild,
+  deleteSavedBuild,
   AudioEngine
 } from '../core/state.js';
 import {
@@ -32,8 +34,10 @@ import {
   navigateToStage,
   renderObjectiveStage,
   refreshBuilderView,
+  centerBuilderCanvas,
   updateBuilderLiveDrag,
   updateCareerButton,
+  showSavedBuildsModal,
   showReviewModal,
   showCompareModal,
   showDesignCodeModal,
@@ -132,7 +136,31 @@ function closeOpenModals() {
   $('#help').hidden = true;
 }
 
+function syncAudioControls({ isSoundOn, volumePct }) {
+  const muteBtn = $('#mute');
+  const volSlider = $('#vol');
+  const wrapper = muteBtn?.closest('.audio-control');
+
+  if (muteBtn) {
+    muteBtn.textContent = `Sound: ${isSoundOn ? 'on' : 'off'}`;
+    muteBtn.classList.toggle('sound-on', isSoundOn);
+  }
+  if (volSlider) {
+    volSlider.value = isSoundOn ? String(volumePct) : '0';
+    volSlider.title = `Master volume (${isSoundOn ? volumePct : 0}%)`;
+  }
+  if (wrapper) {
+    wrapper.classList.toggle('is-muted', !isSoundOn);
+  }
+}
+
 export function bindGlobalControls() {
+  // Initialize volume slider state from saved AudioEngine volume
+  syncAudioControls({
+    isSoundOn: AudioEngine.isEnabled(),
+    volumePct: AudioEngine.getVolume()
+  });
+
   document.addEventListener('dragstart', e => {
     e.preventDefault();
   });
@@ -174,7 +202,6 @@ export function bindGlobalControls() {
     }
   });
 
-  // Free-form part separation, drag & re-attachment when unlocked; locked mode prevents moves
   document.addEventListener('pointerdown', e => {
     if (appState.mission.stage !== 2) return;
 
@@ -426,6 +453,7 @@ export function bindGlobalControls() {
     const delta = e.deltaY < 0 ? 0.08 : -0.08;
     appState.canvasZoom = Math.max(0.45, Math.min(1.5, +(appState.canvasZoom + delta).toFixed(2)));
     refreshBuilderView();
+    centerBuilderCanvas();
   }, { passive: false });
 
   document.addEventListener('pointerdown', e => {
@@ -474,8 +502,18 @@ export function bindGlobalControls() {
       if (a === 'flp') return flipSelectedPart();
       if (a === 'del') return deleteSelectedPart();
       if (a === 'undo') return undoLastAction();
-      if (a === 'zi') { appState.canvasZoom = Math.min(1.3, appState.canvasZoom + 0.1); return refreshBuilderView(); }
-      if (a === 'zo') { appState.canvasZoom = Math.max(0.35, appState.canvasZoom - 0.1); return refreshBuilderView(); }
+      if (a === 'zi') {
+        appState.canvasZoom = Math.min(1.3, +(appState.canvasZoom + 0.1).toFixed(2));
+        refreshBuilderView();
+        centerBuilderCanvas();
+        return;
+      }
+      if (a === 'zo') {
+        appState.canvasZoom = Math.max(0.45, +(appState.canvasZoom - 0.1).toFixed(2));
+        refreshBuilderView();
+        centerBuilderCanvas();
+        return;
+      }
       if (a === 'rev') return showReviewModal();
       return;
     }
@@ -490,7 +528,43 @@ export function bindGlobalControls() {
     if (e.target.id === 'creset') {
       resetCareer();
       localStorage.removeItem('apogeeMissionState');
+      localStorage.removeItem('apogeeSavedBuilds');
       location.reload();
+    }
+
+    if (e.target.id === 'confirm-save-build') {
+      const inputEl = $('#new-build-name');
+      const res = saveNamedBuild(inputEl ? inputEl.value : '');
+      if (!res.ok) return showToast(res.message);
+      AudioEngine.attach();
+      const myBuildsBtn = $('#my-builds');
+      if (myBuildsBtn) myBuildsBtn.textContent = `My builds (${appState.savedBuilds.length})`;
+      showSavedBuildsModal();
+      showToast(`Saved "${res.entry.name}".`);
+    }
+
+    const loadBuildBtn = e.target.closest('[data-load-build]');
+    const delBuildBtn = e.target.closest('[data-del-build]');
+    if (loadBuildBtn) {
+      const build = appState.savedBuilds.find(b => b.id === loadBuildBtn.dataset.loadBuild);
+      if (build) {
+        if (DATA.contracts[build.mission.ci] && !isContractOpen(DATA.contracts[build.mission.ci].id)) {
+          return showToast('That saved build targets a destination still locked in Career mode.');
+        }
+        saveUndoSnapshot();
+        appState.mission = { ...appState.mission, ...JSON.parse(JSON.stringify(build.mission)), stage: 2, locked: false };
+        appState.selectedPartUid = null;
+        saveMissionProgress();
+        $('#rev').hidden = true;
+        navigateToStage(2);
+        showToast(`Loaded "${build.name}".`);
+      }
+    }
+    if (delBuildBtn) {
+      deleteSavedBuild(delBuildBtn.dataset.delBuild);
+      const myBuildsBtn = $('#my-builds');
+      if (myBuildsBtn) myBuildsBtn.textContent = `My builds (${appState.savedBuilds.length})`;
+      showSavedBuildsModal();
     }
 
     const loadCandidateBtn = e.target.closest('[data-c]');
@@ -513,7 +587,7 @@ export function bindGlobalControls() {
     if (e.target.id === 'start') {
       $('#title').hidden = true;
       AudioEngine.setMusic('design');
-      navigateToStage(appState.mission.stage || 1);
+      navigateToStage(1);
     }
 
     if (e.target.id === 'demo-ok') {
@@ -580,10 +654,12 @@ export function bindGlobalControls() {
     }
   });
 
-  $('#mute').addEventListener('click', e => {
-    const isNowOn = AudioEngine.toggleMute();
-    e.target.textContent = `Sound: ${isNowOn ? 'on' : 'off'}`;
-    e.target.classList.toggle('sound-on', isNowOn);
+  $('#mute').addEventListener('click', () => {
+    syncAudioControls(AudioEngine.toggleMute());
+  });
+
+  $('#vol')?.addEventListener('input', e => {
+    syncAudioControls(AudioEngine.setVolume(e.target.value));
   });
 
   $('#copy').addEventListener('click', () => {

@@ -24,7 +24,10 @@
     </a>
     <nav id="nav" aria-label="Mission stages"></nav>
     <button type="button" id="car"></button>
-    <button type="button" id="mute" class="sound-on">Sound: on</button>
+    <div class="audio-control" role="group" aria-label="Audio controls">
+      <button type="button" id="mute" class="sound-on">Sound: on</button>
+      <input type="range" id="vol" min="0" max="100" value="75" aria-label="Master volume" title="Master volume (75%)" />
+    </div>
     <button type="button" id="copy">Share / Load code</button>
     <button type="button" id="hp">How to play</button>
   </header>

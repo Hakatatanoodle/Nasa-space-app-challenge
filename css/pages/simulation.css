@@ -80,6 +80,7 @@
   color: var(--muted);
 }
 
+/* Full-bleed blueprint grid across the entire canvas viewport at every zoom level */
 #cv {
   position: relative;
   width: 100%;
@@ -87,10 +88,20 @@
   min-height: 480px;
   margin: 0;
   overflow: auto;
-  background:
-    radial-gradient(circle at 50% 48%, #1d4b7a66, #08182be0 76%),
-    radial-gradient(circle at 22% 20%, #7fe3b812 0%, transparent 45%),
-    radial-gradient(circle at 78% 75%, #ffc85710 0%, transparent 48%);
+  background-color: #08182be0;
+  background-image:
+    linear-gradient(#5da9ff1e 1px, transparent 1px),
+    linear-gradient(90deg, #5da9ff1e 1px, transparent 1px),
+    linear-gradient(#5da9ff0c 1px, transparent 1px),
+    linear-gradient(90deg, #5da9ff0c 1px, transparent 1px),
+    radial-gradient(circle at 50% 48%, #1d4b7a66, #08182be8 78%);
+  background-size:
+    80px 80px,
+    80px 80px,
+    20px 20px,
+    20px 20px,
+    100% 100%;
+  background-attachment: local, local, local, local, scroll;
   border: 1.5px solid #4484c4;
   box-shadow: inset 0 0 42px #040d18dd, 0 8px 28px #00000066;
   border-radius: 12px;
@@ -113,9 +124,12 @@
 
 #wr {
   position: relative;
+  min-width: 100%;
+  min-height: 100%;
   margin: 0 auto;
 }
 
+/* Keep transform-origin: 0 0 so controls.js clientToWorldCoords() stays exact */
 #world {
   position: relative;
   width: 960px;
@@ -127,22 +141,8 @@
     radial-gradient(2px 2px at 260px 620px, #ffc85755, transparent),
     radial-gradient(1.5px 1.5px at 720px 760px, #ffffff44, transparent),
     radial-gradient(1.5px 1.5px at 480px 120px, #ffffff44, transparent),
-    linear-gradient(90deg, transparent 479px, #ffc85726 479px, #ffc85726 481px, transparent 481px),
-    linear-gradient(#5da9ff1a 1px, transparent 1px),
-    linear-gradient(90deg, #5da9ff1a 1px, transparent 1px),
-    linear-gradient(#5da9ff0b 1px, transparent 1px),
-    linear-gradient(90deg, #5da9ff0b 1px, transparent 1px);
-  background-size:
-    960px 1100px,
-    960px 1100px,
-    960px 1100px,
-    960px 1100px,
-    960px 1100px,
-    960px 1100px,
-    80px 80px,
-    80px 80px,
-    20px 20px,
-    20px 20px;
+    linear-gradient(90deg, transparent 479px, #ffc8572e 479px, #ffc8572e 481px, transparent 481px);
+  background-size: 960px 1100px;
 }
 
 .pt {

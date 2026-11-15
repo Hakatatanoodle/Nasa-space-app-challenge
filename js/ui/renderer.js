@@ -12,6 +12,7 @@ import {
   getAssetFilename,
   saveUndoSnapshot,
   saveMissionProgress,
+  saveNamedBuild,
   AudioEngine
 } from '../core/state.js';
 import {
@@ -45,6 +46,8 @@ import {
   recordMission
 } from '../core/career.js';
 import { $, $$, toPercent, formatNumber, delay, showToast } from './domElements.js';
+
+const WORLD_PAD_PX = 360;
 
 const renderDataBadge = isVerified =>
   isVerified
@@ -273,6 +276,8 @@ export function renderBuilderStage() {
           <button type="button" data-a="undo" ${isLocked ? 'disabled' : ''}>Undo</button>
           <button type="button" id="stk" ${isLocked ? 'disabled' : ''}>Starter ship</button>
           <button type="button" id="clr" ${isLocked ? 'disabled' : ''}>Clear</button>
+          <button type="button" id="save-build">Save build</button>
+          <button type="button" id="my-builds">My builds (${appState.savedBuilds.length})</button>
           <button type="button" id="cand">Save candidate</button>
           <button type="button" id="cmp">Compare</button>
           <span style="flex: 1;"></span>
@@ -309,6 +314,16 @@ export function renderBuilderStage() {
     appState.selectedPartUid = null;
     refreshBuilderView();
   };
+
+  $('#save-build').onclick = () => {
+    const res = saveNamedBuild();
+    if (!res.ok) return showToast(res.message);
+    AudioEngine.attach();
+    $('#my-builds').textContent = `My builds (${appState.savedBuilds.length})`;
+    showToast(`Saved "${res.entry.name}" to browser storage.`);
+  };
+
+  $('#my-builds').onclick = showSavedBuildsModal;
 
   $('#cand').onclick = () => {
     if (appState.candidates.length >= MAX_CANDIDATES) {
@@ -421,25 +436,41 @@ export function updateBuilderLiveDrag() {
   }
 }
 
-function autoFitBuilderCanvas() {
+export function centerBuilderCanvas() {
   const cv = $('#cv');
   if (!cv) return;
-  const idealZoom = Math.max(0.7, Math.min(1.05, +(cv.clientWidth / 900).toFixed(2)));
-  appState.canvasZoom = idealZoom;
-  refreshBuilderView();
-
+  const zoom = appState.canvasZoom;
   const parts = appState.mission.parts;
+
   if (parts.length) {
-    const xs = parts.map(p => p.x);
-    const ys = parts.map(p => p.y);
-    const midX = ((Math.min(...xs) + Math.max(...xs)) / 2) * idealZoom;
-    const midY = ((Math.min(...ys) + Math.max(...ys)) / 2) * idealZoom;
+    const bounds = parts.map(p => {
+      const [w, h] = getPartSize(p);
+      return [p.x - w / 2, p.y - h / 2, p.x + w / 2, p.y + h / 2];
+    });
+    const minX = Math.min(...bounds.map(b => b[0]));
+    const minY = Math.min(...bounds.map(b => b[1]));
+    const maxX = Math.max(...bounds.map(b => b[2]));
+    const maxY = Math.max(...bounds.map(b => b[3]));
+
+    const midX = WORLD_PAD_PX + ((minX + maxX) / 2) * zoom;
+    const midY = WORLD_PAD_PX + ((minY + maxY) / 2) * zoom;
     cv.scrollLeft = Math.max(0, midX - cv.clientWidth / 2);
     cv.scrollTop = Math.max(0, midY - cv.clientHeight / 2);
   } else {
-    cv.scrollLeft = Math.max(0, (960 * idealZoom - cv.clientWidth) / 2);
-    cv.scrollTop = Math.max(0, (1100 * idealZoom - cv.clientHeight) / 2);
+    const midX = WORLD_PAD_PX + 480 * zoom;
+    const midY = WORLD_PAD_PX + 500 * zoom;
+    cv.scrollLeft = Math.max(0, midX - cv.clientWidth / 2);
+    cv.scrollTop = Math.max(0, midY - cv.clientHeight / 2);
   }
+}
+
+function autoFitBuilderCanvas() {
+  const cv = $('#cv');
+  if (!cv) return;
+  const idealZoom = Math.max(0.8, Math.min(1.05, +(cv.clientWidth / 820).toFixed(2)));
+  appState.canvasZoom = idealZoom;
+  refreshBuilderView();
+  requestAnimationFrame(() => centerBuilderCanvas());
 }
 
 export function refreshBuilderView() {
@@ -461,8 +492,11 @@ export function refreshBuilderView() {
   $('#so').innerHTML = contract.orbits.map((o, i) => `<option value="${i}">${o.n}</option>`).join('');
   $('#so').value = mission.oi;
 
-  $('#wr').style.width = `${960 * appState.canvasZoom}px`;
-  $('#wr').style.height = `${1100 * appState.canvasZoom}px`;
+  // Generous scroll buffer around #world so centering never hits scroll bounds
+  $('#wr').style.width = `${WORLD_PAD_PX * 2 + 960 * appState.canvasZoom}px`;
+  $('#wr').style.height = `${WORLD_PAD_PX * 2 + 1100 * appState.canvasZoom}px`;
+  $('#world').style.left = `${WORLD_PAD_PX}px`;
+  $('#world').style.top = `${WORLD_PAD_PX}px`;
   $('#world').style.transform = `scale(${appState.canvasZoom})`;
   $('#world').innerHTML = renderSpacecraftCanvas(telemetry);
 
@@ -677,7 +711,40 @@ export function refreshBuilderView() {
           : 'Design review and launch';
 }
 
-/* ---- Modals ---- */
+/* ---- Modals: Saved Builds, Design Review, Trade Space, Share/Load Code ---- */
+
+export function showSavedBuildsModal() {
+  const builds = appState.savedBuilds;
+  const defaultName = `${DATA.contracts[appState.mission.ci]?.n || 'Spacecraft'} #${builds.length + 1}`;
+
+  $('#rev').innerHTML = `
+    <div class="box modal-box" style="width: min(860px, 96vw);">
+      ${renderModalHeader('My Saved Spacecraft Builds')}
+      <div class="row" style="align-items: center; margin-bottom: 12px;">
+        <input type="text" id="new-build-name" placeholder="Build name (e.g. Mars Relay Mk II)" value="${defaultName}" style="flex: 1; min-width: 220px;" />
+        <button type="button" class="go" id="confirm-save-build" style="margin: 0;">Save current build</button>
+      </div>
+      ${builds.length
+        ? `<table class="rt">
+            <tr><th>Build Name</th><th>Mission &amp; Orbit</th><th>Specs</th><th>Saved</th><th>Actions</th></tr>
+            ${builds.map(b => `
+              <tr>
+                <td><b>${b.name}</b><br><small>${b.summary.partCount} parts</small></td>
+                <td>${b.summary.contract}<br><small>${b.summary.orbit} · ${b.summary.launcher}</small></td>
+                <td>${formatNumber(b.summary.massKg)} kg · ${formatNumber(b.summary.dvMs)} m/s · $${b.summary.costM}M</td>
+                <td><small>${b.savedAt}</small></td>
+                <td>
+                  <button type="button" data-load-build="${b.id}">Load</button>
+                  <button type="button" data-del-build="${b.id}">Delete</button>
+                </td>
+              </tr>
+            `).join('')}
+          </table>`
+        : '<p><small>No saved builds yet. Name your current spacecraft above and click <b>Save current build</b> to store it in your browser.</small></p>'}
+    </div>
+  `;
+  $('#rev').hidden = false;
+}
 
 const renderPredictedFlight = telemetry => {
   const flight = resolveFlight(telemetry);
