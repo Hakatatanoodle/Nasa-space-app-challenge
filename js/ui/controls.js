@@ -1,6 +1,6 @@
 /* File: js/ui/controls.js
  * Owner: Person B (Saurav)
- * AI-assisted (update): Claude, 2026-11-15 - Flight menu buttons + P shortcut. Reviewed by a human: NO.
+ * AI-assisted (update): Claude, 2026-11-15 - centred flight menu (M opens it; Home / Pause P / Resume X / Restart R). Reviewed by a human: NO.
  * AI-assisted (update): Claude, 2026-11-15 - win/loss tightening (outcome bands, audio, demos). Reviewed by a human: NO.
  * AI-assisted: YES — Gemini, 2026-11-15. Reviewed by a human: YES Reviewd by Person C (Yochan)
  * Sources used: none
@@ -50,8 +50,10 @@ import {
   abortLaunchSequence,
   pauseFlight,
   resumeFlight,
-  toggleFlightPause,
-  restartLaunchSequence
+  isFlightPaused,
+  restartLaunchSequence,
+  openFlightMenu,
+  closeFlightMenu
 } from './renderer.js';
 
 const DEVELOPER_CHEAT_CODE = 'Eventhorizon';
@@ -144,6 +146,16 @@ function activateDeveloperMode() {
 function closeOpenModals() {
   $('#rev').hidden = true;
   $('#help').hidden = true;
+  closeFlightMenu();
+}
+
+// Leaves the flight (if any) and shows the home / title screen.
+function goHome() {
+  abortLaunchSequence();
+  closeOpenModals();
+  AudioEngine.click();
+  $('#title').hidden = false;
+  AudioEngine.setMusic('landing');
 }
 
 function syncAudioControls({ isSoundOn, volumePct }) {
@@ -176,22 +188,95 @@ export function bindGlobalControls() {
 
   $('#brand-home')?.addEventListener('click', e => {
     e.preventDefault();
-    abortLaunchSequence();
-    closeOpenModals();
-    AudioEngine.click();
-    $('#title').hidden = false;
-    AudioEngine.setMusic('landing');
+    goHome();
   });
 
-  // Flight menu (header): only usable while a launch is running
-  $('#fm-pause')?.addEventListener('click', () => pauseFlight());
-  $('#fm-resume')?.addEventListener('click', () => {
-    resumeFlight();
+  // Flight menu: the header Menu button opens a centred panel with Home / Pause / Resume / Restart
+  const flightMenu = $('#flightmenu');
+  $('#fm-open')?.addEventListener('click', () => {
     AudioEngine.click();
+    openFlightMenu();
+  });
+  $('#fm-close')?.addEventListener('click', () => {
+    AudioEngine.click();
+    closeFlightMenu();
+  });
+  $('#fm-home')?.addEventListener('click', goHome);
+  $('#fm-pause')?.addEventListener('click', () => {
+    AudioEngine.click();
+    pauseFlight();
+  });
+  $('#fm-resume')?.addEventListener('click', () => {
+    AudioEngine.click();
+    resumeFlight();
   });
   $('#fm-restart')?.addEventListener('click', () => {
     AudioEngine.click();
     restartLaunchSequence();
+  });
+  // Clicking the dark area around the panel closes the menu
+  flightMenu?.addEventListener('click', e => {
+    if (e.target === flightMenu) closeFlightMenu();
+  });
+  // Keep Tab inside the open menu
+  flightMenu?.addEventListener('keydown', e => {
+    if (e.key !== 'Tab') return;
+    const items = [...flightMenu.querySelectorAll('button:not(:disabled)')];
+    if (!items.length) return;
+    const first = items[0];
+    const last = items[items.length - 1];
+    if (e.shiftKey && document.activeElement === first) {
+      e.preventDefault();
+      last.focus();
+    } else if (!e.shiftKey && document.activeElement === last) {
+      e.preventDefault();
+      first.focus();
+    } else if (!items.includes(document.activeElement)) {
+      e.preventDefault();
+      first.focus();
+    }
+  });
+
+  // Flight shortcuts: Backspace = home, M = menu, P = pause, X = resume, R = restart (only while a launch is running)
+  document.addEventListener('keydown', e => {
+    if (e.repeat || e.ctrlKey || e.metaKey || e.altKey) return;
+    const tag = e.target.tagName;
+    if (/SELECT|TEXTAREA/.test(tag) || (tag === 'INPUT' && e.target.type !== 'range')) return;
+    const key = (e.key || '').toLowerCase();
+
+    // M opens or closes the flight menu whenever the header Menu button is showing
+    if (key === 'm' && !$('#fm-open').hidden) {
+      e.preventDefault();
+      AudioEngine.click();
+      if ($('#flightmenu').hidden) openFlightMenu();
+      else closeFlightMenu();
+      return;
+    }
+    // Backspace goes Home from the flight screen (same as the Home button)
+    if (e.key === 'Backspace' && !$('#fm-open').hidden) {
+      e.preventDefault();
+      goHome();
+      return;
+    }
+    if (!appState.isFlying) return;
+
+    if (key === 'p') {
+      e.preventDefault();
+      if (!isFlightPaused()) {
+        AudioEngine.click();
+        pauseFlight();
+      }
+    } else if (key === 'x') {
+      e.preventDefault();
+      if (isFlightPaused()) {
+        AudioEngine.click();
+        resumeFlight();
+      }
+    } else if (key === 'r') {
+      e.preventDefault();
+      AudioEngine.click();
+      restartLaunchSequence();
+    }
   });
 
   let logoClicks = 0;
@@ -214,12 +299,6 @@ export function bindGlobalControls() {
       return;
     }
     if (/SELECT|TEXTAREA|INPUT/.test(e.target.tagName)) return;
-    // P pauses or resumes the flight
-    if (e.key && e.key.toLowerCase() === 'p' && !e.repeat && !e.ctrlKey && !e.metaKey && !e.altKey && appState.isFlying) {
-      e.preventDefault();
-      toggleFlightPause();
-      return;
-    }
     if (e.key && e.key.length === 1) {
       keyBuffer = (keyBuffer + e.key).slice(-DEVELOPER_CHEAT_CODE.length);
       if (keyBuffer === DEVELOPER_CHEAT_CODE) {

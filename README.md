@@ -168,7 +168,7 @@ Stage 3 plays the flight on a canvas. The ascent is one continuous camera move: 
 
 Hold the button (or Space) and release inside the green zone. Together the burns can add up to **+6% science** (`DATA.flightModel.burnBonusMax`, a simplified gameplay value). Each burn is worth its precision × its weight (0.5 each) of that cap. **Auto-pilot** gives no bonus and no penalty, so a miss is never worse than skipping. The Skip animation button and reduced-motion setting shorten the animation but never remove the choice between manual burns and Auto-pilot.
 
-**Flight menu (pause, resume, restart).** During the launch stage the header shows a Flight menu. **Pause** (or press `P`) freezes the animation, the burn gauge, the mission-log timing and the sound; **Resume** (or `P` again) continues. If you pause while holding a burn, that burn starts over on resume. **Restart** throws the flight away and flies the same design again from lift-off (same design and seed, so the outcome does not depend on luck).
+**Flight menu (home, pause, resume, restart).** During the launch stage the header shows a **Menu** button. It (or the `M` key) opens a pause menu in the middle of the screen with four options: **Home** (or `Backspace`; back to the title screen), **Pause** (or press `P`) freezes the animation, the burn gauge, the mission-log timing and the sound, **Resume** (or press `X`) continues, and **Restart** (or press `R`) flies the same design again from lift-off (same design and seed, so the outcome does not depend on luck). `Esc` or the Close link hides the menu. If you pause while holding a burn, that burn starts over on resume.
 
 ---
 

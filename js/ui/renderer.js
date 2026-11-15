@@ -1,6 +1,6 @@
 /* File: js/ui/renderer.js
  * Owner: Person B (Saurav)
- * AI-assisted (update): Claude, 2026-11-15 - flight menu: pause / resume / restart + P shortcut. Reviewed by a human: NO.
+ * AI-assisted (update): Claude, 2026-11-15 - flight menu: centred pause menu with Home / Pause (P) / Resume (X) / Restart (R). Reviewed by a human: NO.
  * AI-assisted (update): Claude, 2026-11-15 - win/loss tightening (outcome bands, audio, demos). Reviewed by a human: NO.
  * AI-assisted: YES — Gemini, 2026-11-14; Gemini, 2026-11-15; Claude, 2026-11-14; Claude, 2026-11-15 (two manual burns). Reviewed by a human:YES Reviewd by Person C (Yochan)
  * Sources used: NASA_CUBESAT101, JPL_CML
@@ -95,6 +95,9 @@ export function abortLaunchSequence() {
   if (cancelActiveBurn) cancelActiveBurn();
   flightClock.resume();
   AudioEngine.resumeAll(false);
+  $('#flv')?.classList.remove('paused');
+  const flightMenu = $('#flightmenu');
+  if (flightMenu) flightMenu.hidden = true;
   appState.isFlying = false;
   const burnPanel = $('#burn');
   if (burnPanel) {
@@ -107,21 +110,40 @@ export function abortLaunchSequence() {
   syncFlightMenu();
 }
 
-/* ---- Flight menu (Pause / Resume / Restart) ---- */
+/* ---- Flight menu: a centred pause menu (Home / Pause / Resume / Restart) ---- */
 
-// Shows or hides the menu in the header and keeps its buttons and status badge up to date.
+const isFlightMenuOpen = () => {
+  const menu = $('#flightmenu');
+  return !!menu && !menu.hidden;
+};
+
+// Keeps the header Menu button, the centred menu and the status badge up to date.
 export function syncFlightMenu() {
   const menu = $('#flightmenu');
-  if (!menu) return;
+  const opener = $('#fm-open');
+  if (!menu || !opener) return;
   const text = CONTENT.flightHud;
   const flying = appState.isFlying;
   const paused = flightClock.paused;
+  const available = appState.mission.stage === 3 && (flying || !!appState.mission.res);
 
-  menu.hidden = !(appState.mission.stage === 3 && (flying || appState.mission.res));
+  opener.hidden = !available;
+  opener.textContent = text.menuButton;
+  opener.title = `${text.menuButton} (${text.keyMenu})`;
+  if (!available) menu.hidden = true;
+
   $('#fm-label').textContent = text.menuLabel;
-  $('#fm-pause').textContent = text.pause;
-  $('#fm-resume').textContent = text.resume;
-  $('#fm-restart').textContent = text.restart;
+  const setBtn = (id, name, key) => {
+    const btn = $(id);
+    btn.querySelector('.fm-name').textContent = name;
+    const kbd = btn.querySelector('kbd');
+    if (kbd) kbd.textContent = key;
+  };
+  setBtn('#fm-home', text.home, text.keyHome);
+  setBtn('#fm-pause', text.pause, text.keyPause);
+  setBtn('#fm-resume', text.resume, text.keyResume);
+  setBtn('#fm-restart', text.restart, text.keyRestart);
+  $('#fm-close').textContent = text.close;
 
   const status = $('#fm-status');
   status.textContent = !flying ? text.statusComplete : paused ? text.statusPaused : text.statusFlying;
@@ -133,6 +155,25 @@ export function syncFlightMenu() {
   $('#fm-restart').disabled = !flying;
 }
 
+export function openFlightMenu() {
+  const menu = $('#flightmenu');
+  if (!menu || $('#fm-open').hidden) return;
+  menu.hidden = false;
+  syncFlightMenu();
+  const first = [$('#fm-resume'), $('#fm-pause'), $('#fm-home')].find(btn => btn && !btn.disabled);
+  first?.focus();
+}
+
+export function closeFlightMenu() {
+  const menu = $('#flightmenu');
+  if (!menu || menu.hidden) return;
+  menu.hidden = true;
+  const opener = $('#fm-open');
+  if (opener && !opener.hidden) opener.focus();
+}
+
+export const isFlightPaused = () => flightClock.paused;
+
 export function pauseFlight() {
   if (!appState.isFlying || flightClock.paused) return;
   flightClock.pause();
@@ -142,7 +183,7 @@ export function pauseFlight() {
   const burnPanel = $('#burn');
   if (burnPanel) burnPanel.inert = true;
   syncFlightMenu();
-  $('#fm-resume')?.focus();
+  if (isFlightMenuOpen()) $('#fm-resume')?.focus();
 }
 
 export function resumeFlight() {
@@ -156,11 +197,10 @@ export function resumeFlight() {
     if (!burnPanel.hidden) $('#burnbtn')?.focus();
   }
   syncFlightMenu();
-}
-
-export function toggleFlightPause() {
-  if (flightClock.paused) resumeFlight();
-  else pauseFlight();
+  if (isFlightMenuOpen()) {
+    $('#flightmenu').hidden = true; // Resume puts the player straight back in the flight
+    if (document.activeElement?.closest?.('#flightmenu')) document.activeElement.blur();
+  }
 }
 
 // Throws away the current flight and flies the same design again from lift-off.

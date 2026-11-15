@@ -481,20 +481,52 @@
   border-radius: 6px;
 }
 
-/* Flight menu: Pause / Resume / Restart, shown in the header during the launch stage */
-.flight-menu {
-  display: inline-flex;
-  flex-wrap: wrap;
+/* Flight menu: header Menu button + a centred pause menu */
+#fm-open {
+  font-weight: 700;
+  color: #0b2038;
+  background: var(--accent);
+  border-color: var(--accent);
+}
+
+#flightmenu {
+  position: fixed;
+  inset: 0;
+  z-index: 30;
+  display: flex;
   align-items: center;
-  gap: 8px;
-  padding: 6px 10px;
-  background: #0f2944;
+  justify-content: center;
+  padding: 12px;
+  background: rgba(5, 16, 30, 0.78);
+}
+
+#flightmenu[hidden] {
+  display: none;
+}
+
+.fm-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  width: min(380px, 92vw);
+  padding: 20px 22px;
+  background: #102a46;
   border: 2px solid var(--accent);
-  border-radius: 8px;
+  border-radius: 14px;
+  box-shadow: 0 20px 52px #020812dd;
+}
+
+.fm-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
 }
 
 .fm-label {
-  font-weight: 700;
+  margin: 0;
+  font-size: 1.3rem;
+  letter-spacing: 0.5px;
   color: var(--accent);
 }
 
@@ -513,4 +545,43 @@
 
 .fm-status.done {
   background: var(--muted);
+}
+
+.fm-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.fm-btn {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  width: 100%;
+  padding: 12px 16px;
+  font-size: 1.05rem;
+  font-weight: 700;
+  text-align: left;
+}
+
+.fm-btn kbd {
+  min-width: 2.2em;
+  white-space: nowrap;
+  padding: 2px 10px;
+  font: inherit;
+  font-size: 0.8rem;
+  text-align: center;
+  color: var(--muted);
+  background: #0b2038;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+}
+
+.fm-close {
+  align-self: center;
+  background: transparent;
+  border-color: transparent;
+  color: var(--muted);
+  text-decoration: underline;
 }

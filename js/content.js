@@ -227,6 +227,14 @@ export const CONTENT = {
     complete: 'Operations complete',
     notToScale: 'Not to scale',
     menuLabel: 'Flight menu',
+    menuButton: 'Menu',
+    keyMenu: 'M',
+    home: 'Home',
+    keyHome: 'Backspace',
+    close: 'Close menu (Esc)',
+    keyPause: 'P',
+    keyResume: 'X',
+    keyRestart: 'R',
     statusFlying: 'Flying',
     statusPaused: 'Paused',
     statusComplete: 'Complete',
@@ -234,7 +242,7 @@ export const CONTENT = {
     resume: 'Resume',
     restart: 'Restart',
     pausedTitle: 'Flight paused',
-    pausedHint: 'Press P or Resume to continue.',
+    pausedHint: 'Press X or Resume to continue.',
     restarted: 'Flight restarted from lift-off.'
   },
   predictedFlight: {
