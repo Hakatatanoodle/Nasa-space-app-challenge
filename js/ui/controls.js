@@ -1,6 +1,6 @@
 /* File: js/ui/controls.js
  * Owner: Person B (Saurav)
- * AI-assisted: YES — Gemini, 2026-11-15. Reviewed by a human: NO.
+ * AI-assisted: YES — Gemini, 2026-11-15. Reviewed by a human: YES Reviewd by Person C (Yochan)
  * Sources used: none
  */
 import { DATA } from '../api/mockData.js';
