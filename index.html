@@ -1,5 +1,6 @@
 <!-- File: index.html
   Owner: Person B (Saurav)
+  AI-assisted (update): Claude, 2026-11-15 - responsive pass: viewport-fit/theme-color meta, inline favicon, collapsible header tools (#hdr-more / #hdr-tools) for phones. Reviewed by a human: NO.
   AI-assisted (update): Claude, 2026-11-15 - flight menu: header Menu button + centred pause menu (home / pause / resume / restart). Reviewed by a human: NO.
   AI-assisted: YES — Gemini, 2026-11-15. Reviewed by a human:YES Reviewd by Person C (Yochan).
   Sources used: SPACEAPPS_CHALLENGE
@@ -8,7 +9,9 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+  <meta name="theme-color" content="#0b2038" />
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='7' fill='%230b2038'/%3E%3Cellipse cx='16' cy='17' rx='11' ry='5' fill='none' stroke='%23295c8f' stroke-width='2'/%3E%3Ccircle cx='16' cy='10' r='4' fill='%23ffc857'/%3E%3C/svg%3E" />
   <title>APOGEE — Space Mission Design Game</title> 
   <link rel="stylesheet" href="./css/variables.css" />
   <link rel="stylesheet" href="./css/base.css" />
@@ -19,19 +22,22 @@
 <body>
   <video id="bg" muted loop playsinline></video>
 
-  <header>
+  <header id="app-header">
     <a href="./index.html" class="home-link" id="brand-home" aria-label="Go to APOGEE home">
       <h1 id="hn"></h1>
     </a>
     <nav id="nav" aria-label="Mission stages"></nav>
-    <button type="button" id="car"></button>
-    <div class="audio-control" role="group" aria-label="Audio controls">
-      <button type="button" id="mute" class="sound-on">Sound: on</button>
-      <input type="range" id="vol" min="0" max="100" value="75" aria-label="Master volume" title="Master volume (75%)" />
-    </div>
+    <button type="button" id="hdr-more" aria-expanded="false" aria-controls="hdr-tools">More</button>
     <button type="button" id="fm-open" aria-haspopup="dialog" hidden></button>
-    <button type="button" id="copy">Share / Load code</button>
-    <button type="button" id="hp">How to play</button>
+    <div id="hdr-tools">
+      <button type="button" id="car"></button>
+      <div class="audio-control" role="group" aria-label="Audio controls">
+        <button type="button" id="mute" class="sound-on">Sound: on</button>
+        <input type="range" id="vol" min="0" max="100" value="75" aria-label="Master volume" title="Master volume (75%)" />
+      </div>
+      <button type="button" id="copy">Share / Load code</button>
+      <button type="button" id="hp">How to play</button>
+    </div>
   </header>
 
   <main id="app">

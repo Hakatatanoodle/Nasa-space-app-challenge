@@ -1,5 +1,6 @@
 <!-- File: README.md
   Owner: Person C (Yochan)
+  AI-assisted: YES — Claude, 2026-11-15 (added Developer Mode section, audio notes). Reviewed by a human: NO.
   AI-assisted: YES — Claude, 2026-11-15. Reviewed by a human: Yochan.
   Sources used: NASA_CUBESAT101, JPL_CML, NASA_SE_WEBINAR, SPACEAPPS_CHALLENGE, plus the external links listed in "References"
 -->
@@ -25,12 +26,13 @@ It was built for the **NASA Space Apps Challenge 2026** (challenge: *Space Missi
 4. [How the simulation works](#how-the-simulation-works)
 5. [Career mode and destinations](#career-mode-and-destinations)
 6. [Flight view and manual burns](#flight-view-and-manual-burns)
-7. [Project structure](#project-structure)
-8. [Data honesty: what is real and what is simplified](#data-honesty-what-is-real-and-what-is-simplified)
-9. [NASA resources used](#nasa-resources-used)
-10. [References and credits](#references-and-credits)
-11. [AI use disclosure](#ai-use-disclosure)
-12. [Accessibility and technical limits](#accessibility-and-technical-limits)
+7. [Developer Mode (testing shortcut)](#developer-mode-testing-shortcut)
+8. [Project structure](#project-structure)
+9. [Data honesty: what is real and what is simplified](#data-honesty-what-is-real-and-what-is-simplified)
+10. [NASA resources used](#nasa-resources-used)
+11. [References and credits](#references-and-credits)
+12. [AI use disclosure](#ai-use-disclosure)
+13. [Accessibility and technical limits](#accessibility-and-technical-limits)
 
 ---
 
@@ -172,6 +174,35 @@ Hold the button (or Space) and release inside the green zone. Together the burns
 
 ---
 
+## Developer Mode (testing shortcut)
+
+Developer Mode is a hidden switch for teammates, judges and testers who want to reach any destination or see a finished design without grinding through the career chain. It is **not part of the normal game** and changes no numbers: the engine, scoring and debrief work exactly the same.
+
+**Turn it on or off (the same action toggles it):**
+
+- **Keyboard:** on any screen, type `Eventhorizon` (capital E only, the rest lower case) while no text field is focused.
+- **Mouse or touch:** tap or click the game title on the title screen **5 times** within about 2 seconds. This is the way to do it on a phone.
+
+A toast message confirms the change, and a **Developer Mode** badge appears next to the Stage 1 heading.
+
+**What it does:**
+
+| Feature | Behaviour |
+|---|---|
+| **All destinations open** | Every contract is unlocked, including those normally gated by the career chain (Venus to the Sun). |
+| **3★ Prebuilt Mission Library** | In **My builds**, a Developer Mode section lists one ready-made, tested design per destination (defined as `DEVELOPER_PREBUILTS` in `js/core/engine.js`). Load one to jump straight to the Build stage with the right contract, orbit, launcher and parts. You can then edit it and launch as usual. |
+| **Career rank** | The rank label reads *Developer Mode (All Maps)*. |
+
+**Good to know:**
+
+- It **persists** in the browser as `dev: true` inside `localStorage.apogeeCareer`, so it survives a page reload. Toggle it off the same way you turned it on.
+- **Reset career** clears it, together with saved progress and saved builds.
+- Arrivals made in Developer Mode count in your career progress and achievements like any other flight. Use **Reset career** before a clean run or a recorded demo.
+- If browser storage is blocked, the mode still works for the current page but is not remembered.
+- Prebuilts are shown only while Developer Mode is on. Pressing a prebuilt button with it off shows a message asking you to unlock it first.
+
+---
+
 ## Project structure
 
 ```text
@@ -183,7 +214,7 @@ Apogee/
 │
 ├── assets/
 │   ├── *.svg                   # Spacecraft parts, destinations, launchers, plumes (drawn for this project)
-│   ├── audio/                  # Landing.mp3, design.mp3, win.mp3
+│   ├── audio/                  # Landing.mp3, design.mp3, win.mp3, loss.mp3, countdown.mp3 (see Music note)
 │   ├── bg/                     # space.mp4 (looping background video) + README.txt
 │   ├── images/  icons/         # Reserved (currently empty)
 │
@@ -280,7 +311,7 @@ All tracks are in `assets/audio/`. Audio never autoplays; it starts only after t
 | Success (win) | `win.mp3` | *Interstellar Jazz Adventure* | [StockTune](https://stocktune.com/free-music/interstellar-jazz-adventure-148637-98792) |
 | Mission lost | `loss.mp3` (see note below) | Kevin MacLeod | [incompetech.com](https://incompetech.com/) and [YouTube](https://www.youtube.com/watch?v=Jhw0F4gvYfM) |
 
-> **Note for the team:** `content.js` points to `assets/audio/loss.mp3`, but that file is **not in the repository yet**. Until it is added, the "mission lost" screen plays no music (the game handles the missing file without errors). Add the file, or update the path in `CONTENT.audioTracks.loss`.
+> **Note for the team:** `loss.mp3` is now in `assets/audio/`. `assets/audio/countdown.mp3` is also in the folder, but **no code loads it and it has no source or licence listed here**. Rule: every asset must be credited. Either add its source to the table above and use it, or remove it from the repo.
 > Please also confirm each track's licence terms and add the exact attribution wording the creators require (several of these sites ask for credit in the project description).
 
 ### Art and visuals

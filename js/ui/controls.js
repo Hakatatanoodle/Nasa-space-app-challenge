@@ -1,5 +1,9 @@
 /* File: js/ui/controls.js
  * Owner: Person B (Saurav)
+ * AI-assisted (update): Claude, 2026-11-15 - responsive pass: header "More" toggle for small screens; touch palette no longer grabs parts while the person scrolls, and a scroll-cancelled tap no longer places a part. Reviewed by a human: NO.
+ * AI-assisted (update): Claude, 2026-11-15 - centred flight menu (M opens it; Home / Pause P / Resume X / Restart R). Reviewed by a human: NO.
+ * AI-assisted (update): Claude, 2026-11-15 - win/loss tightening (outcome bands, audio, demos). Reviewed by a human: NO.
+ * AI-assisted: YES — Gemini, 2026-11-15. Reviewed by a human: YES Reviewd by Person C (Yochan)
  * AI-assisted (update): Gemini, 2026-11-15 - rAF-throttled 60fps drag pipeline and clean snap nodes. Reviewed by a human: NO.
  * Sources used: none
  */
@@ -54,6 +58,14 @@ import {
 } from './renderer.js';
 
 const DEVELOPER_CHEAT_CODE = 'Eventhorizon';
+
+// Which way does this element scroll natively on touch screens? 'x' (pan-x), 'y' (pan-y) or '' (none / both).
+function getTouchScrollAxis(el) {
+  const action = getComputedStyle(el).touchAction;
+  if (action === 'pan-x') return 'x';
+  if (action === 'pan-y') return 'y';
+  return '';
+}
 
 function clientToWorldCoords(event) {
   const rect = $('#world').getBoundingClientRect();
@@ -187,6 +199,22 @@ export function bindGlobalControls() {
     goHome();
   });
 
+  // Small screens: the "More" button folds the career / sound / share / help buttons in and out of the header
+  const appHeader = $('#app-header');
+  const setHeaderTools = open => {
+    appHeader?.classList.toggle('tools-open', open);
+    $('#hdr-more')?.setAttribute('aria-expanded', String(open));
+  };
+  $('#hdr-more')?.addEventListener('click', () => {
+    AudioEngine.click();
+    setHeaderTools(!appHeader.classList.contains('tools-open'));
+  });
+  // Choosing Career / Share / How to play closes the panel; Sound stays open so the volume can be adjusted
+  $('#hdr-tools')?.addEventListener('click', e => {
+    if (e.target.closest('#car, #copy, #hp')) setHeaderTools(false);
+  });
+
+  // Flight menu: the header Menu button opens a centred panel with Home / Pause / Resume / Restart
   const flightMenu = $('#flightmenu');
   $('#fm-open')?.addEventListener('click', () => {
     AudioEngine.click();
@@ -285,6 +313,7 @@ export function bindGlobalControls() {
   document.addEventListener('keydown', e => {
     if (e.key === 'Escape') {
       closeOpenModals();
+      setHeaderTools(false);
       return;
     }
     if (/SELECT|TEXTAREA|INPUT/.test(e.target.tagName)) return;
@@ -327,7 +356,10 @@ export function bindGlobalControls() {
         pointerId: e.pointerId,
         x: e.clientX,
         y: e.clientY,
-        mv: false
+        mv: false,
+        // On touch screens the palette scrolls natively along one axis (pan-x tray or pan-y list).
+        // Remember which, so a swipe along that axis scrolls instead of dragging a part out.
+        scrollAxis: e.pointerType === 'touch' ? getTouchScrollAxis(paletteEl) : ''
       };
       return;
     }
@@ -359,6 +391,16 @@ export function bindGlobalControls() {
 
     if (!drag.mv) {
       if (Math.hypot(e.clientX - drag.x, e.clientY - drag.y) < 7) return;
+
+      if (drag.nid && drag.scrollAxis) {
+        const movesAlongScrollAxis = drag.scrollAxis === 'x'
+          ? Math.abs(e.clientX - drag.x) > Math.abs(e.clientY - drag.y)
+          : Math.abs(e.clientY - drag.y) > Math.abs(e.clientX - drag.x);
+        if (movesAlongScrollAxis) {
+          appState.activeDrag = null;
+          return;
+        }
+      }
 
       if (drag.nid) {
         const partId = drag.nid;
@@ -488,7 +530,7 @@ export function bindGlobalControls() {
     latestDragEvent = null;
 
     if (!drag.mv) {
-      if (drag.nid) {
+      if (drag.nid && e.type !== 'pointercancel') {
         const result = autoAttachPart(drag.nid);
         if (!result.ok) showToast(result.message);
         else AudioEngine.attach();

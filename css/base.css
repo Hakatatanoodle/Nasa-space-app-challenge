@@ -1,5 +1,6 @@
 /* File: css/base.css
  * Owner: Person B (Saurav)
+ * AI-assisted (update): Claude, 2026-11-15 - responsive pass: compact collapsible header, dvh units, safe-area insets, 16px form fields, 44px tap targets. Reviewed by a human: NO.
  * AI-assisted: YES — Gemini, 2026-11-15. Reviewed by a human: YES Reviewd by Person C (Yochan)
  * Sources used: none
  */
@@ -14,9 +15,16 @@ img {
   -webkit-touch-callout: none;
 }
 
+html {
+  -webkit-text-size-adjust: 100%;
+  text-size-adjust: 100%;
+}
+
 body {
   margin: 0;
   min-height: 100vh;
+  min-height: 100dvh;
+  -webkit-tap-highlight-color: transparent;
   display: flex;
   flex-direction: column;
   background: var(--bg);
@@ -31,15 +39,27 @@ header {
   flex-wrap: wrap;
   align-items: center;
   gap: 8px;
-  padding: 8px 14px;
+  /* env() keeps the header clear of a phone notch in landscape; it is 0 elsewhere */
+  padding: calc(8px + env(safe-area-inset-top, 0px)) max(14px, env(safe-area-inset-right, 0px)) 8px max(14px, env(safe-area-inset-left, 0px));
   background: #0d2640f2;
   border-bottom: 1px solid var(--line);
+}
+
+/* Desktop: the tools wrapper is invisible to layout, so the buttons sit in the header row as before.
+   Small screens turn it into a collapsible panel (see the max-width: 1180px block below). */
+#hdr-tools {
+  display: contents;
+}
+
+#hdr-more {
+  display: none;
 }
 
 .home-link {
   text-decoration: none;
   display: inline-flex;
   align-items: center;
+  min-height: 44px;
   cursor: pointer;
 }
 
@@ -127,18 +147,20 @@ button:disabled {
   border: 0;
   border-right: 1px solid #295c8f;
   border-radius: 5px 0 0 5px;
-  min-height: 42px;
+  min-height: 44px;
 }
 
 .audio-control input[type="range"] {
   width: 78px;
-  height: 6px;
+  height: 28px;
   padding: 0;
   min-height: 0;
+  margin: 0;
   accent-color: var(--ok);
-  background: #08182b;
+  background: transparent;
   border-radius: 4px;
   cursor: pointer;
+  touch-action: pan-y;
 }
 
 .audio-control.is-muted input[type="range"] {
@@ -186,7 +208,22 @@ button:disabled {
   z-index: 1;
   flex: 1;
   overflow: auto;
-  padding: 14px 16px;
+  padding: 14px max(16px, env(safe-area-inset-right, 0px)) 14px max(16px, env(safe-area-inset-left, 0px));
+}
+
+/* overflow-x: clip does not create a scroll container, so position: sticky inside #app still works */
+@supports (overflow: clip) {
+  #app {
+    overflow-x: clip;
+    overflow-y: visible;
+  }
+}
+
+/* Text fields stay at 16px or larger: iOS Safari zooms the page in when a smaller field is focused */
+select,
+input[type="text"],
+textarea {
+  font-size: 1rem;
 }
 
 .st {
@@ -225,21 +262,114 @@ button:disabled {
   will-change: transform;
 }
 
-@media (max-width: 640px) {
+/* Laptops (1181-1500px): tighten the header so every control fits on one row */
+@media (min-width: 1181px) and (max-width: 1500px) {
   header {
-    padding: 6px 10px;
     gap: 6px;
   }
-  button,
-  select {
-    padding: 6px 10px;
-    font-size: 0.9rem;
+  h1,
+  .home-link h1 {
+    margin-right: 4px;
+    font-size: 22px;
+    letter-spacing: 1.5px;
+  }
+  header button {
+    padding: 8px 10px;
   }
   .audio-control input[type="range"] {
-    width: 62px;
+    width: 64px;
   }
+}
+
+/* Tablets and phones: stage buttons stay visible, everything else folds into the "More" panel */
+@media (max-width: 1180px) {
+  #hdr-more {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    margin-left: auto;
+    font-weight: 600;
+  }
+
+  #hdr-more::after {
+    content: "\25BE";
+    font-size: 0.85em;
+    transition: transform 0.15s ease;
+  }
+
+  header.tools-open #hdr-more {
+    background: var(--accent);
+    border-color: var(--accent);
+    color: #0b2038;
+  }
+
+  header.tools-open #hdr-more::after {
+    transform: rotate(180deg);
+  }
+
+  #hdr-tools {
+    display: none;
+    order: 10;
+    flex: 1 1 100%;
+    grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+    gap: 8px;
+    padding-top: 6px;
+    border-top: 1px solid #295c8f77;
+  }
+
+  header.tools-open #hdr-tools {
+    display: grid;
+  }
+
+  #hdr-tools #car,
+  #hdr-tools .audio-control {
+    grid-column: 1 / -1;
+  }
+
+  #hdr-tools .audio-control {
+    display: flex;
+  }
+
+  #hdr-tools .audio-control input[type="range"] {
+    flex: 1;
+    width: auto;
+  }
+}
+
+@media (max-width: 640px) {
+  header {
+    gap: 6px;
+    padding-top: calc(6px + env(safe-area-inset-top, 0px));
+    padding-bottom: 6px;
+  }
+
+  h1,
+  .home-link h1 {
+    margin-right: 0;
+    font-size: 22px;
+  }
+
+  /* Row 1: logo, (flight Menu), More.  Row 2: the four stage buttons share the full width. */
+  #nav {
+    order: 5;
+    flex: 1 1 100%;
+    gap: 4px;
+    margin: 0;
+  }
+
+  #nav button {
+    flex: 1;
+    padding: 6px 4px;
+  }
+
+  button {
+    padding: 6px 10px;
+    font-size: 0.95rem;
+  }
+
   #app {
-    padding: 10px 10px;
+    padding-top: 10px;
+    padding-bottom: 10px;
   }
 }
 
