@@ -149,14 +149,18 @@ export function mirrorPartIfEnabled(childPart) {
   attachParts(twinPart, childPart.cn, host, oppositeNode);
 }
 
+/**
+ * Builds the starter spacecraft centered at (480, 495) of the 960x1100 world canvas,
+ * omitting the communications antenna so players attach one before launching.
+ */
 export function buildStarterSpacecraft() {
   appState.mission.parts = [];
   appState.mission.nu = 1;
 
   const centerX = 480;
-  const bus = createPartInstance('bus_rad', centerX, 430);
-  const tank = createPartInstance('tank', centerX, 550);
-  const engine = createPartInstance('chem', centerX, 660);
+  const bus = createPartInstance('bus_rad', centerX, 395);
+  const tank = createPartInstance('tank', centerX, 515);
+  const engine = createPartInstance('chem', centerX, 625);
 
   attachParts(tank, 'top', bus, 'bottom');
   attachParts(engine, 'top', tank, 'bottom');
@@ -182,10 +186,10 @@ export function buildFailingDemoSpacecraft() {
   appState.mission.nu = 1;
 
   const centerX = 480;
-  const bus = createPartInstance('bus_std', centerX, 380);
-  const tank1 = createPartInstance('tank', centerX, 500);
-  const tank2 = createPartInstance('tank', centerX, 620);
-  const engine = createPartInstance('chem', centerX, 730);
+  const bus = createPartInstance('bus_std', centerX, 355);
+  const tank1 = createPartInstance('tank', centerX, 475);
+  const tank2 = createPartInstance('tank', centerX, 595);
+  const engine = createPartInstance('chem', centerX, 705);
 
   attachParts(tank1, 'top', bus, 'bottom');
   attachParts(tank2, 'top', tank1, 'bottom');
@@ -208,7 +212,7 @@ export function autoAttachPart(partId) {
       bus.id = partId;
     } else {
       saveUndoSnapshot();
-      createPartInstance(partId, 480, 430);
+      createPartInstance(partId, 480, 395);
     }
     return { ok: true };
   }
@@ -383,7 +387,6 @@ export function calculateTelemetry(missionInput = appState.mission) {
     engineSpec.dvDay ? (orbit.dv * 1000) / engineSpec.dvDay : 0
   );
 
-  // Live NASA DONKI space weather affects unhardened electronics in radiation environments
   const radWear = orbit.rad && !busSpec.hard
     ? Math.max(0.5, 0.65 / (weather?.radiationMultiplier || 1))
     : orbit.rad > 1
@@ -568,7 +571,6 @@ export function getTriggeredEvents(telemetry) {
     .filter(event => doesEventTrigger(event, telemetry))
     .map(event => {
       const immune = isEventImmune(event, telemetry);
-      // Scale solar flare penalty dynamically with live NASA DONKI space weather
       let factor = event.scienceFactor;
       if (!immune && event.id === 'solar_flare' && weather?.radiationMultiplier > 1) {
         factor = Math.max(0.65, +(event.scienceFactor / weather.radiationMultiplier).toFixed(2));

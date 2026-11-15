@@ -18,6 +18,7 @@ import { bindGlobalControls } from './ui/controls.js';
 
 function initBackgroundVideo() {
   const videoEl = $('#bg');
+  if (!videoEl) return;
   if (matchMedia('(prefers-reduced-motion: reduce)').matches) {
     videoEl.remove();
     return;
@@ -29,10 +30,6 @@ function initBackgroundVideo() {
 
 async function initApp() {
   initBackgroundVideo();
-
-  const serviceResult = await fetchMissionReferenceData();
-  appState.dataSourceLabel = serviceResult.sourceMode;
-  appState.spaceWeather = serviceResult.spaceWeather;
 
   $('#cr').textContent = CONTENT.bgCredit;
   $('#title-disclaimer').textContent = CONTENT.disclaimer;
@@ -50,7 +47,16 @@ async function initApp() {
 
   bindGlobalControls();
   AudioEngine.setMusic('landing');
-  navigateToStage(appState.mission.stage || 1);
+  navigateToStage(1);
+
+  try {
+    const serviceResult = await fetchMissionReferenceData();
+    appState.dataSourceLabel = serviceResult.sourceMode;
+    appState.spaceWeather = serviceResult.spaceWeather;
+    if (appState.mission.stage === 1) {
+      navigateToStage(1);
+    }
+  } catch {}
 }
 
 initApp();
