@@ -30,10 +30,17 @@ function initBackgroundVideo() {
 
 function bindButtonSoundEffects() {
   let lastHovered = null;
+  let lastHoverAt = 0;
+
   document.addEventListener('pointerover', e => {
+    if (appState.activeDrag) return;
     const interactive = e.target.closest('button:not(:disabled), .card[role="button"]:not(.lkd), summary');
     if (!interactive || interactive === lastHovered) return;
     lastHovered = interactive;
+
+    const now = performance.now();
+    if (now - lastHoverAt < 65) return;
+    lastHoverAt = now;
     AudioEngine.tick();
   });
 

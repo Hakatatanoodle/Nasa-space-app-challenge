@@ -1,6 +1,6 @@
 /* File: js/ui/renderer.js
  * Owner: Person B (Saurav)
- * AI-assisted (update): Gemini, 2026-11-15 - prominent science HUD badge, post-launch debrief polish, and preserved flight controls. Reviewed by a human: NO.
+ * AI-assisted (update): Gemini, 2026-11-15 - clean context-aware CAD snap crosshairs, prominent science progress meter, and high-FPS live drag. Reviewed by a human: NO.
  * Sources used: NASA_CUBESAT101, JPL_CML
  */
 import { DATA } from '../api/mockData.js';
@@ -30,7 +30,8 @@ import {
   scoreFlight,
   classifyOutcome,
   buildStarterSpacecraft,
-  DEVELOPER_PREBUILTS
+  DEVELOPER_PREBUILTS,
+  isStackNode
 } from '../core/engine.js';
 import { getFeasibility, buildPlanetBriefing } from '../core/planets.js';
 import {
@@ -295,7 +296,7 @@ export function renderObjectiveStage() {
       <div>
         <b>${c.n}</b>
         <p>${CONTENT.contractBriefs[c.id]}</p>
-        <small>Baseline science ${c.target} (threshold ${c.thr}) · budget $${c.cap}M · ${c.months} months${appState.highScores[c.id] ? ' · best ' + appState.highScores[c.id] : ''}</small>
+        <small>Baseline science <b>${c.target}</b> (min ${c.thr}) · budget $${c.cap}M · ${c.months} months${appState.highScores[c.id] ? ' · best ' + appState.highScores[c.id] : ''}</small>
         <span class="fb ${feasibility.cls}">${feasibility.lab}</span><small class="fn">${feasibility.notes.join(' · ')}</small>
         ${lock ? `<span class="lk">LOCKED - Level ${lock.level}: ${lock.need}</span>` : ''}
         ${devPrebuilt ? `<div style="margin-top:8px;"><button type="button" data-load-prebuilt="${devPrebuilt.id}" style="min-height:34px; padding:4px 10px; font-size:0.82rem; border-color:var(--ok); color:var(--ok);">Load 3&#9733; Prebuilt &rarr;</button></div>` : ''}
@@ -422,7 +423,7 @@ export function renderBuilderStage() {
       <div>
         <div class="row" style="align-items: center;">
           <b id="mn"></b>
-          <span id="sci-hud" class="science-hud-badge" aria-live="polite" title="Predicted science return vs contract goal"></span>
+          <div id="sci-hud" class="science-hud-wrap" aria-live="polite"></div>
           <span style="flex: 1;"></span>
           <select id="sl" aria-label="Select launcher">${launcherOptions}</select>
           <select id="so" aria-label="Select orbit"></select>
@@ -514,24 +515,42 @@ const getPartZIndex = part => {
   return part.u === appState.selectedPartUid ? 35 : base;
 };
 
+/* Clean, context-aware CAD snap crosshairs: invisible when idle so the rocket looks crisp,
+   and only displays compatible attachment ports while actively dragging a part! */
 function renderAttachmentNodesHtml() {
   if (appState.mission.locked) return '';
-  const occupied = getOccupiedNodes();
   const drag = appState.activeDrag;
   const isDragging = drag && drag.mv;
-  const draggedSubtree = isDragging ? new Set(getSubtreeUids(drag.u)) : new Set();
+  if (!isDragging) return '';
+
+  const draggedPart = findPartByUid(drag.u);
+  if (!draggedPart || getNodeCategory(draggedPart.id) === 'bus') return '';
+
+  const occupied = getOccupiedNodes();
+  const draggedSubtree = new Set(getSubtreeUids(drag.u));
+  const draggedNodes = ATTACHMENT_NODES[getNodeCategory(draggedPart.id)].filter(
+    ([childNode]) => !occupied.has(`${draggedPart.u}:${childNode}`)
+  );
+
+  const acceptsStack = draggedNodes.some(([n]) => isStackNode(n));
+  const acceptsRadial = draggedNodes.some(([n]) => !isStackNode(n));
 
   let html = '';
   appState.mission.parts.forEach(part => {
+    const isOwn = draggedSubtree.has(part.u);
     ATTACHMENT_NODES[getNodeCategory(part.id)].forEach(([nodeName]) => {
       if (occupied.has(`${part.u}:${nodeName}`)) return;
+      if (!isOwn) {
+        const nodeIsStack = isStackNode(nodeName);
+        if (nodeIsStack && !acceptsStack) return;
+        if (!nodeIsStack && !acceptsRadial) return;
+      }
       const [x, y] = getNodeWorldPosition(part, nodeName);
-      const nodeCls = isDragging ? (draggedSubtree.has(part.u) ? 'own' : '') : 'idle';
-      html += `<i class="nd ${nodeCls}" style="left:${x}px; top:${y}px;"></i>`;
+      html += `<i class="nd ${isOwn ? 'own' : ''}" style="left:${x}px; top:${y}px;"></i>`;
     });
   });
 
-  if (isDragging && drag.sn) {
+  if (drag.sn) {
     const [snapX, snapY] = getNodeWorldPosition(findPartByUid(drag.sn.h), drag.sn.hn);
     html += `<i class="nd hot" style="left:${snapX}px; top:${snapY}px;"></i>`;
   }
@@ -653,11 +672,17 @@ export function refreshBuilderView() {
   if (sciHud) {
     const sciReady = telemetry.sciF >= contract.target;
     const sciMin = telemetry.sciF >= contract.thr;
-    sciHud.className = `chip ${sciReady ? 'ok' : ''}`;
-    sciHud.style.borderColor = sciReady ? 'var(--ok)' : sciMin ? 'var(--accent)' : 'var(--bad)';
-    sciHud.style.color = sciReady ? 'var(--ok)' : sciMin ? 'var(--accent)' : 'var(--bad)';
-    sciHud.style.fontWeight = '700';
-    sciHud.innerHTML = `&#128300; Science: ${telemetry.sciF.toFixed(0)} / ${contract.target} pts (min ${contract.thr})`;
+    const fillPct = Math.min(100, Math.round((telemetry.sciF / Math.max(1, contract.target)) * 100));
+    const statusCls = sciReady ? 'goal-met' : sciMin ? 'min-met' : 'low';
+    const barColor = sciReady ? 'var(--ok)' : sciMin ? 'var(--accent)' : 'var(--bad)';
+    sciHud.className = `science-hud-wrap ${statusCls}`;
+    sciHud.innerHTML = `
+      <span style="color:${barColor}; font-weight:700; font-size:0.88rem;">&#128300; Science: ${telemetry.sciF.toFixed(0)} / ${contract.target} pts</span>
+      <span class="science-hud-bar" title="${fillPct}% of baseline science goal (minimum ${contract.thr} pts)">
+        <i style="width:${fillPct}%; background:${barColor};"></i>
+      </span>
+      <small style="color:var(--muted); font-size:0.78rem;">min ${contract.thr}</small>
+    `;
   }
 
   $('#sl').value = mission.L;
@@ -676,7 +701,7 @@ export function refreshBuilderView() {
     ? `<b>${getPartDisplayName(selectedPart.id)}</b> <small>${formatPartSpecs(selectedPart.id)}</small> <button type="button" data-a="rot" ${isLocked ? 'disabled' : ''}>Rotate (R)</button><button type="button" data-a="flp" ${isLocked ? 'disabled' : ''}>Flip (F)</button><button type="button" data-a="del" ${isLocked ? 'disabled' : ''}>Delete</button>`
     : isLocked
       ? '<small>&#128274; Design is locked. Click <b>Design locked: ON</b> above to unlock and customize parts.</small>'
-      : '<small>Drag any part on the ship to separate &amp; re-attach, drag from palette, or click a part to rotate, flip, or delete.</small>';
+      : '<small>Drag any part on the ship to separate &amp; re-attach (crosshair ports light up while dragging), or click a part to rotate, flip, or delete.</small>';
 
   const openMap = {};
   $$('#mt details[data-dd]').forEach(el => {
@@ -962,7 +987,7 @@ const renderPredictedFlight = telemetry => {
   return `
     <h3>${text.heading}</h3>
     <p><small>${text.note}</small></p>
-    <p><b>${CONTENT.outcomeLabels[flight.outcome]}</b>: science ${flight.science.toFixed(0)} (threshold ${contract.thr}, baseline ${contract.target}), launch reliability ${toPercent(flight.reliability)}%, ${flight.stars}&#9733;, ${flight.score} pts.</p>
+    <p><b>${CONTENT.outcomeLabels[flight.outcome]}</b>: science <b>${flight.science.toFixed(0)}</b> (threshold ${contract.thr}, baseline ${contract.target}), launch reliability ${toPercent(flight.reliability)}%, ${flight.stars}&#9733;, ${flight.score} pts.</p>
     <ul>${eventItems}</ul>
   `;
 };
@@ -1410,7 +1435,7 @@ function createFlightView(canvas, telemetry) {
   function placeCraftDom(cam) {
     const domAlpha = clamp01((cam.sRel - 0.07) / 0.09);
     craftWrap.style.transform =
-      `translate(${cam.craft.x}px, ${cam.craft.y}px) translate(-50%, -50%) rotate(${cam.theta - Math.PI / 2}rad) scale(${cam.scale})`;
+      `translate3d(${cam.craft.x}px, ${cam.craft.y}px, 0) translate(-50%, -50%) rotate(${cam.theta - Math.PI / 2}rad) scale(${cam.scale})`;
     craftWrap.style.opacity = String(domAlpha);
   }
 
@@ -1462,20 +1487,14 @@ function createFlightView(canvas, telemetry) {
         tracePath(arcPoint, 0, state.craftT);
         ctx.strokeStyle = '#ffc857';
         ctx.lineWidth = 2.5;
-        ctx.shadowColor = '#ffc857';
-        ctx.shadowBlur = 8;
         ctx.stroke();
-        ctx.shadowBlur = 0;
       }
     }
     if (state.dive !== null && state.dive > 0) {
       tracePath(divePoint, 0, state.dive);
       ctx.strokeStyle = '#ff7a3d';
       ctx.lineWidth = 2.5;
-      ctx.shadowColor = '#ff5a1f';
-      ctx.shadowBlur = 10;
       ctx.stroke();
-      ctx.shadowBlur = 0;
     }
 
     ctx.globalAlpha = 1;
@@ -1632,6 +1651,13 @@ function createFlightView(canvas, telemetry) {
     hud.querySelector('.flph').textContent = phase;
     hud.querySelector('.flday').textContent = detail;
     canvas.setAttribute('aria-label', `${hudText.canvasLabel}: ${phase}${detail ? `, ${detail}` : ''}`);
+  };
+  view.setScienceHud = (currentSci, targetSci) => {
+    const sciEl = hud.querySelector('.flsci');
+    if (sciEl) {
+      sciEl.textContent = `🔬 Projected Science: ${Math.round(currentSci)} / ${targetSci} pts`;
+      sciEl.style.color = currentSci >= targetSci ? 'var(--ok)' : 'var(--accent)';
+    }
   };
 
   view.setScene = name => {
@@ -1924,7 +1950,7 @@ export async function startLaunchSequence() {
         <div id="flv">
           <canvas id="flcv" role="img" aria-label="${CONTENT.flightHud.canvasLabel}"></canvas>
           <div id="flcw"><div class="flc" id="fl">${renderFlightSpacecraft()}</div></div>
-          <div id="flhud"><span class="flph"></span><span class="flday"></span></div>
+          <div id="flhud"><span class="flph"></span><span class="flday"></span><span class="flsci"></span></div>
           <div id="flpause" aria-hidden="true">
             <div class="flpause-box">
               <strong>${CONTENT.flightHud.pausedTitle}</strong>
@@ -1955,6 +1981,7 @@ export async function startLaunchSequence() {
     const logEl = $('#log');
     const craftEl = $('#fl');
     const view = createFlightView($('#flcv'), telemetry);
+    view.setScienceHud(flight.science, telemetry.C.target);
 
     $('#fskip').onclick = () => {
       resumeFlight();
@@ -1998,6 +2025,7 @@ export async function startLaunchSequence() {
         burns[kind] = burn;
         flight = resolveFlight(telemetry, burns);
         steps = flight.steps;
+        view.setScienceHud(flight.science * decisionMultiplier, telemetry.C.target);
       }
       $('#burnstate').textContent = all
         ? CONTENT.burn.autoAllResult
@@ -2052,6 +2080,7 @@ export async function startLaunchSequence() {
         } else {
           view.explode();
         }
+        view.setScienceHud(0, telemetry.C.target);
         AudioEngine.fail();
       }
 
@@ -2067,6 +2096,7 @@ export async function startLaunchSequence() {
         if (aborted) return;
         if (chosen) {
           decisionMultiplier *= chosen.bonusFactor;
+          view.setScienceHud(flight.science * decisionMultiplier, telemetry.C.target);
           decisionReasons.push(`Flight Director response (${CONTENT.eventText[step.values.eventId].n}): ${chosen.label}.`);
         }
       }
