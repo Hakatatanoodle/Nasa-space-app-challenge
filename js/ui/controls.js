@@ -29,7 +29,7 @@ import {
   buildFailingDemoSpacecraft,
   isStackNode
 } from '../core/engine.js';
-import { $, $$, showToast } from './domElements.js';
+import { $, showToast } from './domElements.js';
 import {
   navigateToStage,
   renderObjectiveStage,
@@ -47,11 +47,10 @@ import {
 } from './renderer.js';
 
 function clientToWorldCoords(event) {
-  const canvas = $('#cv');
-  const rect = canvas.getBoundingClientRect();
+  const rect = $('#world').getBoundingClientRect();
   return [
-    (canvas.scrollLeft + event.clientX - rect.left) / appState.canvasZoom,
-    (canvas.scrollTop + event.clientY - rect.top) / appState.canvasZoom
+    (event.clientX - rect.left) / appState.canvasZoom,
+    (event.clientY - rect.top) / appState.canvasZoom
   ];
 }
 
