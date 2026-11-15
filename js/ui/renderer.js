@@ -1,5 +1,7 @@
 /* File: js/ui/renderer.js
  * Owner: Person B (Saurav)
+ * AI-assisted (update): Claude, 2026-11-15 - responsive pass: class hooks on the builder template (b-main / builder-head / builder-tools), smaller zoom floor on narrow canvases, 44px Developer Mode prebuilt button. Reviewed by a human: NO.
+ * AI-assisted (update): Claude, 2026-11-15 - getHalf() clamped to a minimum so ctx.arc() never gets a negative radius on short landscape screens. Reviewed by a human: NO.
  * AI-assisted (update): Claude, 2026-11-15 - flight menu: centred pause menu with Home / Pause (P) / Resume (X) / Restart (R). Reviewed by a human: NO.
  * AI-assisted (update): Claude, 2026-11-15 - win/loss tightening (outcome bands, audio, demos). Reviewed by a human: NO.
  * AI-assisted: YES — Gemini, 2026-11-14; Gemini, 2026-11-15; Claude, 2026-11-14; Claude, 2026-11-15 (two manual burns). Reviewed by a human:YES Reviewd by Person C (Yochan)
@@ -304,7 +306,7 @@ export function renderObjectiveStage() {
         <small>Baseline science ${c.target} (threshold ${c.thr}) · budget $${c.cap}M · ${c.months} months${appState.highScores[c.id] ? ' · best ' + appState.highScores[c.id] : ''}</small>
         <span class="fb ${feasibility.cls}">${feasibility.lab}</span><small class="fn">${feasibility.notes.join(' · ')}</small>
         ${lock ? `<span class="lk">LOCKED - Level ${lock.level}: ${lock.need}</span>` : ''}
-        ${devPrebuilt ? `<div style="margin-top:8px;"><button type="button" data-load-prebuilt="${devPrebuilt.id}" style="min-height:34px; padding:4px 10px; font-size:0.82rem; border-color:var(--ok); color:var(--ok);">Load 3&#9733; Prebuilt &rarr;</button></div>` : ''}
+        ${devPrebuilt ? `<div style="margin-top:8px;"><button type="button" data-load-prebuilt="${devPrebuilt.id}" style="min-height:44px; padding:4px 12px; font-size:0.85rem; border-color:var(--ok); color:var(--ok);">Load 3&#9733; Prebuilt &rarr;</button></div>` : ''}
       </div>
     </div>
   `;
@@ -425,14 +427,14 @@ export function renderBuilderStage() {
   $('#s2').innerHTML = `
     <div id="b3">
       <div id="pal" aria-label="Spacecraft parts palette" class="${isLocked ? 'lock' : ''}">${paletteHtml}</div>
-      <div>
-        <div class="row" style="align-items: center;">
+      <div class="b-main">
+        <div class="row builder-head" style="align-items: center;">
           <b id="mn"></b>
           <span style="flex: 1;"></span>
           <select id="sl" aria-label="Select launcher">${launcherOptions}</select>
           <select id="so" aria-label="Select orbit"></select>
         </div>
-        <div class="row" style="margin: 6px 0; align-items: center;">
+        <div class="row builder-tools" style="margin: 6px 0; align-items: center;">
           <label class="team-toggle" for="mir">
             <input type="checkbox" id="mir" ${appState.mission.mirror ? 'checked' : ''}> Mirror symmetry
           </label>
@@ -633,7 +635,9 @@ export function centerBuilderCanvas() {
 export function autoFitBuilderCanvas() {
   const cv = $('#cv');
   if (!cv) return;
-  const idealZoom = Math.max(0.8, Math.min(1.05, +(cv.clientWidth / 820).toFixed(2)));
+  // Wide canvases never zoom out below 0.8; narrow (phone) canvases may go down to 0.55 so the whole ship fits
+  const minZoom = cv.clientWidth < 700 ? 0.55 : 0.8;
+  const idealZoom = Math.max(minZoom, Math.min(1.05, +(cv.clientWidth / 820).toFixed(2)));
   appState.canvasZoom = idealZoom;
   refreshBuilderView();
   requestAnimationFrame(() => centerBuilderCanvas());
@@ -1197,7 +1201,7 @@ function createFlightView(canvas, telemetry) {
     return true;
   }
 
-  const getHalf = () => Math.min(width, height - state.inset) / 2 - 16;
+  const getHalf = () => Math.max(12, Math.min(width, height - state.inset) / 2 - 16); // never negative: ctx.arc() throws on a negative radius when the burn panel covers a short canvas
   const getCx = () => width / 2;
   const getCy = () => (height - state.inset) / 2;
 

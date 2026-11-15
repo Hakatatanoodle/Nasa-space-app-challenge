@@ -1,5 +1,7 @@
 /* File: css/components.css
  * Owner: Person B (Saurav)
+ * AI-assisted (update): Claude, 2026-11-15 - report tables: headers no longer break mid-word, source tag stays on one line (table scrolls sideways on phones). Reviewed by a human: NO.
+ * AI-assisted (update): Claude, 2026-11-15 - responsive pass: readable toast, scrollable report tables, dvh modal height, full-width cards on phones, safe-area padding. Reviewed by a human: NO.
  * AI-assisted (update): Claude, 2026-11-15 - flight menu styles. Reviewed by a human: NO.
  * AI-assisted: YES — Gemini, 2026-11-15. Reviewed by a human: YES Reviewd by Person C (Yochan)
  * Sources used: none
@@ -173,6 +175,7 @@
   position: relative;
   width: min(820px, 95vw);
   max-height: 88vh;
+  max-height: 88dvh;
   overflow-y: auto;
   overscroll-behavior: contain;
   transform: translateZ(0);
@@ -364,9 +367,10 @@
 #toast {
   position: fixed;
   left: 50%;
-  bottom: 20px;
+  bottom: calc(20px + env(safe-area-inset-bottom, 0px));
   transform: translateX(-50%);
-  max-width: 92vw;
+  width: max-content;
+  max-width: min(92vw, 560px);
   padding: 10px 16px;
   font-weight: 600;
   color: #0b2038;
@@ -382,7 +386,7 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  padding: 12px;
+  padding: max(12px, env(safe-area-inset-top, 0px)) max(12px, env(safe-area-inset-right, 0px)) max(12px, env(safe-area-inset-bottom, 0px)) max(12px, env(safe-area-inset-left, 0px));
   overflow: hidden;
   background: #05101ef0;
   z-index: 20;
@@ -393,10 +397,14 @@
 }
 
 .rt {
+  display: block;
   width: 100%;
+  max-width: 100%;
   margin: 8px 0;
+  overflow-x: auto;
   font-size: 0.88rem;
   border-collapse: collapse;
+  -webkit-overflow-scrolling: touch;
 }
 
 .rt th,
@@ -405,10 +413,18 @@
   text-align: left;
   vertical-align: top;
   border: 1px solid var(--line);
+  overflow-wrap: break-word;
 }
 
 .rt th {
   background: #0d243d;
+  white-space: nowrap; /* headers like "Resource" and "Margin" must never break mid-word */
+}
+
+/* Source tags (e.g. SIMPLIFIED_FOR_GAMEPLAY) stay on one line so rows stay short; on phones the table
+   scrolls sideways for that last column instead of chopping the tag into four lines. */
+.rt td small {
+  white-space: nowrap;
 }
 
 .bar {
@@ -584,4 +600,39 @@
   border-color: transparent;
   color: var(--muted);
   text-decoration: underline;
+}
+
+/* ---- Small screens ---- */
+@media (max-width: 640px) {
+  .card {
+    max-width: none;
+  }
+
+  .box {
+    padding: 12px 14px;
+  }
+
+  .modal-header {
+    margin: 0 -14px 12px;
+    padding: 10px 14px;
+  }
+
+  .rt {
+    font-size: 0.8rem;
+  }
+
+  .rt th,
+  .rt td {
+    padding: 5px 6px;
+  }
+
+  .fm-panel {
+    padding: 16px;
+  }
+
+  /* Toast sits at the top on phones so it never covers the parts tray, burn panel or Next button */
+  #toast {
+    top: calc(10px + env(safe-area-inset-top, 0px));
+    bottom: auto;
+  }
 }
