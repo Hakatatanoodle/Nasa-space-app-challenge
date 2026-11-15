@@ -1,5 +1,6 @@
 /* File: js/content.js
  * Owner: Person C (Yochan)
+ * AI-assisted (update): Claude, 2026-11-15 - win/loss tightening (outcome bands, audio, demos). Reviewed by a human: NO.
  * AI-assisted: YES — Gemini, 2026-11-14; Gemini, 2026-11-15; Claude, 2026-11-14; Claude, 2026-11-15 (two manual burns). Reviewed by a human: YES Reviewd by Person C (Yochan)
  * Sources used: NASA_CUBESAT101, JPL_CML
  */
@@ -13,7 +14,7 @@ export const CONTENT = {
     landing: 'assets/audio/Landing.mp3',
     design: 'assets/audio/design.mp3',
     win: 'assets/audio/win.mp3',
-    loss: 'assets/audio/loss.mp3'
+    loss: 'assets/audio/lost.mp3'
   },
   disclaimer: 'Mission design simulation — live NASA DONKI space weather + simplified spacecraft engineering model.',
   stageNames: ['Objective', 'Build', 'Launch', 'Debrief'],
@@ -31,7 +32,7 @@ export const CONTENT = {
   outcomeLabels: {
     success: 'Mission accomplished',
     partial: 'Partial success',
-    lost: 'Mission lost'
+    lost: 'Mission failed'
   },
   marginFormulaTooltip:
     'Margin % = (Capacity − Predicted Use) ÷ Predicted Use × 100. Project convention; NASA programs define reserves per mission phase.',
@@ -160,6 +161,7 @@ export const CONTENT = {
     operations: '<b>Operations complete.</b> {returnedPct}% of data downlinked. Science return: <b>{science}</b> / {target} pts.'
   },
   flightFailures: {
+    belowMinimum: 'Your spacecraft arrived, but it returned only {sciPts} science points. This contract needs at least {minPts} to count as a mission. Fix: add or upgrade instruments, raise data return with a better antenna or a recorder, or pick an orbit with sharper resolution.',
     tumble: {
       why: 'Center of mass was offset from the engine thrust line by more than the balance limit.',
       fix: 'Mirror heavy parts symmetrically left and right.'
@@ -220,7 +222,7 @@ export const CONTENT = {
     stalled: 'Out of propellant',
     dive: 'Falling toward the Sun',
     orbit: 'In orbit: {orbit}',
-    lost: 'Mission lost',
+    lost: 'Mission failed',
     complete: 'Operations complete',
     notToScale: 'Not to scale'
   },
@@ -328,6 +330,7 @@ export const CONTENT = {
     <p><b>Six resources:</b> Mass, Power, Budget, Data, Comms, and Time. Green = healthy reserve, Amber = thin reserve, Red = critical failure.</p>
     <p><b>Career progression:</b> Earth, the Moon, and Mars start open. Safe arrivals unlock Venus, Jupiter, Saturn, Uranus, Neptune, Mercury, and the Sun. Progress saves automatically in your browser.</p>
     <p><b>Manual burns:</b> During launch you can fly two burns yourself: the departure burn that sends you on your way, and the orbit insertion burn when you arrive. Hold the button (or Space) and let go inside the green zone. The insertion zone is narrower, so it is harder. A clean pair adds up to 6% extra science in total. Press Auto-pilot to skip one burn, or Auto-pilot all burns to skip both: no bonus, no penalty. The result never depends on luck.</p>
-    <p><b>Stars:</b> 1&#9733; survive mission, 2&#9733; meet baseline science, 3&#9733; earn all four role sign-offs and spend under 85% of budget.</p>
+    <p><b>How a mission ends:</b> <b>Mission accomplished</b> means you reached orbit <i>and</i> returned at least the baseline science. <b>Partial success</b> means you reached orbit and met the minimum (threshold) science, but fell short of the baseline. <b>Mission failed</b> means you never arrived, or arrived but returned less than the minimum. Only Mission accomplished plays the victory music.</p>
+    <p><b>Stars:</b> 1&#9733; partial success, 2&#9733; meet baseline science, 3&#9733; earn all four role sign-offs and spend under 85% of budget.</p>
   `
 };
