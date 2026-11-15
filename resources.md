@@ -4,3 +4,7 @@ design.mp3 : https://stocktune.com/free-music/misty-echoes-of-neptune-279973-165
 win.mp3 : https://stocktune.com/free-music/interstellar-jazz-adventure-148637-98792
 loss.mp3 : https://incompetech.com/
 UI Hover & Click SFX : Procedural Web Audio API synthesizer (`AudioEngine.tick` / `AudioEngine.click` in `js/core/state.js`, zero external network dependencies)
+
+Optional Open-Source External Button SFX References (CC0 / Public Domain):
+- Kenney Interface Sounds (CC0): https://kenney.nl/assets/interface-sounds
+- Mixkit Sci-Fi Interface Clicks (Royalty-Free): https://mixkit.co/free-sound-effects/sci-fi/

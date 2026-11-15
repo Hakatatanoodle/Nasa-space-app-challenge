@@ -1236,6 +1236,50 @@ b.bad { color: var(--bad); }
   animation-play-state: paused;
 }
 
+/* ---- Pre-launch terminal countdown (T-10 to lift-off), drawn over the flight window ---- */
+#flcountdown {
+  position: absolute;
+  inset: 0;
+  z-index: 4;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 12px;
+  text-align: center;
+  pointer-events: none;
+  background: radial-gradient(circle at center, rgba(6, 18, 34, 0.72), rgba(4, 12, 24, 0.35));
+}
+
+#flcountdown[hidden] {
+  display: none;
+}
+
+#flcd-num {
+  font-size: clamp(3rem, 9vw, 5.2rem);
+  font-weight: 800;
+  line-height: 1;
+  letter-spacing: 4px;
+  color: var(--accent);
+  text-shadow: 0 0 28px rgba(255, 200, 87, 0.65), 0 4px 12px #000;
+}
+
+#flcd-num.pop {
+  animation: cdPop 0.45s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+@keyframes cdPop {
+  0% { transform: scale(1.45); opacity: 0.2; }
+  100% { transform: scale(1); opacity: 1; }
+}
+
+#flcd-sub {
+  max-width: 90%;
+  font-size: clamp(0.85rem, 2.4vw, 1.05rem);
+  color: var(--text);
+}
+
 /* Touch screens wider than the phone breakpoint (iPad landscape): keep the zoom and undo buttons finger-sized */
 @media (pointer: coarse) {
   .builder-tools [data-a="undo"],

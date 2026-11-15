@@ -16,7 +16,8 @@ export const CONTENT = {
     landing: 'assets/audio/Landing.mp3',
     design: 'assets/audio/design.mp3',
     win: 'assets/audio/win.mp3',
-    loss: 'assets/audio/loss.mp3'
+    loss: 'assets/audio/loss.mp3',
+    countdown: 'assets/audio/countdown.mp3'
   },
   disclaimer: 'Mission design simulation — live NASA DONKI space weather + simplified spacecraft engineering model.',
   stageNames: ['Objective', 'Build', 'Launch', 'Debrief'],
@@ -213,6 +214,21 @@ export const CONTENT = {
   flightHud: {
     canvasLabel: 'Flight view',
     skip: 'Skip animation',
+    countdown: 'Terminal countdown',
+    countdownDetail: '10 seconds',
+    countdownBeats: [
+      { label: '10', sub: 'External power disconnected', ms: 1000 },
+      { label: '9', sub: 'Final flight computer alignment', ms: 1000 },
+      { label: '8', sub: 'Tank pressurization sequence', ms: 1000 },
+      { label: '7', sub: 'Gaseous nitrogen purge start', ms: 1000 },
+      { label: '6', sub: 'Internal power transfer confirmed', ms: 1000 },
+      { label: '5', sub: 'Launch pad arm retract', ms: 1000 },
+      { label: '4', sub: 'Guidance & telemetry locked', ms: 1000 },
+      { label: '3', sub: 'Main engine chilldown nominal', ms: 1000 },
+      { label: '2', sub: 'Ignition sequence start', ms: 1000 },
+      { label: '1', sub: 'All engines running', ms: 1000 },
+      { label: 'LIFT-OFF', sub: 'Tower cleared', ms: 550 }
+    ],
     logTitle: 'Mission log',
     ascent: 'Ascent',
     atmosphere: 'Leaving the atmosphere',
