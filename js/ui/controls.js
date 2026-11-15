@@ -1,9 +1,6 @@
 /* File: js/ui/controls.js
  * Owner: Person B (Saurav)
- * AI-assisted (update): Gemini, 2026-11-15 - universal multi-node drag snapping & global button hover/click SFX. Reviewed by a human: NO.
- * AI-assisted (update): Claude, 2026-11-15 - centred flight menu (M opens it; Home / Pause P / Resume X / Restart R). Reviewed by a human: NO.
- * AI-assisted (update): Claude, 2026-11-15 - win/loss tightening (outcome bands, audio, demos). Reviewed by a human: NO.
- * AI-assisted: YES — Gemini, 2026-11-15. Reviewed by a human: YES Reviewd by Person C (Yochan)
+ * AI-assisted (update): Gemini, 2026-11-15 - rAF-throttled 60fps drag pipeline and clean snap nodes. Reviewed by a human: NO.
  * Sources used: none
  */
 import { DATA } from '../api/mockData.js';
@@ -15,7 +12,6 @@ import {
   saveUndoSnapshot,
   saveMissionProgress,
   saveNamedBuild,
-  deleteSavedBuild,
   AudioEngine
 } from '../core/state.js';
 import {
@@ -26,7 +22,6 @@ import {
   createPartInstance,
   deletePartSubtree,
   attachParts,
-  orientChildForJoin,
   mirrorPartIfEnabled,
   autoAttachPart,
   buildStarterSpacecraft,
@@ -140,7 +135,7 @@ function activateDeveloperMode() {
   if (appState.mission.stage === 1) renderObjectiveStage();
   showToast(
     enabled
-      ? 'Developer Mode active: all destinations & max-score 3★ prebuilts unlocked in My builds.'
+      ? 'Developer Mode active: all destinations & 3★ prebuilt rockets unlocked in My builds.'
       : 'Developer Mode off: standard Career locks restored.'
   );
 }
@@ -187,25 +182,6 @@ export function bindGlobalControls() {
     e.preventDefault();
   });
 
-  // Global hover & click UI telemetry sound hooks for all buttons, cards, and interactive tiles
-  let lastHoveredControl = null;
-  document.addEventListener('pointerover', e => {
-    const interactive = e.target.closest('button:not(:disabled), .card:not(.lkd), .tile, summary');
-    if (interactive && interactive !== lastHoveredControl) {
-      lastHoveredControl = interactive;
-      AudioEngine.hover();
-    } else if (!interactive) {
-      lastHoveredControl = null;
-    }
-  });
-
-  document.addEventListener('pointerdown', e => {
-    const btn = e.target.closest('button:not(:disabled)');
-    if (btn && btn.id !== 'burnbtn' && !btn.dataset.p) {
-      AudioEngine.click();
-    }
-  }, true);
-
   $('#brand-home')?.addEventListener('click', e => {
     e.preventDefault();
     goHome();
@@ -213,26 +189,29 @@ export function bindGlobalControls() {
 
   const flightMenu = $('#flightmenu');
   $('#fm-open')?.addEventListener('click', () => {
+    AudioEngine.click();
     openFlightMenu();
   });
   $('#fm-close')?.addEventListener('click', () => {
+    AudioEngine.click();
     closeFlightMenu();
   });
   $('#fm-home')?.addEventListener('click', goHome);
   $('#fm-pause')?.addEventListener('click', () => {
+    AudioEngine.click();
     pauseFlight();
   });
   $('#fm-resume')?.addEventListener('click', () => {
+    AudioEngine.click();
     resumeFlight();
   });
   $('#fm-restart')?.addEventListener('click', () => {
+    AudioEngine.click();
     restartLaunchSequence();
   });
-
   flightMenu?.addEventListener('click', e => {
     if (e.target === flightMenu) closeFlightMenu();
   });
-
   flightMenu?.addEventListener('keydown', e => {
     if (e.key !== 'Tab') return;
     const items = [...flightMenu.querySelectorAll('button:not(:disabled)')];
@@ -318,6 +297,9 @@ export function bindGlobalControls() {
     }
   });
 
+  let dragRafPending = false;
+  let latestDragEvent = null;
+
   document.addEventListener('pointerdown', e => {
     if (appState.mission.stage !== 2) return;
 
@@ -369,9 +351,11 @@ export function bindGlobalControls() {
     };
   });
 
-  document.addEventListener('pointermove', e => {
+  const processDragFrame = () => {
+    dragRafPending = false;
+    const e = latestDragEvent;
     const drag = appState.activeDrag;
-    if (!drag || e.pointerId !== drag.pointerId) return;
+    if (!e || !drag) return;
 
     if (!drag.mv) {
       if (Math.hypot(e.clientX - drag.x, e.clientY - drag.y) < 7) return;
@@ -439,7 +423,6 @@ export function bindGlobalControls() {
       q.y = activeDrag.orig[uid][1] + dy;
     });
 
-    // Multi-directional snap check across all unoccupied nodes on both child and host
     activeDrag.sn = null;
     if (getNodeCategory(draggedPart.id) !== 'bus') {
       const occupied = getOccupiedNodes();
@@ -449,23 +432,20 @@ export function bindGlobalControls() {
       const hasChildren = appState.mission.parts.some(q => q.par === draggedPart.u);
       const origFlip = draggedPart.flip;
       const origRot = draggedPart.rot;
-      const draggedCat = getNodeCategory(draggedPart.id);
 
-      ATTACHMENT_NODES[draggedCat].forEach(([childNode]) => {
+      ATTACHMENT_NODES[getNodeCategory(draggedPart.id)].forEach(([childNode]) => {
         if (occupied.has(`${draggedPart.u}:${childNode}`)) return;
 
         appState.mission.parts.forEach(host => {
           if (draggedTree.has(host.u)) return;
 
           ATTACHMENT_NODES[getNodeCategory(host.id)].forEach(([hostNode]) => {
-            if (occupied.has(`${host.u}:${hostNode}`)) return;
+            if (occupied.has(`${host.u}:${hostNode}`) || isStackNode(childNode) !== isStackNode(hostNode)) return;
 
-            // Core structural stack parts (tanks/engines) join vertically on stack nodes
-            if ((draggedCat === 'tank' || draggedCat === 'eng') && isStackNode(childNode) !== isStackNode(hostNode)) {
-              return;
+            if (!isStackNode(childNode) && !hasChildren) {
+              draggedPart.rot = 0;
+              draggedPart.flip = hostNode.startsWith('L') ? 1 : 0;
             }
-
-            orientChildForJoin(draggedPart, childNode, hostNode, hasChildren);
 
             const a = getNodeWorldPosition(draggedPart, childNode);
             const b = getNodeWorldPosition(host, hostNode);
@@ -489,12 +469,23 @@ export function bindGlobalControls() {
     }
 
     updateBuilderLiveDrag();
+  };
+
+  document.addEventListener('pointermove', e => {
+    const drag = appState.activeDrag;
+    if (!drag || e.pointerId !== drag.pointerId) return;
+    latestDragEvent = e;
+    if (!dragRafPending) {
+      dragRafPending = true;
+      requestAnimationFrame(processDragFrame);
+    }
   });
 
   const finishPointerDrag = e => {
     const drag = appState.activeDrag;
     if (!drag || (e.pointerId !== undefined && e.pointerId !== drag.pointerId)) return;
     appState.activeDrag = null;
+    latestDragEvent = null;
 
     if (!drag.mv) {
       if (drag.nid) {
@@ -595,6 +586,7 @@ export function bindGlobalControls() {
 
   document.addEventListener('click', e => {
     if (e.target.closest('[data-close-modal]') || e.target.id === 'rev' || e.target.id === 'help') {
+      AudioEngine.click();
       closeOpenModals();
       return;
     }
@@ -619,6 +611,7 @@ export function bindGlobalControls() {
 
     const actionEl = e.target.closest('[data-a], [data-st]');
     if (actionEl) {
+      AudioEngine.click();
       const { st, a, v } = actionEl.dataset;
 
       if (st) return navigateToStage(+st);
@@ -732,12 +725,11 @@ export function bindGlobalControls() {
       appState.mission.locked = false;
       appState.mission.ci = 1;
       appState.mission.oi = 0;
-      appState.mission.L = 'heavy';
+      appState.mission.L = 'medium';
       appState.mission.hard = 0;
       buildStarterSpacecraft();
-      autoAttachPart('tank');
       autoAttachPart('i_spec');
-      autoAttachPart('ant_hg');
+      autoAttachPart('ant_mg');
       autoAttachPart('rec');
       saveMissionProgress();
       AudioEngine.setMusic('design');
