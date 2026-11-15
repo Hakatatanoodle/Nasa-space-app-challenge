@@ -1,6 +1,6 @@
 /* File: js/api/nasaService.js
  * Owner: Person A (Ashmin)
- * AI-assisted: YES — Gemini, 2026-11-15. Reviewed by a human: NO.
+ * AI-assisted: YES — Gemini, 2026-11-15. Reviewed by a human: YES Reviewd by Person C (Yochan)
  * Sources used: SPACEAPPS_CHALLENGE
  */
 import { API_CONFIG } from '../config.js';
