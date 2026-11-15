@@ -21,11 +21,18 @@ export const GATES = [
 
 const GRAND_TOUR = ['mercury', 'venus', 'earth', 'mars', 'jupiter', 'saturn', 'uranus', 'neptune'];
 const STORAGE_KEY = 'apogeeCareer';
-const emptyCareer = () => ({ arr: {}, good: {}, lost: 0, tot: 0, un: [], ach: {}, streak: 0, god: false });
+const emptyCareer = () => ({ arr: {}, good: {}, lost: 0, tot: 0, un: [], ach: {}, streak: 0, dev: false });
 
 let career = emptyCareer();
 try {
-  Object.assign(career, JSON.parse(localStorage[STORAGE_KEY] || '{}'));
+  const parsed = JSON.parse(localStorage[STORAGE_KEY] || '{}');
+  if (parsed && typeof parsed === 'object') {
+    if ('god' in parsed && !('dev' in parsed)) {
+      parsed.dev = !!parsed.god;
+    }
+    delete parsed.god;
+    Object.assign(career, parsed);
+  }
 } catch {
   career = emptyCareer();
 }
@@ -54,13 +61,13 @@ export const ACHIEVEMENTS = [
 ];
 
 export const getCareer = () => career;
-export const isGodMode = () => !!career.god;
-export const isContractOpen = id => isGodMode() || HOME_IDS.includes(id) || career.un.includes(id);
+export const isDeveloperMode = () => !!career.dev;
+export const isContractOpen = id => isDeveloperMode() || HOME_IDS.includes(id) || career.un.includes(id);
 
-export function toggleGodMode() {
-  career.god = !career.god;
+export function toggleDeveloperMode() {
+  career.dev = !career.dev;
   saveCareer();
-  return career.god;
+  return career.dev;
 }
 
 export const getContractSortKey = contract =>
@@ -68,10 +75,10 @@ export const getContractSortKey = contract =>
 
 export const getPlanetName = id => CONTENT.planetInfo[id].name.replace(/^the /, '');
 
-const getTopGate = () => (isGodMode() ? GATES[GATES.length - 1] : GATES.filter(g => career.un.includes(g.id)).pop());
+const getTopGate = () => (isDeveloperMode() ? GATES[GATES.length - 1] : GATES.filter(g => career.un.includes(g.id)).pop());
 export const getCareerLevel = () => (getTopGate() ? getTopGate().lv : 0);
-export const getCareerRank = () => (isGodMode() ? 'Director Override (All Maps)' : getTopGate() ? getTopGate().title : 'Launch Pad Rookie');
-export const getNextGate = () => (isGodMode() ? null : GATES.find(g => !career.un.includes(g.id)));
+export const getCareerRank = () => (isDeveloperMode() ? 'Developer Mode (All Maps)' : getTopGate() ? getTopGate().title : 'Launch Pad Rookie');
+export const getNextGate = () => (isDeveloperMode() ? null : GATES.find(g => !career.un.includes(g.id)));
 export const getCareerButtonLabel = () => `Career: Level ${getCareerLevel()} - ${getCareerRank()}`;
 
 const countArrivals = (id, good) => (good ? career.good : career.arr)[id] || 0;
