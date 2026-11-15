@@ -1,8 +1,8 @@
 <!-- File: README.md
   Owner: Person C (Yochan)
-  AI-assisted: YES — Claude, 2026-11-15 (added Developer Mode section, audio notes). Reviewed by a human: NO.
-  AI-assisted: YES — Claude, 2026-11-15. Reviewed by a human: Yochan.
-  Sources used: NASA_CUBESAT101, JPL_CML, NASA_SE_WEBINAR, SPACEAPPS_CHALLENGE, plus the external links listed in "References"
+  AI-assisted: YES — Claude, 2026-11-15 (Developer Mode section and audio notes). Reviewed by a human: YES, Person C (Yochan).
+  AI-assisted (update): ChatGPT, 2026-11-15 - reconciled source-backed data and policies, updated project structure, test results, credits and AI disclosure. Reviewed by a human: YES, Person C (Yochan).
+  Sources used: NASA Planetary Fact Sheets, NASA CubeSat 101, Wessen et al. (2013), NASA DONKI and the project references listed below
 -->
 
 # APOGEE — Space Mission Design Game
@@ -14,7 +14,7 @@ APOGEE is a browser game where you design a complete space mission: pick a desti
 It was built for the **NASA Space Apps Challenge 2026** (challenge: *Space Mission Design Game*). It is plain HTML, CSS and vanilla JavaScript (native ES6 modules). There is no framework, no npm and no build step.
 
 **Live game:** https://apogee-alpha-tawny.vercel.app/
-**Team:** Person A — Ashmin (engine, NASA data layer) · Person B — Saurav (UI, entry, styles) · Person C — Yochan (content, data values, docs)
+**Team:** Person A — Asmin (engine, NASA data layer) · Person B — Saurav (UI, entry, styles) · Person C — Yochan (content, data values, docs)
 
 ---
 
@@ -57,7 +57,6 @@ Press **How to play** in the header at any time for the in-game guide.
 - **Three launchers:** medium, heavy and super-heavy.
 - **Ten destinations** in a career chain, from Earth orbit out to Neptune, plus the Sun, which physics will not let you reach.
 - **Career mode** with ranks, 14 achievements and progress saved in the browser.
-- **Solo or team play (hot-seat on one device).** Four roles (Director, Engineer, Science, Comms) each sign off a part of the design. All four sign-offs are needed for a 3-star result.
 - **Save, load and compare builds,** plus a **Share / Load code** to copy a design as a text code.
 - **Live space weather** from NASA DONKI feeds a radiation multiplier, with an offline fallback (see [NASA resources used](#nasa-resources-used)).
 - **Optional manual burns** during the flight for up to +6% science.
@@ -108,10 +107,10 @@ The simulation is **deterministic**: the same design and the same manual-burn pr
 
 | Policy | Margin | Source |
 |---|---|---|
-| Easy | 10% | NASA CubeSat 101 (p. 13): budgets should carry at least a 10% reserve |
-| Hard ("by the book") | 35% | JPL CML 4 checklist (Wessen et al., 2013, Fig. 8b): 35% on dry mass, power and energy |
+| Easy | 10% | NASA CubeSat 101 (p. 13): recommends a budget reserve of at least 10% for unexpected events |
+| Hard ("by the book") | 35% | Wessen et al. (2013), Fig. 8b: CML 4 technical margins of at least 35% for spacecraft dry mass, power and energy |
 
-A design review passes when at least **80%** of checklist items are complete, following the JPL concept-maturity rule (§V).
+The game uses **80%** as its nominal review threshold. Wessen et al. explicitly caution that 80% is not a special or rigid cutoff; engineering judgment applies (§V).
 
 ### Role sign-offs
 
@@ -122,11 +121,13 @@ A design review passes when at least **80%** of checklist items are complete, fo
 | **Science** | Science return reaches the contract target |
 | **Comms** | Comms and data-storage margins are healthy and data is actually returned |
 
+These are four automatic checks labelled by role, not separate players. **Role-per-player team play is planned, not built.**
+
 ### Outcomes, stars and score
 
 - **Outcomes:** *Mission accomplished*, *Partial success* or *Mission lost*.
 - **1★** survive the mission · **2★** meet the baseline science target · **3★** earn all four sign-offs **and** spend under 85% of the budget.
-- Score weights (science, budget savings, stars, sign-off bonus) live in `DATA.scoringWeights` in `js/api/mockData.js`, not in the logic.
+- Score weights (science, budget savings, stars, sign-off bonus) live in `DATA.scoringWeights` in `js/api/gameData.js`, not in the logic.
 
 ### Random-looking events are rule-based
 
@@ -190,7 +191,7 @@ A toast message confirms the change, and a **Developer Mode** badge appears next
 | Feature | Behaviour |
 |---|---|
 | **All destinations open** | Every contract is unlocked, including those normally gated by the career chain (Venus to the Sun). |
-| **3★ Prebuilt Mission Library** | In **My builds**, a Developer Mode section lists one ready-made, tested design per destination (defined as `DEVELOPER_PREBUILTS` in `js/core/engine.js`). Load one to jump straight to the Build stage with the right contract, orbit, launcher and parts. You can then edit it and launch as usual. |
+| **Reference design library** | In **My builds**, a Developer Mode section lists reference designs for testing (defined as `DEVELOPER_REFERENCE_DESIGNS` in `js/core/engine.js`). Load one to jump to the Build stage with its contract, orbit, launcher and parts, then edit and launch it. These are starting points for testing, not guaranteed 3★ designs. |
 | **Career rank** | The rank label reads *Developer Mode (All Maps)*. |
 
 **Good to know:**
@@ -199,7 +200,24 @@ A toast message confirms the change, and a **Developer Mode** badge appears next
 - **Reset career** clears it, together with saved progress and saved builds.
 - Arrivals made in Developer Mode count in your career progress and achievements like any other flight. Use **Reset career** before a clean run or a recorded demo.
 - If browser storage is blocked, the mode still works for the current page but is not remembered.
-- Prebuilts are shown only while Developer Mode is on. Pressing a prebuilt button with it off shows a message asking you to unlock it first.
+- Reference designs are shown only while Developer Mode is on. Loading one while it is off shows a message asking you to unlock Developer Mode first.
+
+### Reference design auto-pilot smoke-test snapshot
+
+These are the final headless smoke-test results for each reference design with auto-pilot (science is shown as result / target; cost as actual / cap):
+
+| Destination | Outcome with auto-pilot | Science vs target | Cost vs cap |
+|---|---|---:|---:|
+| Earth | Partial | 70.0 / 76 | 332 / 305 |
+| Moon | Partial | 69.6 / 74 | 461 / 430 |
+| Mars | Partial | 54.7 / 82 | 497 / 640 |
+| Mercury | Partial | 49.1 / 64 | 803 / 1,200 |
+| Venus | Partial | 62.7 / 72 | 475 / 820 |
+| Jupiter | Lost | 11.1 / 34 | 732 / 1,020 |
+| Saturn | Lost | 15.2 / 34 | 732 / 1,080 |
+| Uranus | Lost | 7.8 / 25 | 937 / 1,180 |
+| Neptune | Lost | 7.7 / 25 | 951 / 1,280 |
+| Sun | Lost | 0.0 / 55 | 785 / 980 |
 
 ---
 
@@ -207,44 +225,38 @@ A toast message confirms the change, and a **Developer Mode** badge appears next
 
 ```text
 Apogee/
-├── index.html                  # Entry page, loads js/main.js as an ES module
-├── README.md                   # This file
-├── resources.md                # Source note for the background video
-├── .gitignore
-│
-├── assets/
-│   ├── *.svg                   # Spacecraft parts, destinations, launchers, plumes (drawn for this project)
-│   ├── audio/                  # Landing.mp3, design.mp3, win.mp3, loss.mp3, countdown.mp3 (see Music note)
-│   ├── bg/                     # space.mp4 (looping background video) + README.txt
-│   ├── images/  icons/         # Reserved (currently empty)
-│
-├── css/
-│   ├── variables.css           # Colors and fonts
-│   ├── base.css                # Reset, typography, layout
-│   ├── components.css          # Buttons, cards, HUD, modals
-│   └── pages/
-│       ├── dashboard.css       # Objective / builder dashboard
-│       └── simulation.css      # Launch and flight view
-│
-├── js/
-│   ├── main.js                 # Bootstrap: wires everything on page load
-│   ├── config.js               # Constants, part sizes, attachment nodes, API config
-│   ├── content.js              # ALL player-visible text (briefs, lessons, help, glossary)
-│   ├── api/
-│   │   ├── mockData.js         # DATA: every game number, each with src + verified
-│   │   └── nasaService.js      # Optional live NASA DONKI fetch + offline fallback
-│   ├── core/
-│   │   ├── engine.js           # Pure logic: telemetry, margins, scoring, flight resolution
-│   │   ├── state.js            # Shared state, saves, undo, AudioEngine
-│   │   ├── planets.js          # Destination feasibility ratings and briefings
-│   │   └── career.js           # Unlock chain, ranks, achievements, saved progress
-│   └── ui/
-│       ├── domElements.js      # Cached selectors and small helpers
-│       ├── renderer.js         # Draws state to HTML / canvas
-│       └── controls.js         # Event listeners (mouse, touch, keyboard)
-│
-└── data/
-    └── sample-dataset.json     # Reserved (currently empty); the game uses mockData.js
+└── Nasa-space-app-challenge/
+    ├── .gitignore
+    ├── index.html                 # Entry page; loads js/main.js as an ES module
+    ├── README.md                  # This file
+    ├── resources.md               # Asset source notes
+    ├── assets/
+    │   ├── *.svg                  # Spacecraft parts, destinations, launchers, instruments and plumes
+    │   ├── audio/                 # Landing.mp3, design.mp3, win.mp3, loss.mp3
+    │   └── bg/                    # space.mp4 and README.txt
+    ├── css/
+    │   ├── variables.css          # Colors and fonts
+    │   ├── base.css               # Reset, typography and layout
+    │   ├── components.css         # Buttons, cards, HUD and modals
+    │   └── pages/
+    │       ├── dashboard.css      # Objective and builder dashboard
+    │       └── simulation.css     # Launch and flight view
+    └── js/
+        ├── main.js                # Bootstrap and page wiring
+        ├── config.js              # Constants, part sizes, attachment nodes and API config
+        ├── content.js             # Player-visible text and planetary briefings
+        ├── api/
+        │   ├── gameData.js        # Game data and source/verification tags
+        │   └── nasaService.js     # Optional live NASA DONKI fetch and offline fallback
+        ├── core/
+        │   ├── engine.js          # Telemetry, margins, scoring and flight resolution
+        │   ├── state.js           # Shared state, saves, undo and AudioEngine
+        │   ├── planets.js         # Destination feasibility ratings and briefings
+        │   └── career.js          # Unlock chain, ranks, achievements and saved progress
+        └── ui/
+            ├── domElements.js     # Cached selectors and small helpers
+            ├── renderer.js        # HTML and canvas rendering
+            └── controls.js        # Mouse, touch and keyboard event handlers
 ```
 
 ### Layers and who owns them
@@ -252,22 +264,36 @@ Apogee/
 | Layer | Files | Owner |
 |---|---|---|
 | Page, styles, UI, entry | `index.html`, `css/*`, `js/ui/*`, `js/main.js`, `js/config.js` | Person B (Saurav) |
-| Engine and NASA API layer | `js/core/engine.js`, `js/core/state.js`, `js/api/nasaService.js` | Person A (Ashmin) |
-| Content and data values, docs | `js/content.js`, values in `js/api/mockData.js`, `README.md` | Person C (Yochan) |
+| Engine and NASA API layer | `js/core/engine.js`, `js/core/state.js`, `js/api/nasaService.js` | Person A (Asmin) |
+| Content and data values, docs | `js/content.js`, values in `js/api/gameData.js`, `README.md` | Person C (Yochan) |
 
-**Design rules we followed:** the engine is pure logic with no DOM access, the UI only renders, all player-visible text lives in `content.js`, and all numbers live in `mockData.js`.
+**Design rules we followed:** the engine is pure logic with no DOM access, the UI only renders, all player-visible text lives in `content.js`, and the data model lives in `js/api/gameData.js`.
 
 ---
 
 ## Data honesty: what is real and what is simplified
 
-Every number in `js/api/mockData.js` carries a `src` tag and a `verified` flag:
+Every tagged data entry in `js/api/gameData.js` has a `src` tag and a `verified` flag. The final headless smoke-test tag summary reports:
 
-- `verified: true` means the value is stated in one of our sources (for example the 10% budget reserve from NASA CubeSat 101, the 35% margin from the JPL CML checklist, the 80% maturity threshold, and standard gravity `g0`).
-- `src: 'SIMPLIFIED_FOR_GAMEPLAY'` means we chose the value so the game plays well. This covers **all** component masses, costs, power and data rates, launcher capacities and prices, and engine specs. **These are not real NASA or vendor specifications.**
-- `src: 'UNVERIFIED_MEMORY'` marks values recalled from memory and not yet checked against a source. This includes the Mars solar-flux ratio and the list of real missions used for comparison in the debrief. **Please verify these before treating them as fact.**
+| Source tag or count | Final count |
+|---|---:|
+| `Standard gravity constant (SI definition)` | 1 |
+| `SIMPLIFIED_FOR_GAMEPLAY` | 93 |
+| `NASA Planetary Fact Sheet (derived)` | 7 |
+| `NASA CubeSat 101 (p. 13)` | 2 |
+| `Wessen et al. (2013), Fig. 8b` | 1 |
+| `Wessen et al. (2013), §V` | 1 |
+| `NASA DONKI Space Weather / SIMPLIFIED_FOR_GAMEPLAY` | 1 |
+| `UNVERIFIED_MEMORY` | 21 |
+| Entries with `verified: true` | 12 |
 
-If you spot a value that looks wrong, the tag tells you how much to trust it.
+The seven planetary solar-flux factors (Mercury, Venus, Mars, Jupiter, Saturn, Uranus and Neptune) are derived from the NASA Planetary Fact Sheet's mean distance-from-Sun row using `(Earth distance / planet distance)^2`. Earth and Moon remain normalized gameplay values; the Sun's value is a scripted-loss placeholder tagged `SIMPLIFIED_FOR_GAMEPLAY`. The 21 remaining `UNVERIFIED_MEMORY` entries are the real-mission comparison records; they were not revalidated in this update and remain unverified.
+
+- `verified: true` means a value is stated in or derived from a source that was read for this update. Derived values identify the source and formula in their notes.
+- `src: 'SIMPLIFIED_FOR_GAMEPLAY'` means the value is chosen for playability rather than asserted as a real-world specification. This covers component masses, costs, power and data rates, launcher capacities and prices, engine specifications, and other game-balance parameters.
+- `src: 'UNVERIFIED_MEMORY'` means the value has not been checked against its source. Do not treat those entries as verified mission-history facts.
+
+If you spot a value that looks wrong, its tag indicates how much to trust it.
 
 ---
 
@@ -277,9 +303,9 @@ If you spot a value that looks wrong, the tag tells you how much to trust it.
 |---|---|
 | **NASA DONKI Space Weather API** (`api.nasa.gov/DONKI/FLR` and `/CME`) | **Live data that drives a mechanic.** `nasaService.js` fetches the last 30 days of solar flares and coronal mass ejections, finds the peak flare class, and sets a radiation multiplier (0.96 nominal, 1.05 elevated, 1.15 severe). The header label shows **Live NASA data** or **Offline sample**. Requests have a 6-second timeout and a 30-minute cache, and fall back to offline values, so a failed fetch never breaks the game. |
 | **NASA CubeSat 101** (CubeSat Launch Initiative, Oct 2017) | The 10% budget-reserve rule and other mission-design guidance behind the margin policies. |
-| **JPL: Space Mission Concept Development Using Concept Maturity Levels** (Wessen et al., 2013) | The 35% margin policy and the 80% design-review threshold. |
+| **JPL: Space Mission Concept Development Using Concept Maturity Levels** (Wessen et al., 2013) | Figure 8b lists 35% CML 4 technical margins for dry mass, power and energy; §V describes 80% as a nominal checklist-completion guide, not a rigid cutoff. |
 | **NASA SE webinar: Design and Develop Science Missions** (J. Levri, Mar 2025) | Mission-design framing (needs, concept, requirements, design, verify). |
-| NASA Planetary Fact Sheet (Metric) · NASA/JPL Planetary Physical Parameters · NASA Moon Fact Sheet | Reference for the planet briefings (gravity, temperature, day length, moons). |
+| NASA NSSDCA Planetary Fact Sheet (Metric), individual planet fact sheets, NASA Moon Fact Sheet and NASA Sun Fact Sheet | Reference for briefing gravity, gravity ratios, mean temperatures, day lengths, atmospheric composition and moon counts. Solar-flux ratios are derived from the Fact Sheet's "Distance from Sun (10^6 km)" row. |
 | NASA Basics of Space Flight | Background for the delta-v and transfer-orbit model. |
 | NASA GSFC Integrated Design Center, Dome Lab · NASA Mission Viz (X3Dom tutorial series) | Inspiration for the mission-design and flight-visualization approach. Not embedded or used as a dependency. |
 | NASA Image and Video Library: *A Future in Orbit* | Background video `assets/bg/space.mp4`. |
@@ -298,7 +324,6 @@ NASA is not affiliated with this project and does not endorse it. No NASA logos 
 | Mission-design inspiration | [NASA GSFC Integrated Design Center: Dome Lab](https://etd.gsfc.nasa.gov/integrated-design-center/dome-lab/) |
 | Mission visualization reference | [NASA Mission Viz: Web Mission Visualization Tutorial Series](https://nasa.github.io/mission-viz/X3Dom/WebMissionVisualizationTutorialSeries.html) |
 | Background video | [NASA Image and Video Library](https://images.nasa.gov/search?q=orion&page=1&media=video,audio&yearStart=1920&yearEnd=2026) (clip: *A Future in Orbit*, see `resources.md`) |
-| Sounds | [NASA on SoundCloud](https://soundcloud.com/nasa) |
 
 ### Music
 
@@ -306,29 +331,31 @@ All tracks are in `assets/audio/`. Audio never autoplays; it starts only after t
 
 | Game moment | File | Track | Source |
 |---|---|---|---|
-| Title / Objective (landing) | `Landing.mp3` | *Adrift Among Infinite Stars*, Scott Buckley | [scottbuckley.com.au](https://www.scottbuckley.com.au/2022/02/new-library-track-adrift-among-infinite-stars/) |
-| Build (design) | `design.mp3` | *Misty Echoes of Neptune* | [StockTune](https://stocktune.com/free-music/misty-echoes-of-neptune-279973-165413?signup=true) |
-| Success (win) | `win.mp3` | *Interstellar Jazz Adventure* | [StockTune](https://stocktune.com/free-music/interstellar-jazz-adventure-148637-98792) |
-| Mission lost | `loss.mp3` (see note below) | Kevin MacLeod | [incompetech.com](https://incompetech.com/) and [YouTube](https://www.youtube.com/watch?v=Jhw0F4gvYfM) |
+| Title / Objective (landing) | `Landing.mp3` | *Adrift Among Infinite Stars*, Scott Buckley (not AI-generated; CC BY 4.0; re-encoded at 128 kbps, reducing the file from 16.2 MB to 6.5 MB) | [Scott Buckley](https://www.scottbuckley.com.au/2022/02/new-library-track-adrift-among-infinite-stars/) |
+| Build (design) | `design.mp3` | *Misty Echoes of Neptune* (AI-generated) | [StockTune](https://stocktune.com/free-music/misty-echoes-of-neptune-279973-165413?signup=true) |
+| Success (win) | `win.mp3` | *Interstellar Jazz Adventure* (AI-generated) | [StockTune](https://stocktune.com/free-music/interstellar-jazz-adventure-148637-98792) |
+| Mission lost | `loss.mp3` | Kevin MacLeod (not AI-generated; track title to be added; CC BY 4.0 as stated by the team) | [incompetech.com](https://incompetech.com/) |
 
-> **Note for the team:** `loss.mp3` is now in `assets/audio/`. `assets/audio/countdown.mp3` is also in the folder, but **no code loads it and it has no source or licence listed here**. Rule: every asset must be credited. Either add its source to the table above and use it, or remove it from the repo.
-> Please also confirm each track's licence terms and add the exact attribution wording the creators require (several of these sites ask for credit in the project description).
+Each track is used under the licence stated on its source page.
 
 ### Art and visuals
 
-- All spacecraft, destination, launcher and plume graphics in `assets/*.svg` are vector files made for this project.
-- No stock photos, no NASA imagery or logos, and no real people or faces are used in the game.
+Some of the SVG artwork in `assets/` was made with AI assistance. The background video `assets/bg/space.mp4` comes from the NASA Image and Video Library; it is not AI-generated. No NASA logos or branding are used.
 
 ---
 
 ## AI use disclosure
 
-AI tools were used in this project, as required by the Space Apps rules:
+AI tools assisted with parts of the implementation and presentation:
 
-- **Tools:** Gemini and Claude were used to help write and review code (engine, UI, data and content modules) and, in this case, this README.
-- **Every AI-assisted file** carries a header naming the tool, date and human reviewer, and the team keeps a log of AI-assisted changes.
-- **The game concept, mission scenarios, design decisions and data sources were chosen by the team,** not by AI. The AI helped implement and review them.
-- **No AI-generated images or video** are used. Audio is third-party music credited above.
+- **Tools:** Gemini and Claude were used throughout development; ChatGPT assisted with this source-verification and documentation update.
+- **Code:** AI assistance was used to write and debug code.
+- **Text:** AI assistance was used to write and edit text, including this README and in-game text.
+- **Visual assets:** AI assistance was used to make some visual design assets; some SVG artwork in `assets/` was made with AI assistance. No file-by-file claim is made here.
+- **AI-generated music:** `design.mp3` (*Misty Echoes of Neptune*) and `win.mp3` (*Interstellar Jazz Adventure*) were generated through StockTune.
+- **Not AI-generated:** `Landing.mp3` is by Scott Buckley (CC BY 4.0); `loss.mp3` is by Kevin MacLeod via incompetech.com; `space.mp4` is from the NASA Image and Video Library.
+- **Human contribution:** the team created the concept and mission scenarios, made the design decisions, and chose the data sources.
+- AI-assisted source files carry headers naming the tool, date and human reviewer, Person C (Yochan).
 
 ---
 
@@ -338,9 +365,9 @@ AI tools were used in this project, as required by the Space Apps rules:
 - Information is never conveyed by color alone: meters and alerts use text and tags (**CRITICAL**, **THIN MARGIN**) as well.
 - Designed for screens from 360 px wide up to desktop.
 - Respects `prefers-reduced-motion`.
-- Player-entered text is written with `textContent`, never `innerHTML`.
+- Player-entered text (build names and share codes) is escaped before display, and share codes are validated before loading.
 - No `alert()` or `confirm()` pop-ups, no trackers and no analytics.
-- Team mode is **hot-seat on one device**. There is no online multiplayer, no accounts and no server.
+- There is no online multiplayer, no accounts and no server.
 - Not supported: opening `index.html` directly from the file system (`file://`).
 
 ---

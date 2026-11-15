@@ -1,7 +1,7 @@
 /* File: js/config.js
  * Owner: Person B (Saurav)
- * AI-assisted (update): Gemini, 2026-11-15 - universal multi-directional attachment nodes for all parts. Reviewed by a human: NO.
- * AI-assisted: YES — Gemini, 2026-11-15. Reviewed by a human: YES Reviewd by Person C (Yochan)
+ * AI-assisted (update): Gemini, 2026-11-15 - universal multi-directional attachment nodes for all parts. Reviewed by a human: YES, Person C (Yochan).
+ * AI-assisted: YES — Gemini, 2026-11-15. Reviewed by a human: YES, Person C (Yochan).
  * Sources used: SPACEAPPS_CHALLENGE
  */
 

@@ -1,12 +1,12 @@
 /* File: css/pages/simulation.css
  * Owner: Person B (Saurav)
- * AI-assisted (update): Claude, 2026-11-15 - responsive pass: grid blow-out fix, canvas-first builder with a sticky bottom parts tray on phones/tablets, landscape-phone side rail, dvh heights. Reviewed by a human: NO.
- * AI-assisted (update): Claude, 2026-11-15 - 44px zoom/undo buttons on touch screens wider than 960px. Reviewed by a human: NO.
- * AI-assisted (update): Claude, 2026-11-15 - landscape phones: compact burn panel strip, flight window full width while a burn is open. Reviewed by a human: NO.
- * AI-assisted (update): Claude, 2026-11-15 - pause overlay for the flight view. Reviewed by a human: NO.
- * AI-assisted (update): Claude, 2026-11-15 - zoom -/+ buttons keep a 44px minimum width on every screen size. Reviewed by a human: NO.
- * AI-assisted: YES — Gemini, 2026-11-14; Gemini, 2026-11-15; Claude, 2026-11-14 (flight view and burn panel styles); Claude, 2026-11-15 (burn panel buttons). Reviewed by a human: YES Reviewd by Person C (Yochan)
- * AI-assisted (update): Gemini, 2026-11-15 - CAD crosshair snap indicators, 60fps GPU-composited drag performance, and prominent Science HUD meter. Reviewed by a human: NO.
+ * AI-assisted (update): Claude, 2026-11-15 - responsive pass: grid blow-out fix, canvas-first builder with a sticky bottom parts tray on phones/tablets, landscape-phone side rail, dvh heights. Reviewed by a human: YES, Person C (Yochan).
+ * AI-assisted (update): Claude, 2026-11-15 - 44px zoom/undo buttons on touch screens wider than 960px. Reviewed by a human: YES, Person C (Yochan).
+ * AI-assisted (update): Claude, 2026-11-15 - landscape phones: compact burn panel strip, flight window full width while a burn is open. Reviewed by a human: YES, Person C (Yochan).
+ * AI-assisted (update): Claude, 2026-11-15 - pause overlay for the flight view. Reviewed by a human: YES, Person C (Yochan).
+ * AI-assisted (update): Claude, 2026-11-15 - zoom -/+ buttons keep a 44px minimum width on every screen size. Reviewed by a human: YES, Person C (Yochan).
+ * AI-assisted: YES — Gemini, 2026-11-14; Gemini, 2026-11-15; Claude, 2026-11-14 (flight view and burn panel styles); Claude, 2026-11-15 (burn panel buttons). Reviewed by a human: YES, Person C (Yochan).
+ * AI-assisted (update): Gemini, 2026-11-15 - CAD crosshair snap indicators, 60fps GPU-composited drag performance, and prominent Science HUD meter. Reviewed by a human: YES, Person C (Yochan).
  * Sources used: none
  */
 #b3 {

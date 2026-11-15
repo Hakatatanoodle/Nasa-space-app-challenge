@@ -1,10 +1,11 @@
 /* File: js/api/nasaService.js
- * Owner: Person A (Ashmin)
- * AI-assisted: YES — Gemini, 2026-11-15. Reviewed by a human: YES Reviewd by Person C (Yochan)
+ * Owner: Person A (Asmin)
+ * AI-assisted: YES — Gemini, 2026-11-15. Reviewed by a human: YES, Person C (Yochan).
+ * AI-assisted (update): Claude, 2026-11-15 - data import path updated for the renamed game-data module (js/api/gameData.js). Reviewed by a human: YES, Person C (Yochan).
  * Sources used: SPACEAPPS_CHALLENGE
  */
 import { API_CONFIG } from '../config.js';
-import { DATA } from './mockData.js';
+import { DATA } from './gameData.js';
 
 const CACHE_KEY = 'apogeeNasaDonkiCache_v2';
 const CACHE_TTL_MS = 30 * 60 * 1000;
