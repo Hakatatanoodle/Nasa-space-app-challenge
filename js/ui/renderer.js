@@ -1,14 +1,16 @@
 /* File: js/ui/renderer.js
  * Owner: Person B (Saurav)
- * AI-assisted (update): Claude, 2026-11-15 - responsive pass: class hooks on the builder template (b-main / builder-head / builder-tools), smaller zoom floor on narrow canvases, 44px Developer Mode prebuilt button. Reviewed by a human: NO.
- * AI-assisted (update): Claude, 2026-11-15 - getHalf() clamped to a minimum so ctx.arc() never gets a negative radius on short landscape screens. Reviewed by a human: NO.
- * AI-assisted (update): Claude, 2026-11-15 - flight menu: centred pause menu with Home / Pause (P) / Resume (X) / Restart (R). Reviewed by a human: NO.
- * AI-assisted (update): Claude, 2026-11-15 - win/loss tightening (outcome bands, audio, demos). Reviewed by a human: NO.
- * AI-assisted: YES — Gemini, 2026-11-14; Gemini, 2026-11-15; Claude, 2026-11-14; Claude, 2026-11-15 (two manual burns). Reviewed by a human:YES Reviewd by Person C (Yochan)
- * AI-assisted (update): Gemini, 2026-11-15 - clean context-aware CAD snap crosshairs, prominent science progress meter, and high-FPS live drag. Reviewed by a human: NO.
+ * AI-assisted (update): Claude, 2026-11-15 - responsive pass: class hooks on the builder template (b-main / builder-head / builder-tools), smaller zoom floor on narrow canvases, 44px Developer Mode reference-design button. Reviewed by a human: YES, Person C (Yochan).
+ * AI-assisted (update): Claude, 2026-11-15 - getHalf() clamped to a minimum so ctx.arc() never gets a negative radius on short landscape screens. Reviewed by a human: YES, Person C (Yochan).
+ * AI-assisted (update): Claude, 2026-11-15 - flight menu: centred pause menu with Home / Pause (P) / Resume (X) / Restart (R). Reviewed by a human: YES, Person C (Yochan).
+ * AI-assisted (update): Claude, 2026-11-15 - win/loss tightening (outcome bands, audio, demos). Reviewed by a human: YES, Person C (Yochan).
+ * AI-assisted: YES — Gemini, 2026-11-14; Gemini, 2026-11-15; Claude, 2026-11-14; Claude, 2026-11-15 (two manual burns). Reviewed by a human: YES, Person C (Yochan).
+ * AI-assisted (update): Gemini, 2026-11-15 - clean context-aware CAD snap crosshairs, prominent science progress meter, and high-FPS live drag. Reviewed by a human: YES, Person C (Yochan).
+ * AI-assisted (update): Claude, 2026-11-15 - reference-design wording in the Developer Mode UI and a starting-points note in the library modal; escapeHtml() applied to player/localStorage text in innerHTML templates. Reviewed by a human: YES, Person C (Yochan).
+ * AI-assisted (update): ChatGPT, 2026-11-15 - generated reserve/review percentages from DATA, renamed the library heading, aligned reference-design handlers, and labelled the NASA CML4 value as a technical margin. Reviewed by a human: YES, Person C (Yochan).
  * Sources used: NASA_CUBESAT101, JPL_CML
  */
-import { DATA } from '../api/mockData.js';
+import { DATA } from '../api/gameData.js';
 import { CONTENT } from '../content.js';
 import { ATTACHMENT_NODES, MAX_CANDIDATES } from '../config.js';
 import {
@@ -35,7 +37,7 @@ import {
   scoreFlight,
   classifyOutcome,
   buildStarterSpacecraft,
-  DEVELOPER_PREBUILTS,
+  DEVELOPER_REFERENCE_DESIGNS,
   isStackNode
 } from '../core/engine.js';
 import { getFeasibility, buildPlanetBriefing } from '../core/planets.js';
@@ -55,7 +57,7 @@ import {
   describeGateNeed,
   recordMission
 } from '../core/career.js';
-import { $, $$, toPercent, formatNumber, showToast } from './domElements.js';
+import { $, $$, toPercent, formatNumber, showToast, escapeHtml } from './domElements.js';
 
 const WORLD_PAD_PX = 360;
 let activeFlightCleanup = null;
@@ -294,17 +296,17 @@ export function renderObjectiveStage() {
       const open = isContractOpen(c.id);
       const feasibility = getFeasibility(c);
       const lock = open ? null : getLockInfo(c);
-      const devPrebuilt = devMode ? DEVELOPER_PREBUILTS.find(p => p.contractId === c.id) : null;
+      const referenceDesign = devMode ? DEVELOPER_REFERENCE_DESIGNS.find(p => p.contractId === c.id) : null;
       return `
     <div class="card ${index === mission.ci ? 'sel' : ''} ${open ? '' : 'lkd'}" role="button" ${open ? `tabindex="0" data-a="ci" data-v="${index}"` : 'aria-disabled="true"'}>
       <img src="assets/dest_${c.dest}.svg" alt="${c.n}">
       <div>
         <b>${c.n}</b>
         <p>${CONTENT.contractBriefs[c.id]}</p>
-        <small>Baseline science <b>${c.target}</b> (min ${c.thr}) · budget $${c.cap}M · ${c.months} months${appState.highScores[c.id] ? ' · best ' + appState.highScores[c.id] : ''}</small>
+        <small>Baseline science <b>${c.target}</b> (min ${c.thr}) · budget $${c.cap}M · ${c.months} months${appState.highScores[c.id] ? ' · best ' + escapeHtml(appState.highScores[c.id]) : ''}</small>
         <span class="fb ${feasibility.cls}">${feasibility.lab}</span><small class="fn">${feasibility.notes.join(' · ')}</small>
         ${lock ? `<span class="lk">LOCKED - Level ${lock.level}: ${lock.need}</span>` : ''}
-        ${devPrebuilt ? `<div style="margin-top:8px;"><button type="button" data-load-prebuilt="${devPrebuilt.id}" style="min-height:44px; padding:4px 12px; font-size:0.85rem; border-color:var(--ok); color:var(--ok);">Load 3&#9733; Prebuilt &rarr;</button></div>` : ''}
+        ${referenceDesign ? `<div style="margin-top:8px;"><button type="button" data-load-reference-design="${referenceDesign.id}" style="min-height:44px; padding:4px 12px; font-size:0.85rem; border-color:var(--ok); color:var(--ok);">Load reference design &rarr;</button></div>` : ''}
       </div>
     </div>
   `;
@@ -353,10 +355,10 @@ export function renderObjectiveStage() {
     <p><small title="${CONTENT.marginFormulaTooltip}">${CONTENT.marginFormulaTooltip}</small></p>
     <div class="row">
       <div class="card o ${mission.hard ? '' : 'sel'}" role="button" tabindex="0" data-a="hd" data-v="0">
-        <div><b>Rookie: 10% reserve</b> — ${DATA.marginPolicies.easy.src}</div>
+        <div><b>Rookie: ${toPercent(DATA.marginPolicies.easy.v)}% reserve</b> — ${DATA.marginPolicies.easy.src}</div>
       </div>
       <div class="card o ${mission.hard ? 'sel' : ''}" role="button" tabindex="0" data-a="hd" data-v="1">
-        <div><b>NASA CML 4: 35% reserve</b> — ${DATA.marginPolicies.hard.src}</div>
+        <div><b>NASA CML 4: ${toPercent(DATA.marginPolicies.hard.v)}% technical margin</b> — ${DATA.marginPolicies.hard.src}</div>
       </div>
     </div>
     <button type="button" class="go" data-a="go2">Design the spacecraft &rarr;</button>
@@ -581,9 +583,9 @@ function renderSpacecraftCanvas(telemetry) {
            tabindex="0"
            role="button"
            aria-label="${getPartDisplayName(part.id)}"
-           data-u="${part.u}"
+           data-u="${escapeHtml(part.u)}"
            src="assets/${getAssetFilename(part.id)}.svg"
-           style="left:${part.x - w / 2}px; top:${part.y - h / 2}px; width:${w}px; height:${h}px; z-index:${zIndex}; transform:rotate(${part.rot}deg) scaleX(${part.flip ? -1 : 1});"
+           style="left:${part.x - w / 2}px; top:${part.y - h / 2}px; width:${w}px; height:${h}px; z-index:${zIndex}; transform:rotate(${escapeHtml(part.rot)}deg) scaleX(${part.flip ? -1 : 1});"
            draggable="false">
     `;
   }).join('');
@@ -916,21 +918,21 @@ export function refreshBuilderView() {
           : 'Design review and launch';
 }
 
-/* ---- Modals: Saved Builds, Developer Prebuilts, Design Review, Trade Space, Share/Load Code ---- */
+/* ---- Modals: Saved Builds, Developer Reference Designs, Design Review, Trade Space, Share/Load Code ---- */
 
 export function showSavedBuildsModal() {
   const builds = appState.savedBuilds;
   const defaultName = `${DATA.contracts[appState.mission.ci]?.n || 'Spacecraft'} #${builds.length + 1}`;
   const devMode = isDeveloperMode();
 
-  const devPrebuiltsHtml = devMode
+  const referenceDesignsHtml = devMode
     ? `
       <div style="margin-top: 18px; padding-top: 14px; border-top: 1px solid var(--line);">
-        <h3 style="margin-top: 0;">Developer Mode: 3&#9733; Prebuilt Mission Library</h3>
-        <p><small>Verified, symmetric reference spacecraft engineered to achieve 3&#9733; completion for each Solar System destination.</small></p>
+        <h3 style="margin-top: 0;">Developer Mode: Reference Design Library</h3>
+        <p><small>Starting points for testing. They are not guaranteed to reach 3★ - edit and improve them.</small></p>
         <table class="rt">
-          <tr><th>Mission &amp; Prebuilt</th><th>Orbit &amp; Launcher</th><th>Propulsion &amp; Policy</th><th>Action</th></tr>
-          ${DEVELOPER_PREBUILTS.map(p => {
+          <tr><th>Mission &amp; Reference design</th><th>Orbit &amp; Launcher</th><th>Propulsion &amp; Policy</th><th>Action</th></tr>
+          ${DEVELOPER_REFERENCE_DESIGNS.map(p => {
             const contract = DATA.contracts.find(c => c.id === p.contractId);
             const orbitName = contract?.orbits[p.oi]?.n || '';
             const launcherName = DATA.launchers[p.launcher]?.n || p.launcher;
@@ -939,8 +941,8 @@ export function showSavedBuildsModal() {
               <tr>
                 <td><b>${p.title}</b><br><small>${p.note}</small></td>
                 <td>${orbitName}<br><small>${launcherName}</small></td>
-                <td>${engineName} (${p.tanks} tank${p.tanks > 1 ? 's' : ''})<br><small>${p.hard ? 'NASA CML 4 (35%)' : 'Rookie (10%)'}</small></td>
-                <td><button type="button" data-load-prebuilt="${p.id}" style="border-color:var(--ok); color:var(--ok);">Load &amp; Open</button></td>
+                <td>${engineName} (${p.tanks} tank${p.tanks > 1 ? 's' : ''})<br><small>${p.hard ? `NASA CML 4 (${toPercent(DATA.marginPolicies.hard.v)}%)` : `Rookie (${toPercent(DATA.marginPolicies.easy.v)}%)`}</small></td>
+                <td><button type="button" data-load-reference-design="${p.id}" style="border-color:var(--ok); color:var(--ok);">Load &amp; Open</button></td>
               </tr>
             `;
           }).join('')}
@@ -951,7 +953,7 @@ export function showSavedBuildsModal() {
 
   $('#rev').innerHTML = `
     <div class="box modal-box" style="width: min(920px, 96vw);">
-      ${renderModalHeader(devMode ? 'My Saved Builds & Developer Prebuilts' : 'My Saved Spacecraft Builds')}
+      ${renderModalHeader(devMode ? 'My Saved Builds & Developer Reference Designs' : 'My Saved Spacecraft Builds')}
       <div class="row" style="align-items: center; margin-bottom: 12px;">
         <input type="text" id="new-build-name" placeholder="Build name (e.g. Mars Relay Mk II)" value="${defaultName}" style="flex: 1; min-width: 220px;" />
         <button type="button" class="go" id="confirm-save-build" style="margin: 0;">Save current build</button>
@@ -961,19 +963,19 @@ export function showSavedBuildsModal() {
             <tr><th>Build Name</th><th>Mission &amp; Orbit</th><th>Specs</th><th>Saved</th><th>Actions</th></tr>
             ${builds.map(b => `
               <tr>
-                <td><b>${b.name}</b><br><small>${b.summary.partCount} parts</small></td>
-                <td>${b.summary.contract}<br><small>${b.summary.orbit} · ${b.summary.launcher}</small></td>
-                <td>${formatNumber(b.summary.massKg)} kg · ${formatNumber(b.summary.dvMs)} m/s · $${b.summary.costM}M</td>
-                <td><small>${b.savedAt}</small></td>
+                <td><b>${escapeHtml(b.name)}</b><br><small>${escapeHtml(b.summary.partCount)} parts</small></td>
+                <td>${escapeHtml(b.summary.contract)}<br><small>${escapeHtml(b.summary.orbit)} · ${escapeHtml(b.summary.launcher)}</small></td>
+                <td>${formatNumber(b.summary.massKg)} kg · ${formatNumber(b.summary.dvMs)} m/s · $${escapeHtml(b.summary.costM)}M</td>
+                <td><small>${escapeHtml(b.savedAt)}</small></td>
                 <td>
-                  <button type="button" data-load-build="${b.id}">Load</button>
-                  <button type="button" data-del-build="${b.id}">Delete</button>
+                  <button type="button" data-load-build="${escapeHtml(b.id)}">Load</button>
+                  <button type="button" data-del-build="${escapeHtml(b.id)}">Delete</button>
                 </td>
               </tr>
             `).join('')}
           </table>`
         : '<p><small>No personal saved builds yet. Name your current spacecraft above and click <b>Save current build</b> to store it in your browser.</small></p>'}
-      ${devPrebuiltsHtml}
+      ${referenceDesignsHtml}
     </div>
   `;
   $('#rev').hidden = false;
@@ -1007,7 +1009,7 @@ export function showReviewModal() {
   $('#rev').innerHTML = `
     <div class="box modal-box">
       ${renderModalHeader('Design review')}
-      <p>${appState.mission.hard ? 'NASA CML 4 policy: 35% reserve.' : 'Rookie policy: 10% reserve.'} A concept passes readiness review when at least ${toPercent(DATA.reviewThreshold.v)}% of items are green (${DATA.reviewThreshold.src}).</p>
+      <p>${appState.mission.hard ? `NASA CML 4 policy: ${toPercent(DATA.marginPolicies.hard.v)}% technical margin.` : `Rookie policy: ${toPercent(DATA.marginPolicies.easy.v)}% reserve.`} A concept passes readiness review when around ${toPercent(DATA.reviewThreshold.v)}% of items are green (${DATA.reviewThreshold.src}); the source calls this a guideline, not a rigid cutoff.</p>
       <p><b class="${rev.pass ? 'g' : 'r'}">${rev.pass ? '✓ REVIEW PASSED' : '✗ NOT READY'}</b> — ${rev.g} green, ${rev.y} amber, ${rev.r} red of ${rev.n} items (${toPercent(rev.pct)}%)</p>
       <div class="row">
         ${telemetry.revItems.map(([label, code]) => `<span class="chip ${code === 2 ? 'ok' : ''}"><span class="${colors[code]}">&#9679;</span> ${label}</span>`).join('')}
@@ -1107,7 +1109,7 @@ function renderFlightSpacecraft() {
   const hullHtml = parts.map(p => {
     const [w, h] = getPartSize(p);
     const zIndex = getPartZIndex(p);
-    return `<img class="pt" src="assets/${getAssetFilename(p.id)}.svg" alt="" style="left:${p.x * scale + offsetX - (w * scale) / 2}px; top:${p.y * scale + offsetY - (h * scale) / 2}px; width:${w * scale}px; height:${h * scale}px; z-index:${zIndex}; transform:rotate(${p.rot}deg) scaleX(${p.flip ? -1 : 1});" draggable="false">`;
+    return `<img class="pt" src="assets/${getAssetFilename(p.id)}.svg" alt="" style="left:${p.x * scale + offsetX - (w * scale) / 2}px; top:${p.y * scale + offsetY - (h * scale) / 2}px; width:${w * scale}px; height:${h * scale}px; z-index:${zIndex}; transform:rotate(${escapeHtml(p.rot)}deg) scaleX(${p.flip ? -1 : 1});" draggable="false">`;
   }).join('');
 
   const plumeHtml = parts.filter(p => getNodeCategory(p.id) === 'eng').map(p => {
@@ -2319,7 +2321,7 @@ function renderCareerNews(news = []) {
     : 'Every destination is unlocked.';
 
   const tip = career.streak >= 2
-    ? `<br><b class="y">Mission Control tip:</b> ${career.streak} losses in a row. Press Starter ship in the Build screen, attach an antenna, keep the Rookie 10% margin, and fix every red meter before you launch.`
+    ? `<br><b class="y">Mission Control tip:</b> ${career.streak} losses in a row. Press Starter ship in the Build screen, attach an antenna, keep the Rookie ${toPercent(DATA.marginPolicies.easy.v)}% margin, and fix every red meter before you launch.`
     : '';
 
   return `<div class="pin">${items}<b>Career:</b> Level ${getCareerLevel()} - ${getCareerRank()}. ${nextLine}${tip}</div>`;

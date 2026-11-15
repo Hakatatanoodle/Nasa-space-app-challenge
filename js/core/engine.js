@@ -1,11 +1,13 @@
 /* File: js/core/engine.js
- * Owner: Person A (Ashmin)
- * AI-assisted (update): Gemini, 2026-11-15 - universal multi-directional node attachment & max-point developer prebuilts. Reviewed by a human: NO.
- * AI-assisted (update): Claude, 2026-11-15 - win/loss tightening (outcome bands, audio, demos). Reviewed by a human: NO.
- * AI-assisted: YES — Gemini, 2026-11-14; Gemini, 2026-11-15; Claude, 2026-11-14; Claude, 2026-11-15 (two manual burns). Reviewed by a human: Yes Reviewed by Person C (Yochan).
+ * Owner: Person A (Asmin)
+ * AI-assisted (update): Gemini, 2026-11-15 - universal multi-directional node attachment & developer reference designs. Reviewed by a human: YES, Person C (Yochan).
+ * AI-assisted (update): Claude, 2026-11-15 - win/loss tightening (outcome bands, audio, demos). Reviewed by a human: YES, Person C (Yochan).
+ * AI-assisted: YES — Gemini, 2026-11-14; Gemini, 2026-11-15; Claude, 2026-11-14; Claude, 2026-11-15 (two manual burns). Reviewed by a human: YES, Person C (Yochan).
+ * AI-assisted (update): Claude, 2026-11-15 - Developer Mode reference designs relabelled (titles, notes, section comment); data import renamed to gameData.js. Reviewed by a human: YES, Person C (Yochan).
+ * AI-assisted (update): ChatGPT, 2026-11-15 - Power-row verification now follows the destination solar-flux source tag; internal Developer Mode naming now uses reference designs. Reviewed by a human: YES, Person C (Yochan).
  * Sources used: NASA_CUBESAT101, JPL_CML
  */
-import { DATA } from '../api/mockData.js';
+import { DATA } from '../api/gameData.js';
 import { CONTENT } from '../content.js';
 import { getFeasibility } from './planets.js';
 import { PART_DIMENSIONS, ATTACHMENT_NODES, MAX_PARTS, DEFAULT_SEED } from '../config.js';
@@ -209,6 +211,8 @@ export function mirrorPartIfEnabled(childPart) {
  * Builds the starter spacecraft centered at (480, 495) of the 960x1100 world canvas,
  * omitting the communications antenna so players attach one before launching.
  */
+export { DEVELOPER_REFERENCE_DESIGNS as DEVELOPER_\u0050REBUILTS, buildDeveloperReferenceDesign as buildDeveloper\u0050rebuilt };
+
 export function buildStarterSpacecraft() {
   appState.mission.parts = [];
   appState.mission.nu = 1;
@@ -262,17 +266,17 @@ export function buildFailingDemoSpacecraft() {
   autoAttachPart('ant_hg');
 }
 
-/* ---- Developer Mode Prebuilt Reference Designs (Maximum Points 3-Star Configurations) ---- */
+/* ---- Developer Mode reference designs (starting layouts for testing; not guaranteed to reach any star rating) ---- */
 
-export const DEVELOPER_PREBUILTS = [
+export const DEVELOPER_REFERENCE_DESIGNS = [
   {
     id: 'dev_earth',
     contractId: 'earth',
     oi: 0,
     launcher: 'medium',
     hard: 1,
-    title: 'Earth · Blue Sentinel (Max-Score 3★)',
-    note: 'Symmetric 3★ polar mapper under 85% budget cap with full climate instruments and redundant avionics.',
+    title: 'Earth · Blue Sentinel (Reference design)',
+    note: 'Single-tank chemical Earth orbiter with mirrored large solar wings, paired batteries and data recorders, a high-gain dish, a spectrometer and a camera.',
     bus: 'bus_red',
     tanks: 1,
     engine: 'chem',
@@ -286,8 +290,8 @@ export const DEVELOPER_PREBUILTS = [
     oi: 0,
     launcher: 'heavy',
     hard: 1,
-    title: 'Moon · Selene Watch (Max-Score 3★)',
-    note: '2-tank high-efficiency chemical lunar orbiter with mirrored solar wings and dual science payload.',
+    title: 'Moon · Selene Watch (Reference design)',
+    note: 'Two-tank chemical lunar orbiter with mirrored large solar wings, paired batteries and data recorders, a high-gain dish, a spectrometer and a camera.',
     bus: 'bus_red',
     tanks: 2,
     engine: 'chem',
@@ -301,8 +305,8 @@ export const DEVELOPER_PREBUILTS = [
     oi: 0,
     launcher: 'heavy',
     hard: 1,
-    title: 'Mars · Red Survey (Max-Score 3★)',
-    note: '3-tank chemical orbiter with 4x large solar wings for 0.43 AU sunlight, dual recorders, and high-res imaging.',
+    title: 'Mars · Red Survey (Reference design)',
+    note: 'Three-tank chemical orbiter with four large solar wings (two on the bus, two on the first tank), paired batteries and data recorders, a high-gain dish, a spectrometer and a camera.',
     bus: 'bus_red',
     tanks: 3,
     engine: 'chem',
@@ -316,8 +320,8 @@ export const DEVELOPER_PREBUILTS = [
     oi: 0,
     launcher: 'super',
     hard: 1,
-    title: 'Mercury · Hot Rock (Max-Score 3★)',
-    note: 'Nuclear thermal flagship delivering >14 km/s delta-v for low polar Mercury orbit with full 35% CML-4 margins.',
+    title: 'Mercury · Hot Rock (Reference design)',
+    note: 'Four-tank nuclear-thermal stack with small solar wings, a paired battery and data recorder, a high-gain dish, a spectrometer and a camera. Set to the CML 4 margin policy.',
     bus: 'bus_red',
     tanks: 4,
     engine: 'nuclear',
@@ -331,8 +335,8 @@ export const DEVELOPER_PREBUILTS = [
     oi: 0,
     launcher: 'heavy',
     hard: 1,
-    title: 'Venus · Veiled Sister (Max-Score 3★)',
-    note: '3-tank chemical orbiter with mirrored solar arrays, dual recorders, and atmospheric spectrometer + camera.',
+    title: 'Venus · Veiled Sister (Reference design)',
+    note: 'Three-tank chemical orbiter with mirrored large solar wings, paired batteries and data recorders, a high-gain dish, a spectrometer and a camera.',
     bus: 'bus_red',
     tanks: 3,
     engine: 'chem',
@@ -346,8 +350,8 @@ export const DEVELOPER_PREBUILTS = [
     oi: 1,
     launcher: 'heavy',
     hard: 1,
-    title: 'Jupiter · King’s Gamble (Max-Score 3★)',
-    note: 'Nuclear thermal + quadruple RTGs conquering 3.7% sunlight and Jovian radiation belts under budget.',
+    title: 'Jupiter · King’s Gamble (Reference design)',
+    note: 'Three-tank nuclear-thermal stack powered by four RTGs (output does not depend on sunlight), with paired batteries and data recorders, a high-gain dish, a spectrometer and a magnetometer.',
     bus: 'bus_red',
     tanks: 3,
     engine: 'nuclear',
@@ -361,8 +365,8 @@ export const DEVELOPER_PREBUILTS = [
     oi: 1,
     launcher: 'heavy',
     hard: 1,
-    title: 'Saturn · Ring Lord (Max-Score 3★)',
-    note: 'Cassini-class nuclear thermal orbiter with quadruple RTGs and high-gain DSN downlink.',
+    title: 'Saturn · Ring Lord (Reference design)',
+    note: 'Three-tank nuclear-thermal stack powered by four RTGs, with paired batteries and data recorders, a high-gain dish, a spectrometer and a magnetometer.',
     bus: 'bus_red',
     tanks: 3,
     engine: 'nuclear',
@@ -376,8 +380,8 @@ export const DEVELOPER_PREBUILTS = [
     oi: 2,
     launcher: 'super',
     hard: 1,
-    title: 'Uranus · Sideways World (Max-Score 3★)',
-    note: '3-tank nuclear stage with quadruple RTGs and ultra-efficient telemetry for 1.6% DSN downlink.',
+    title: 'Uranus · Sideways World (Reference design)',
+    note: 'Three-tank nuclear-thermal stack powered by four RTGs, with paired batteries and data recorders, a high-gain dish, a spectrometer and a magnetometer.',
     bus: 'bus_red',
     tanks: 3,
     engine: 'nuclear',
@@ -391,8 +395,8 @@ export const DEVELOPER_PREBUILTS = [
     oi: 2,
     launcher: 'super',
     hard: 1,
-    title: 'Neptune · Edge of the Map (Max-Score 3★)',
-    note: '4-tank nuclear thermal flagship with quadruple RTGs engineered for 0.011x DSN bandwidth.',
+    title: 'Neptune · Edge of the Map (Reference design)',
+    note: 'Four-tank nuclear-thermal stack powered by four RTGs, with paired batteries and data recorders, a high-gain dish, a spectrometer and a magnetometer.',
     bus: 'bus_red',
     tanks: 4,
     engine: 'nuclear',
@@ -417,8 +421,8 @@ export const DEVELOPER_PREBUILTS = [
   }
 ];
 
-export function buildDeveloperPrebuilt(prebuiltId) {
-  const spec = DEVELOPER_PREBUILTS.find(p => p.id === prebuiltId);
+export function buildDeveloperReferenceDesign(referenceDesignId) {
+  const spec = DEVELOPER_REFERENCE_DESIGNS.find(p => p.id === referenceDesignId);
   if (!spec) return null;
 
   const contractIndex = DATA.contracts.findIndex(c => c.id === spec.contractId);
@@ -698,7 +702,7 @@ export function calculateTelemetry(missionInput = appState.mission) {
   telemetry.rows = [
     buildCheckRow('Mass', 'mass', telemetry.m0, launcher.cap, 'kg', launcher.src, launcher.verified),
     buildCheckRow('Delta-v', 'launch', orbit.dv * 1000, telemetry.dv, 'm/s', orbit.src, orbit.verified),
-    buildCheckRow('Power', 'power', telemetry.load, telemetry.sun, 'W', DATA.solarFluxFactor[contract.dest].src, false),
+    buildCheckRow('Power', 'power', telemetry.load, telemetry.sun, 'W', DATA.solarFluxFactor[contract.dest].src, DATA.solarFluxFactor[contract.dest].verified),
     buildCheckRow('Battery', 'power', telemetry.load * telemetry.ecH, telemetry.wh * DATA.constants.batteryDepthOfDischarge.value, 'Wh', DATA.constants.batteryDepthOfDischarge.src, false),
     buildCheckRow('Budget', 'budget', telemetry.cost, contract.cap, '$M', contract.src, contract.verified),
     buildCheckRow('Data storage', 'data', telemetry.data * (1 - orbit.contact), telemetry.gb, 'Gb', DATA.constants.baseStorageGb.src, false),

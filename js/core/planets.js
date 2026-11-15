@@ -1,9 +1,11 @@
 /* File: js/core/planets.js
  * Owner: ported from the Apogee-temp-asmin feature branch (lib/planets.js, v3.2)
- * AI-assisted: YES — Claude, 2026-11-14. Reviewed by a human: Yes Reviewed by Person C (Yochan).
- * Sources used: none (game design; planet facts are UNVERIFIED_MEMORY, see content.js)
+ * AI-assisted: YES — Claude, 2026-11-14. Reviewed by a human: YES, Person C (Yochan).
+ * AI-assisted (update): Claude, 2026-11-15 - data import path updated for the renamed game-data module (js/api/gameData.js). Reviewed by a human: YES, Person C (Yochan).
+ * AI-assisted (update): ChatGPT, 2026-11-15 - source header aligned with the NASA Planetary, Moon and Sun fact sheets used by the briefings. Reviewed by a human: YES, Person C (Yochan).
+ * Sources used: NASA NSSDCA Planetary Fact Sheet (Metric) and individual planet fact sheets; NASA Moon Fact Sheet; NASA Sun Fact Sheet (read 2026-11-15)
  */
-import { DATA } from '../api/mockData.js';
+import { DATA } from '../api/gameData.js';
 import { CONTENT } from '../content.js';
 
 /**

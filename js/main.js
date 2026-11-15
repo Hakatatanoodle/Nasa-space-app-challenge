@@ -1,6 +1,6 @@
 /* File: js/main.js
  * Owner: Person B (Saurav)
- * AI-assisted: YES — Gemini, 2026-11-15. Reviewed by a human: YES Reviewed by Person C (Yochan)
+ * AI-assisted: YES — Gemini, 2026-11-15. Reviewed by a human: YES, Person C (Yochan).
  * Sources used: none
  */
 import { CONTENT } from './content.js';

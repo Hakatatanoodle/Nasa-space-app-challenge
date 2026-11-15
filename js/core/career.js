@@ -1,9 +1,11 @@
 /* File: js/core/career.js
  * Owner: ported from the Apogee-temp-asmin feature branch (lib/career.js, v3.2)
- * AI-assisted: YES — Claude, 2026-11-14; Gemini, 2026-11-15. Reviewed by a human: YES Reviewd by Person C (Yochan)
+ * AI-assisted: YES — Claude, 2026-11-14; Gemini, 2026-11-15. Reviewed by a human: YES, Person C (Yochan).
+ * AI-assisted (update): Claude, 2026-11-15 - data import path updated for the renamed game-data module (js/api/gameData.js). Reviewed by a human: YES, Person C (Yochan).
+ * AI-assisted (update): ChatGPT, 2026-11-15 - generated the margin-policy achievement text from DATA instead of a hard-coded percentage. Reviewed by a human: YES, Person C (Yochan).
  * Sources used: none (game design, not NASA data)
  */
-import { DATA } from '../api/mockData.js';
+import { DATA } from '../api/gameData.js';
 import { CONTENT } from '../content.js';
 
 export const HOME_IDS = ['earth', 'moon', 'mars'];
@@ -51,7 +53,7 @@ export const ACHIEVEMENTS = [
   { id: 'nuke', n: 'Nuclear Option', t: 'Arrive safely using a nuclear thermal engine.', test: x => x.ok && x.d.E.patch === 'nuc' },
   { id: 'ion', n: 'Slow and Steady', t: 'Arrive safely using an ion engine.', test: x => x.ok && x.d.E.patch === 'ion' },
   { id: 'rtg', n: 'Atomic Battery', t: 'Arrive safely with a radioisotope generator aboard.', test: x => x.ok && x.rtg },
-  { id: 'book', n: 'By the Book', t: 'Succeed under the NASA 35% margin policy.', test: x => x.out === 'success' && x.hard },
+  { id: 'book', n: 'By the Book', t: `Succeed under the NASA ${Math.round(DATA.marginPolicies.hard.v * 100)}% margin policy.`, test: x => x.out === 'success' && x.hard },
   { id: 'phoenix', n: 'Phoenix', t: 'Succeed right after losing a mission.', test: x => x.ok && x.wasLost },
   { id: 'learn', n: 'Learning the Hard Way', t: 'Lose 3 missions. Every engineer iterates.', test: () => career.lost >= 3 },
   { id: 'vet', n: 'Veteran', t: 'Make 8 safe arrivals.', test: () => career.tot >= 8 },

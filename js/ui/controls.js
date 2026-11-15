@@ -1,13 +1,15 @@
 /* File: js/ui/controls.js
  * Owner: Person B (Saurav)
- * AI-assisted (update): Claude, 2026-11-15 - responsive pass: header "More" toggle for small screens; touch palette no longer grabs parts while the person scrolls, and a scroll-cancelled tap no longer places a part. Reviewed by a human: NO.
- * AI-assisted (update): Claude, 2026-11-15 - centred flight menu (M opens it; Home / Pause P / Resume X / Restart R). Reviewed by a human: NO.
- * AI-assisted (update): Claude, 2026-11-15 - win/loss tightening (outcome bands, audio, demos). Reviewed by a human: NO.
- * AI-assisted: YES — Gemini, 2026-11-15. Reviewed by a human: YES Reviewd by Person C (Yochan)
- * AI-assisted (update): Gemini, 2026-11-15 - rAF-throttled 60fps drag pipeline and clean snap nodes. Reviewed by a human: NO.
+ * AI-assisted (update): Claude, 2026-11-15 - responsive pass: header "More" toggle for small screens; touch palette no longer grabs parts while the person scrolls, and a scroll-cancelled tap no longer places a part. Reviewed by a human: YES, Person C (Yochan).
+ * AI-assisted (update): Claude, 2026-11-15 - centred flight menu (M opens it; Home / Pause P / Resume X / Restart R). Reviewed by a human: YES, Person C (Yochan).
+ * AI-assisted (update): Claude, 2026-11-15 - win/loss tightening (outcome bands, audio, demos). Reviewed by a human: YES, Person C (Yochan).
+ * AI-assisted: YES — Gemini, 2026-11-15. Reviewed by a human: YES, Person C (Yochan).
+ * AI-assisted (update): Gemini, 2026-11-15 - rAF-throttled 60fps drag pipeline and clean snap nodes. Reviewed by a human: YES, Person C (Yochan).
+ * AI-assisted (update): Claude, 2026-11-15 - Quick Demo also attaches the magnetometer so it reaches success; reference-design wording for Developer Mode toasts; share-code loading now goes through sanitizeLoadedMission(). Reviewed by a human: YES, Person C (Yochan).
+ * AI-assisted (update): ChatGPT, 2026-11-15 - imported deleteSavedBuild and aligned Developer Mode handlers with reference-design naming. Reviewed by a human: YES, Person C (Yochan).
  * Sources used: none
  */
-import { DATA } from '../api/mockData.js';
+import { DATA } from '../api/gameData.js';
 import { isContractOpen, isDeveloperMode, toggleDeveloperMode, resetCareer } from '../core/career.js';
 import { ATTACHMENT_NODES, MAX_PARTS, SNAP_RADIUS_PX } from '../config.js';
 import {
@@ -16,6 +18,8 @@ import {
   saveUndoSnapshot,
   saveMissionProgress,
   saveNamedBuild,
+  deleteSavedBuild,
+  sanitizeLoadedMission,
   AudioEngine
 } from '../core/state.js';
 import {
@@ -30,7 +34,7 @@ import {
   autoAttachPart,
   buildStarterSpacecraft,
   buildFailingDemoSpacecraft,
-  buildDeveloperPrebuilt,
+  buildDeveloperReferenceDesign,
   isStackNode
 } from '../core/engine.js';
 import { $, showToast } from './domElements.js';
@@ -147,7 +151,7 @@ function activateDeveloperMode() {
   if (appState.mission.stage === 1) renderObjectiveStage();
   showToast(
     enabled
-      ? 'Developer Mode active: all destinations & 3★ prebuilt rockets unlocked in My builds.'
+      ? 'Developer Mode active: all destinations & reference designs unlocked in My builds.'
       : 'Developer Mode off: standard Career locks restored.'
   );
 }
@@ -633,12 +637,12 @@ export function bindGlobalControls() {
       return;
     }
 
-    const prebuiltBtn = e.target.closest('[data-load-prebuilt]');
-    if (prebuiltBtn) {
+    const referenceDesignBtn = e.target.closest('[data-load-reference-design]');
+    if (referenceDesignBtn) {
       e.stopPropagation();
-      if (!isDeveloperMode()) return showToast('Unlock Developer Mode first to load prebuilt reference rockets.');
+      if (!isDeveloperMode()) return showToast('Unlock Developer Mode first to load reference designs.');
       saveUndoSnapshot();
-      const loaded = buildDeveloperPrebuilt(prebuiltBtn.dataset.loadPrebuilt);
+      const loaded = buildDeveloperReferenceDesign(referenceDesignBtn.dataset.loadReferenceDesign);
       if (loaded) {
         appState.selectedPartUid = null;
         saveMissionProgress();
@@ -646,7 +650,7 @@ export function bindGlobalControls() {
         $('#rev').hidden = true;
         navigateToStage(2);
         autoFitBuilderCanvas();
-        showToast(`Loaded 3★ Prebuilt: ${loaded.title}`);
+        showToast(`Loaded reference design: ${loaded.title}`);
       }
       return;
     }
@@ -773,6 +777,7 @@ export function bindGlobalControls() {
       autoAttachPart('i_spec');
       autoAttachPart('ant_mg');
       autoAttachPart('rec');
+      autoAttachPart('i_mag');
       saveMissionProgress();
       AudioEngine.setMusic('design');
       navigateToStage(2);
@@ -807,18 +812,13 @@ export function bindGlobalControls() {
     if (e.target.id === 'load-code-btn') {
       try {
         const raw = $('#design-code-input').value.trim();
-        const decoded = JSON.parse(atob(raw));
-        if (DATA.contracts[decoded.ci] && !isContractOpen(DATA.contracts[decoded.ci].id)) {
+        const loaded = sanitizeLoadedMission(JSON.parse(atob(raw)));
+        if (loaded && !isContractOpen(DATA.contracts[loaded.ci].id)) {
           return showToast('That design flies to a destination that is still locked in Career mode.');
         }
-        const isValid =
-          DATA.contracts[decoded.ci] &&
-          DATA.launchers[decoded.L] &&
-          Array.isArray(decoded.parts) &&
-          decoded.parts.every(p => p.id === 'tank' || DATA.parts[p.id] || DATA.engines[p.id]);
 
-        if (isValid) {
-          appState.mission = { ...appState.mission, ...decoded, stage: 2, locked: false };
+        if (loaded) {
+          appState.mission = { ...appState.mission, ...loaded, stage: 2, locked: false };
           saveMissionProgress();
           $('#rev').hidden = true;
           navigateToStage(2);
