@@ -838,21 +838,14 @@ b.bad { color: var(--bad); }
   }
 }
 
-/* The Flight menu makes the header two rows tall, so the flight view gets a little less height. */
-body:has(#flightmenu:not([hidden])) #flv {
-  height: calc(100vh - 200px);
-  min-height: 520px;
-}
-
 /* Pause overlay: dims the flight view and freezes the CSS animations */
 #flpause {
   position: absolute;
   inset: 0;
   z-index: 4;
   display: none;
-  align-items: flex-start;
+  align-items: center;
   justify-content: center;
-  padding-top: 56px;
   background: rgba(4, 12, 24, 0.6);
 }
 

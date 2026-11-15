@@ -1,6 +1,6 @@
 <!-- File: index.html
   Owner: Person B (Saurav)
-  AI-assisted (update): Claude, 2026-11-15 - flight menu markup (pause / resume / restart). Reviewed by a human: NO.
+  AI-assisted (update): Claude, 2026-11-15 - flight menu: header Menu button + centred pause menu (home / pause / resume / restart). Reviewed by a human: NO.
   AI-assisted: YES — Gemini, 2026-11-15. Reviewed by a human:YES Reviewd by Person C (Yochan).
   Sources used: SPACEAPPS_CHALLENGE
 -->
@@ -29,13 +29,7 @@
       <button type="button" id="mute" class="sound-on">Sound: on</button>
       <input type="range" id="vol" min="0" max="100" value="75" aria-label="Master volume" title="Master volume (75%)" />
     </div>
-    <div id="flightmenu" class="flight-menu" role="group" aria-label="Flight menu" hidden>
-      <span id="fm-label" class="fm-label"></span>
-      <span id="fm-status" class="fm-status" role="status"></span>
-      <button type="button" id="fm-pause"></button>
-      <button type="button" id="fm-resume"></button>
-      <button type="button" id="fm-restart"></button>
-    </div>
+    <button type="button" id="fm-open" aria-haspopup="dialog" hidden></button>
     <button type="button" id="copy">Share / Load code</button>
     <button type="button" id="hp">How to play</button>
   </header>
@@ -68,10 +62,26 @@
     <div class="box modal-box" id="help-body"></div>
   </div>
 
+  <div id="flightmenu" role="dialog" aria-modal="true" aria-labelledby="fm-label" hidden>
+    <div class="fm-panel">
+      <div class="fm-head">
+        <h2 id="fm-label" class="fm-label"></h2>
+        <span id="fm-status" class="fm-status" role="status"></span>
+      </div>
+      <div class="fm-list">
+        <button type="button" id="fm-home" class="fm-btn"><span class="fm-name"></span><kbd></kbd></button>
+        <button type="button" id="fm-pause" class="fm-btn"><span class="fm-name"></span><kbd></kbd></button>
+        <button type="button" id="fm-resume" class="fm-btn"><span class="fm-name"></span><kbd></kbd></button>
+        <button type="button" id="fm-restart" class="fm-btn"><span class="fm-name"></span><kbd></kbd></button>
+      </div>
+      <button type="button" id="fm-close" class="fm-close"></button>
+    </div>
+  </div>
+
   <div id="rev" role="dialog" aria-modal="true" hidden></div>
   <div id="toast" role="status" aria-live="polite" hidden></div>
   <img id="gh" hidden alt="" />
 
   <script type="module" src="./js/main.js"></script>
 </body>
-</html>
+</html> 
