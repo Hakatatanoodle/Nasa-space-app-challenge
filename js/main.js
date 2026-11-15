@@ -1,6 +1,6 @@
 /* File: js/main.js
  * Owner: Person B (Saurav)
- * AI-assisted: YES — Gemini, 2026-11-15. Reviewed by a human: YES Reviewd by Person C (Yochan)
+ * AI-assisted: YES — Gemini, 2026-11-15. Reviewed by a human: YES Reviewed by Person C (Yochan)
  * Sources used: none
  */
 import { CONTENT } from './content.js';
@@ -28,6 +28,22 @@ function initBackgroundVideo() {
   videoEl.play().catch(() => {});
 }
 
+function bindButtonSoundEffects() {
+  let lastHovered = null;
+  document.addEventListener('pointerover', e => {
+    const interactive = e.target.closest('button:not(:disabled), .card[role="button"]:not(.lkd), summary');
+    if (!interactive || interactive === lastHovered) return;
+    lastHovered = interactive;
+    AudioEngine.tick();
+  });
+
+  document.addEventListener('pointerout', e => {
+    if (lastHovered && !e.relatedTarget?.closest?.('button, .card[role="button"], summary')) {
+      lastHovered = null;
+    }
+  });
+}
+
 async function initApp() {
   initBackgroundVideo();
 
@@ -46,6 +62,7 @@ async function initApp() {
   }
 
   bindGlobalControls();
+  bindButtonSoundEffects();
   AudioEngine.setMusic('landing');
   navigateToStage(1);
 

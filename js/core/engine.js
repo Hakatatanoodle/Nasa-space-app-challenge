@@ -1,5 +1,6 @@
 /* File: js/core/engine.js
  * Owner: Person A (Ashmin)
+ * AI-assisted (update): Gemini, 2026-11-15 - universal multi-directional node attachment & max-point developer prebuilts. Reviewed by a human: NO.
  * AI-assisted (update): Claude, 2026-11-15 - win/loss tightening (outcome bands, audio, demos). Reviewed by a human: NO.
  * AI-assisted: YES — Gemini, 2026-11-14; Gemini, 2026-11-15; Claude, 2026-11-14; Claude, 2026-11-15 (two manual burns). Reviewed by a human: Yes Reviewed by Person C (Yochan).
  * Sources used: NASA_CUBESAT101, JPL_CML
@@ -30,10 +31,38 @@ export function createSeededRng(seed = DEFAULT_SEED) {
 export const findPartByUid = uid => appState.mission.parts.find(p => p.u === uid);
 export const getPartSize = part => PART_DIMENSIONS[getDimensionKey(part.id)];
 export const isStackNode = nodeName => ['top', 'bottom', 'base'].includes(nodeName);
+export const isLeftHostNode = nodeName => nodeName === 'left' || nodeName.startsWith('L');
+export const isRightHostNode = nodeName => nodeName === 'right' || nodeName.startsWith('R');
+
+/**
+ * Resolves the natural child attachment node on a part so all ends of every part
+ * can join cleanly without overlapping host geometry.
+ */
+export function getPreferredChildNode(partId, hostNode = 'R1') {
+  const cat = getNodeCategory(partId);
+  if (cat === 'eng') return 'top';
+  if (cat === 'ant') {
+    if (hostNode === 'top') return 'base';
+    if (hostNode === 'bottom') return 'top';
+    return 'left';
+  }
+  if (cat === 'sol' || cat === 'sm') {
+    if (hostNode === 'top') return 'bottom';
+    if (hostNode === 'bottom') return 'top';
+    return 'left';
+  }
+  if (hostNode === 'bottom') return 'top';
+  if (hostNode === 'top') return 'bottom';
+  if (isLeftHostNode(hostNode)) return 'right';
+  if (isRightHostNode(hostNode)) return 'left';
+  return 'top';
+}
 
 export function getNodeOffset(part, nodeName) {
   const [width, height] = getPartSize(part);
-  const node = ATTACHMENT_NODES[getNodeCategory(part.id)].find(n => n[0] === nodeName);
+  const nodes = ATTACHMENT_NODES[getNodeCategory(part.id)];
+  const fallbackNode = nodes.find(n => n[0] === 'left' || n[0] === 'in' || n[0] === 'base') || nodes[0];
+  const node = nodes.find(n => n[0] === nodeName) || fallbackNode;
   let x = (node[1] - 0.5) * width;
   let y = (node[2] - 0.5) * height;
   if (part.flip) x = -x;
@@ -114,12 +143,33 @@ export function deletePartSubtree(rootUid) {
   appState.mission.parts = appState.mission.parts.filter(part => !toDelete.has(part.u));
 }
 
+export function orientChildForJoin(child, childNode, hostNode, hasChildren) {
+  if (hasChildren) return;
+  const cat = getNodeCategory(child.id);
+  if (cat === 'bus' || cat === 'tank' || cat === 'eng') return;
+
+  // Radial side mounts on host: ensure side parts extend outward without overlapping host
+  if (isLeftHostNode(hostNode) && childNode === 'left') {
+    child.rot = 0;
+    child.flip = 1;
+  } else if (isRightHostNode(hostNode) && childNode === 'right') {
+    child.rot = 0;
+    child.flip = 1;
+  } else if ((isLeftHostNode(hostNode) && childNode === 'right') || (isRightHostNode(hostNode) && childNode === 'left')) {
+    child.rot = 0;
+    child.flip = 0;
+  } else if (hostNode === 'top' && childNode === 'left') {
+    child.rot = 270;
+    child.flip = 0;
+  } else if (hostNode === 'bottom' && childNode === 'left') {
+    child.rot = 90;
+    child.flip = 0;
+  }
+}
+
 export function attachParts(child, childNode, host, hostNode) {
   const hasChildren = appState.mission.parts.some(p => p.par === child.u);
-  if (!isStackNode(childNode) && !isStackNode(hostNode) && !hasChildren) {
-    child.rot = 0;
-    child.flip = hostNode.startsWith('L') ? 1 : 0;
-  }
+  orientChildForJoin(child, childNode, hostNode, hasChildren);
 
   const [hostX, hostY] = getNodeWorldPosition(host, hostNode);
   const [childOffsetX, childOffsetY] = getNodeOffset(child, childNode);
@@ -133,18 +183,23 @@ export function attachParts(child, childNode, host, hostNode) {
 export function mirrorPartIfEnabled(childPart) {
   const host = findPartByUid(childPart.par);
   if (
+    !host ||
     !appState.mission.mirror ||
     isStackNode(childPart.pn) ||
     host.rot !== 0 ||
-    DATA.parts[childPart.id].g === 'sci' ||
+    DATA.parts[childPart.id]?.g === 'sci' ||
     appState.mission.parts.length >= MAX_PARTS
   ) {
     return;
   }
 
-  const oppositeSide = childPart.pn.startsWith('L') ? 'R' : 'L';
-  const oppositeNode = oppositeSide + childPart.pn.slice(1);
-  if (getOccupiedNodes().has(`${host.u}:${oppositeNode}`)) return;
+  let oppositeNode = null;
+  if (childPart.pn.startsWith('L')) oppositeNode = 'R' + childPart.pn.slice(1);
+  else if (childPart.pn.startsWith('R')) oppositeNode = 'L' + childPart.pn.slice(1);
+  else if (childPart.pn === 'left') oppositeNode = 'right';
+  else if (childPart.pn === 'right') oppositeNode = 'left';
+
+  if (!oppositeNode || getOccupiedNodes().has(`${host.u}:${oppositeNode}`)) return;
 
   const twinPart = createPartInstance(childPart.id, 0, 0);
   attachParts(twinPart, childPart.cn, host, oppositeNode);
@@ -168,7 +223,7 @@ export function buildStarterSpacecraft() {
 
   const mountPart = (partId, host, hostNode) => {
     const part = createPartInstance(partId, 0, 0);
-    const childNode = getNodeCategory(partId) === 'ant' ? 'base' : 'in';
+    const childNode = getPreferredChildNode(partId, hostNode);
     attachParts(part, childNode, host, hostNode);
     return part;
   };
@@ -179,8 +234,6 @@ export function buildStarterSpacecraft() {
 }
 
 export function buildFailingDemoSpacecraft() {
-  // A design that passes every launch check but cannot be flown: a heavy radar craft with one tank is
-  // short on delta-v for a low Mars orbit, so the flight (and the debrief) explains why it fails.
   appState.mission.ci = 2;
   appState.mission.oi = 0;
   appState.mission.L = 'medium';
@@ -198,7 +251,7 @@ export function buildFailingDemoSpacecraft() {
 
   const mountPart = (partId, host, hostNode) => {
     const part = createPartInstance(partId, 0, 0);
-    attachParts(part, 'in', host, hostNode);
+    attachParts(part, getPreferredChildNode(partId, hostNode), host, hostNode);
     return part;
   };
 
@@ -209,7 +262,7 @@ export function buildFailingDemoSpacecraft() {
   autoAttachPart('ant_hg');
 }
 
-/* ---- Developer Mode Prebuilt Reference Designs (3-Star Perfect Configurations) ---- */
+/* ---- Developer Mode Prebuilt Reference Designs (Maximum Points 3-Star Configurations) ---- */
 
 export const DEVELOPER_PREBUILTS = [
   {
@@ -218,14 +271,14 @@ export const DEVELOPER_PREBUILTS = [
     oi: 0,
     launcher: 'medium',
     hard: 1,
-    title: 'Earth · Blue Sentinel (3★ Polar Mapper)',
-    note: 'Balanced chemical orbiter with mirrored large solar wings, high-gain downlink, and full climate suite.',
+    title: 'Earth · Blue Sentinel (Max-Score 3★)',
+    note: 'Symmetric 3★ polar mapper under 85% budget cap with full climate instruments and redundant avionics.',
     bus: 'bus_red',
     tanks: 1,
     engine: 'chem',
     ant: 'ant_hg',
     pairs: [['sol_l', 'bus', 1], ['bat', 'tank', 1], ['rec', 'tank', 2]],
-    singles: [['i_cam', 'bus', 'R2'], ['i_spec', 'bus', 'L2']]
+    singles: [['i_spec', 'bus', 'R2'], ['i_cam', 'bus', 'L2']]
   },
   {
     id: 'dev_moon',
@@ -233,23 +286,23 @@ export const DEVELOPER_PREBUILTS = [
     oi: 0,
     launcher: 'heavy',
     hard: 1,
-    title: 'Moon · Selene Watch (3★ Lunar Surveyor)',
-    note: '2-tank chemical transfer stack with mirrored solar wings, dual batteries, and mineral/ice instruments.',
+    title: 'Moon · Selene Watch (Max-Score 3★)',
+    note: '2-tank high-efficiency chemical lunar orbiter with mirrored solar wings and dual science payload.',
     bus: 'bus_red',
     tanks: 2,
     engine: 'chem',
     ant: 'ant_hg',
     pairs: [['sol_l', 'bus', 1], ['bat', 0, 1], ['rec', 0, 2]],
-    singles: [['i_spec', 'bus', 'R2'], ['i_therm', 'bus', 'L2']]
+    singles: [['i_spec', 'bus', 'R2'], ['i_cam', 'bus', 'L2']]
   },
   {
     id: 'dev_mars',
     contractId: 'mars',
-    oi: 1,
+    oi: 0,
     launcher: 'heavy',
     hard: 1,
-    title: 'Mars · Red Survey (3★ Deep-Space Orbiter)',
-    note: '3-tank chemical orbiter with 4x large solar wings for 0.43 AU flux, high-gain dish, and subsurface spectrometer.',
+    title: 'Mars · Red Survey (Max-Score 3★)',
+    note: '3-tank chemical orbiter with 4x large solar wings for 0.43 AU sunlight, dual recorders, and high-res imaging.',
     bus: 'bus_red',
     tanks: 3,
     engine: 'chem',
@@ -260,43 +313,43 @@ export const DEVELOPER_PREBUILTS = [
   {
     id: 'dev_mercury',
     contractId: 'mercury',
-    oi: 1,
+    oi: 0,
     launcher: 'super',
     hard: 1,
-    title: 'Mercury · Hot Rock (3★ Nuclear Thermal)',
-    note: 'High-Isp nuclear thermal stage delivering >14 km/s delta-v for Mercury insertion with redundant avionics.',
+    title: 'Mercury · Hot Rock (Max-Score 3★)',
+    note: 'Nuclear thermal flagship delivering >14 km/s delta-v for low polar Mercury orbit with full 35% CML-4 margins.',
     bus: 'bus_red',
-    tanks: 3,
+    tanks: 4,
     engine: 'nuclear',
     ant: 'ant_hg',
     pairs: [['sol_s', 'bus', 1], ['bat', 0, 1], ['rec', 0, 2]],
-    singles: [['i_spec', 'bus', 'R2'], ['i_therm', 'bus', 1, 'L2']]
+    singles: [['i_spec', 'bus', 'R2'], ['i_cam', 'bus', 'L2']]
   },
   {
     id: 'dev_venus',
     contractId: 'venus',
-    oi: 1,
+    oi: 0,
     launcher: 'heavy',
     hard: 1,
-    title: 'Venus · Veiled Sister (3★ Cloud Penetrator)',
-    note: '3-tank chemical orbiter with mirrored solar arrays, recorder, and spectrometer + thermal imager.',
+    title: 'Venus · Veiled Sister (Max-Score 3★)',
+    note: '3-tank chemical orbiter with mirrored solar arrays, dual recorders, and atmospheric spectrometer + camera.',
     bus: 'bus_red',
     tanks: 3,
     engine: 'chem',
     ant: 'ant_hg',
     pairs: [['sol_l', 'bus', 1], ['bat', 0, 1], ['rec', 0, 2]],
-    singles: [['i_spec', 'bus', 'R2'], ['i_therm', 'bus', 'L2']]
+    singles: [['i_spec', 'bus', 'R2'], ['i_cam', 'bus', 'L2']]
   },
   {
     id: 'dev_jupiter',
     contractId: 'jupiter',
-    oi: 2,
+    oi: 1,
     launcher: 'heavy',
     hard: 1,
-    title: 'Jupiter · King’s Gamble (3★ RTG Nuclear)',
-    note: 'Twin RTGs + nuclear thermal engine to conquer 3.7% sunlight and Jovian radiation belts.',
+    title: 'Jupiter · King’s Gamble (Max-Score 3★)',
+    note: 'Nuclear thermal + quadruple RTGs conquering 3.7% sunlight and Jovian radiation belts under budget.',
     bus: 'bus_red',
-    tanks: 2,
+    tanks: 3,
     engine: 'nuclear',
     ant: 'ant_hg',
     pairs: [['rtg', 'bus', 1], ['rtg', 0, 1], ['bat', 0, 2], ['rec', 1, 1]],
@@ -305,13 +358,13 @@ export const DEVELOPER_PREBUILTS = [
   {
     id: 'dev_saturn',
     contractId: 'saturn',
-    oi: 2,
+    oi: 1,
     launcher: 'heavy',
     hard: 1,
-    title: 'Saturn · Ring Lord (3★ Cassini-Class)',
-    note: 'Nuclear thermal propulsion with quadruple RTGs for 1.1% solar flux and high-gain DSN downlink.',
+    title: 'Saturn · Ring Lord (Max-Score 3★)',
+    note: 'Cassini-class nuclear thermal orbiter with quadruple RTGs and high-gain DSN downlink.',
     bus: 'bus_red',
-    tanks: 2,
+    tanks: 3,
     engine: 'nuclear',
     ant: 'ant_hg',
     pairs: [['rtg', 'bus', 1], ['rtg', 0, 1], ['bat', 0, 2], ['rec', 1, 1]],
@@ -323,8 +376,8 @@ export const DEVELOPER_PREBUILTS = [
     oi: 2,
     launcher: 'super',
     hard: 1,
-    title: 'Uranus · Sideways World (3★ Ice Giant Probe)',
-    note: '3-tank nuclear stage with quadruple RTGs, low-data spectrometer + magnetometer for 1.8% DSN rate.',
+    title: 'Uranus · Sideways World (Max-Score 3★)',
+    note: '3-tank nuclear stage with quadruple RTGs and ultra-efficient telemetry for 1.6% DSN downlink.',
     bus: 'bus_red',
     tanks: 3,
     engine: 'nuclear',
@@ -338,8 +391,8 @@ export const DEVELOPER_PREBUILTS = [
     oi: 2,
     launcher: 'super',
     hard: 1,
-    title: 'Neptune · Edge of the Map (3★ Deepest Orbit)',
-    note: '4-tank nuclear thermal flagship with quadruple RTGs and ultra-lean telemetry for 0.012x DSN comms.',
+    title: 'Neptune · Edge of the Map (Max-Score 3★)',
+    note: '4-tank nuclear thermal flagship with quadruple RTGs engineered for 0.011x DSN bandwidth.',
     bus: 'bus_red',
     tanks: 4,
     engine: 'nuclear',
@@ -403,16 +456,18 @@ export function buildDeveloperPrebuilt(prebuiltId) {
 
   (spec.pairs || []).forEach(([partId, hostRef, tier]) => {
     const host = resolveHost(hostRef);
+    const rightNode = `R${tier}`;
+    const leftNode = `L${tier}`;
     const rightPart = createPartInstance(partId, 0, 0);
-    attachParts(rightPart, 'in', host, `R${tier}`);
+    attachParts(rightPart, getPreferredChildNode(partId, rightNode), host, rightNode);
     const leftPart = createPartInstance(partId, 0, 0);
-    attachParts(leftPart, 'in', host, `L${tier}`);
+    attachParts(leftPart, getPreferredChildNode(partId, leftNode), host, leftNode);
   });
 
   (spec.singles || []).forEach(([partId, hostRef, nodeName]) => {
     const host = resolveHost(hostRef);
     const part = createPartInstance(partId, 0, 0);
-    attachParts(part, 'in', host, nodeName);
+    attachParts(part, getPreferredChildNode(partId, nodeName), host, nodeName);
   });
 
   return spec;
@@ -481,16 +536,18 @@ export function autoAttachPart(partId) {
 
   if (category === 'ant') {
     const topHost = hosts.find(h => ['bus', 'tank'].includes(getNodeCategory(h.id)) && isNodeFree(h, 'top'));
-    if (!topHost) return { ok: false, message: 'No free mounting point on top. Move something first.' };
-    attachParts(createPartInstance(partId, 0, 0), 'base', topHost, 'top');
-    return { ok: true };
+    if (topHost) {
+      attachParts(createPartInstance(partId, 0, 0), 'base', topHost, 'top');
+      return { ok: true };
+    }
   }
 
   for (const host of hosts) {
-    for (const sideNode of ['R1', 'L1', 'R2', 'L2']) {
+    for (const sideNode of ['R1', 'L1', 'R2', 'L2', 'right', 'left', 'top']) {
       if (hasNode(host, sideNode) && isNodeFree(host, sideNode)) {
         const part = createPartInstance(partId, 0, 0);
-        attachParts(part, 'in', host, sideNode);
+        const childNode = getPreferredChildNode(partId, sideNode);
+        attachParts(part, childNode, host, sideNode);
         mirrorPartIfEnabled(part);
         return { ok: true };
       }
@@ -823,14 +880,6 @@ export function scoreFlight(telemetry, outcome, science) {
   return { stars, score };
 }
 
-/**
- * One place that decides how a flight ends, so the flight, the re-score after mid-flight decisions and the
- * predicted flight can never disagree.
- *   success = science reaches the contract baseline (target)
- *   partial = science reaches the minimum (threshold) but not the baseline
- *   lost    = no science, or less than the minimum
- * The minimum is the contract threshold times DATA.flightModel.failBelowThresholdFactor.
- */
 export function classifyOutcome(science, contract) {
   const minimum = contract.thr * DATA.flightModel.failBelowThresholdFactor;
   if (science >= contract.target) return 'success';
@@ -862,7 +911,7 @@ export function resolveFlight(telemetry, burns = null) {
 
   const finish = (outcome, science, events, reasons, arrived = false) => ({
     outcome,
-    arrived, // true once the craft is safely in orbit, even if the science was too low to count
+    arrived,
     science,
     events,
     reasons,
