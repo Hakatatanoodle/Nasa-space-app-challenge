@@ -31,6 +31,17 @@
   background: #12304f;
 }
 
+.lock-toggle {
+  border-color: #4c8fd1;
+}
+
+.lock-toggle.locked-on {
+  border-color: var(--accent);
+  background: #ffc85726;
+  color: var(--accent);
+  font-weight: 700;
+}
+
 .tile {
   display: flex;
   align-items: center;
@@ -69,7 +80,6 @@
   color: var(--muted);
 }
 
-/* Full-bleed edge-to-edge blueprint grid on #cv at every zoom level */
 #cv {
   position: relative;
   width: 100%;
@@ -77,25 +87,24 @@
   min-height: 480px;
   margin: 0;
   overflow: auto;
-  background-color: #08182bd9;
-  background-image:
-    linear-gradient(#5da9ff22 1px, transparent 1px),
-    linear-gradient(90deg, #5da9ff22 1px, transparent 1px),
-    linear-gradient(#5da9ff0e 1px, transparent 1px),
-    linear-gradient(90deg, #5da9ff0e 1px, transparent 1px),
-    radial-gradient(circle at 50% 48%, #1d4b7a55, #071526cc 78%);
-  background-size:
-    var(--grid-lg, 72px) var(--grid-lg, 72px),
-    var(--grid-lg, 72px) var(--grid-lg, 72px),
-    var(--grid-sm, 18px) var(--grid-sm, 18px),
-    var(--grid-sm, 18px) var(--grid-sm, 18px),
-    100% 100%;
-  background-attachment: local, local, local, local, scroll;
+  background:
+    radial-gradient(circle at 50% 48%, #1d4b7a66, #08182be0 76%),
+    radial-gradient(circle at 22% 20%, #7fe3b812 0%, transparent 45%),
+    radial-gradient(circle at 78% 75%, #ffc85710 0%, transparent 48%);
   border: 1.5px solid #4484c4;
-  box-shadow: inset 0 0 38px #040d18cc, 0 8px 28px #00000066;
+  box-shadow: inset 0 0 42px #040d18dd, 0 8px 28px #00000066;
   border-radius: 12px;
   touch-action: none;
   cursor: grab;
+}
+
+#cv.design-locked {
+  border-color: var(--accent);
+  box-shadow: inset 0 0 42px #040d18dd, 0 0 0 1px #ffc85766;
+}
+
+#cv.design-locked #world .pt {
+  cursor: pointer;
 }
 
 #cv:active {
@@ -118,8 +127,22 @@
     radial-gradient(2px 2px at 260px 620px, #ffc85755, transparent),
     radial-gradient(1.5px 1.5px at 720px 760px, #ffffff44, transparent),
     radial-gradient(1.5px 1.5px at 480px 120px, #ffffff44, transparent),
-    linear-gradient(90deg, transparent 479px, #ffc8572b 479px, #ffc8572b 481px, transparent 481px);
-  background-size: 960px 1100px;
+    linear-gradient(90deg, transparent 479px, #ffc85726 479px, #ffc85726 481px, transparent 481px),
+    linear-gradient(#5da9ff1a 1px, transparent 1px),
+    linear-gradient(90deg, #5da9ff1a 1px, transparent 1px),
+    linear-gradient(#5da9ff0b 1px, transparent 1px),
+    linear-gradient(90deg, #5da9ff0b 1px, transparent 1px);
+  background-size:
+    960px 1100px,
+    960px 1100px,
+    960px 1100px,
+    960px 1100px,
+    960px 1100px,
+    960px 1100px,
+    80px 80px,
+    80px 80px,
+    20px 20px,
+    20px 20px;
 }
 
 .pt {
@@ -223,7 +246,7 @@
   gap: 8px;
 }
 
-/* Unified Section & Metric Boxes (both dropdown and standalone cards) */
+/* Unified Section & Metric Boxes */
 .panel-section-label {
   margin: 4px 0 6px;
   font-size: 0.85rem;
@@ -237,7 +260,7 @@
 .resource-card,
 .panel-card {
   margin-top: 8px;
-  background: #0b2038b8;
+  background: #0b2038a8;
   border: 1px solid var(--line);
   border-radius: 8px;
   overflow: hidden;
