@@ -1,5 +1,6 @@
 /* File: js/config.js
  * Owner: Person B (Saurav)
+ * AI-assisted (update): Gemini, 2026-11-15 - universal multi-directional attachment nodes for all parts. Reviewed by a human: NO.
  * AI-assisted: YES — Gemini, 2026-11-15. Reviewed by a human: YES Reviewd by Person C (Yochan)
  * Sources used: SPACEAPPS_CHALLENGE
  */
@@ -32,25 +33,41 @@ export const PART_DIMENSIONS = {
 };
 
 const STACK_AND_RADIAL_NODES = [
-  ['top', 0.5, 0.07],
-  ['bottom', 0.5, 0.93],
-  ['L1', 0.14, 0.32],
-  ['L2', 0.14, 0.72],
-  ['R1', 0.86, 0.32],
-  ['R2', 0.86, 0.72]
+  ['top', 0.5, 0.06],
+  ['bottom', 0.5, 0.94],
+  ['L1', 0.12, 0.30],
+  ['L2', 0.12, 0.70],
+  ['R1', 0.88, 0.30],
+  ['R2', 0.88, 0.70]
+];
+
+const ALL_FOUR_SIDES = [
+  ['top', 0.5, 0.08],
+  ['bottom', 0.5, 0.92],
+  ['left', 0.10, 0.5],
+  ['right', 0.90, 0.5]
 ];
 
 export const ATTACHMENT_NODES = {
   bus: STACK_AND_RADIAL_NODES,
   tank: STACK_AND_RADIAL_NODES,
-  eng: [['top', 0.5, 0.12]],
-  sol: [['in', 0.12, 0.5]],
-  ant: [['base', 0.5, 0.86]],
-  sm: [['in', 0.16, 0.5]]
+  eng: [
+    ['top', 0.5, 0.10],
+    ['left', 0.14, 0.45],
+    ['right', 0.86, 0.45]
+  ],
+  sol: ALL_FOUR_SIDES,
+  ant: [
+    ['base', 0.5, 0.88],
+    ['top', 0.5, 0.12],
+    ['left', 0.12, 0.5],
+    ['right', 0.88, 0.5]
+  ],
+  sm: ALL_FOUR_SIDES
 };
 
 export const MAX_PARTS = 40;
-export const SNAP_RADIUS_PX = 44;
+export const SNAP_RADIUS_PX = 48;
 export const MAX_CANDIDATES = 3;
 export const MAX_HISTORY = 40;
 export const DEFAULT_SEED = 20261115;

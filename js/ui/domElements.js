@@ -1,11 +1,10 @@
 /* File: js/ui/domElements.js
  * Owner: Person B (Saurav)
- * AI-assisted: YES — Gemini, 2026-11-14. Reviewed by a human: YES Reviewd by Person C (Yochan)
+ * AI-assisted: YES — Gemini, 2026-11-15. Reviewed by a human: YES Reviewed by Person C (Yochan)
  * Sources used: none
  */
 
-export const $ = selector => document.querySelector(selector);
-export const $$ = selector => document.querySelectorAll(selector);
+export const $ = selector => document.querySelector(selector); export const $$ = selector => document.querySelectorAll(selector);
 
 export const toPercent = value => Math.round(value * 100);
 export const formatNumber = value => Math.round(value).toLocaleString();

@@ -1,5 +1,6 @@
 /* File: js/core/state.js
  * Owner: Person A (Ashmin)
+ * AI-assisted (update): Gemini, 2026-11-15 - distinct hover & click sci-fi button SFX balanced against background music. Reviewed by a human: NO.
  * AI-assisted (update): Claude, 2026-11-15 - AudioEngine.pauseAll/resumeAll for the flight pause. Reviewed by a human: NO.
  * AI-assisted (update): Claude, 2026-11-15 - win/loss tightening (outcome bands, audio, demos). Reviewed by a human: NO.
  * AI-assisted: YES — Gemini, 2026-11-15. Reviewed by a human: Yes Reviewed by Person C (Yochan).
@@ -31,7 +32,7 @@ export function createInitialMission(contractIndex = 1) {
 
 export const appState = {
   mission: createInitialMission(1),
-  marginThreshold: 0.1,
+  marginThreshold: 0.15,
   candidates: [],
   savedBuilds: [],
   previousErrorCount: 0,
@@ -170,8 +171,8 @@ export function saveUndoSnapshot() {
 
 /* ---- Web Audio Synthesizer & Smooth Crossfading Screen Music Controller ---- */
 export const AudioEngine = (() => {
-  const MAX_MUSIC_VOL = 0.48;
-  const MAX_SFX_GAIN = 0.6;
+  const MAX_MUSIC_VOL = 0.34;
+  const MAX_SFX_GAIN = 0.85;
   const CROSSFADE_MS = 700;
 
   let savedLevel = 0.75;
@@ -189,6 +190,7 @@ export const AudioEngine = (() => {
   let activeAudioEl = null;
   let pausedMusicEl = null;
   let unlockBound = false;
+  let lastHoverAt = 0;
 
   const trackElements = {};
   const fadeTimers = new WeakMap();
@@ -344,7 +346,7 @@ export const AudioEngine = (() => {
   const playTone = (freq, delay, duration, type = 'sine', volume = 0.2, endFreq = null) => {
     if (!isSoundOn || masterLevel <= 0) return;
     init();
-    if (!ctx) return;
+    if (!ctx || ctx.state !== 'running') return;
     const osc = ctx.createOscillator();
     const gain = ctx.createGain();
     const startTime = ctx.currentTime + delay;
@@ -394,7 +396,6 @@ export const AudioEngine = (() => {
       return { isSoundOn, volumePct: Math.round(masterLevel * 100) };
     },
     setMusic: (key, forceRestart = false) => playTrack(key, forceRestart),
-    // Flight pause: freeze sound effects and any playing music track.
     pauseAll() {
       if (ctx && ctx.state === 'running') ctx.suspend().catch(() => {});
       if (activeAudioEl && !activeAudioEl.paused) {
@@ -402,7 +403,6 @@ export const AudioEngine = (() => {
         activeAudioEl.pause();
       }
     },
-    // Resume after a pause. Pass false to forget the paused track instead of playing it (flight aborted).
     resumeAll(playMusic = true) {
       if (ctx && ctx.state === 'suspended') ctx.resume().catch(() => {});
       if (pausedMusicEl && playMusic && pausedMusicEl === activeAudioEl) pausedMusicEl.play().catch(() => {});
@@ -424,29 +424,39 @@ export const AudioEngine = (() => {
       }
       return { isSoundOn, volumePct: Math.round(masterLevel * 100) };
     },
-    click: () => playTone(660, 0, 0.05, 'square', 0.06),
+    // Crisp high-frequency telemetry blip audible over background music
+    hover: () => {
+      const now = performance.now();
+      if (now - lastHoverAt < 55) return;
+      lastHoverAt = now;
+      playTone(1320, 0, 0.038, 'sine', 0.14, 1760);
+    },
+    // Tactile dual-harmonic console switch click
+    click: () => {
+      playTone(980, 0, 0.055, 'triangle', 0.24, 540);
+      playTone(1480, 0.015, 0.045, 'sine', 0.16, 1120);
+    },
     attach: () => {
-      playTone(520, 0, 0.08, 'triangle', 0.14);
-      playTone(780, 0.07, 0.1, 'triangle', 0.11);
+      playTone(540, 0, 0.08, 'triangle', 0.22);
+      playTone(860, 0.06, 0.11, 'triangle', 0.19);
     },
-    remove: () => playTone(420, 0, 0.12, 'triangle', 0.12, 240),
+    remove: () => playTone(440, 0, 0.13, 'triangle', 0.20, 220),
     warn: () => {
-      playTone(310, 0, 0.14, 'sawtooth', 0.07);
-      playTone(310, 0.2, 0.14, 'sawtooth', 0.07);
+      playTone(320, 0, 0.14, 'sawtooth', 0.12);
+      playTone(320, 0.19, 0.14, 'sawtooth', 0.12);
     },
-    tick: () => playTone(900, 0, 0.04, 'square', 0.05),
-    launch: () => playTone(65, 0, 2.5, 'sawtooth', 0.14, 110),
+    tick: () => playTone(1040, 0, 0.04, 'sine', 0.11),
+    launch: () => playTone(68, 0, 2.5, 'sawtooth', 0.22, 115),
     win: () => {
       playTrack('win', true);
-      [523, 659, 784, 1047].forEach((f, i) => playTone(f, i * 0.14, 0.45, 'triangle', 0.16));
+      [523, 659, 784, 1047].forEach((f, i) => playTone(f, i * 0.14, 0.45, 'triangle', 0.22));
     },
     partial: () => {
-      // Partial success is not a win: short two-note chime only, no victory track.
-      [523, 659].forEach((f, i) => playTone(f, i * 0.2, 0.45, 'triangle', 0.14));
+      [523, 659].forEach((f, i) => playTone(f, i * 0.2, 0.45, 'triangle', 0.19));
     },
     fail: () => {
       playTrack('loss', true);
-      playTone(120, 0, 1.0, 'sawtooth', 0.22, 35);
+      playTone(120, 0, 1.0, 'sawtooth', 0.26, 35);
     }
   };
 })();

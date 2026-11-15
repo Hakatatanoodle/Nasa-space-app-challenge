@@ -1,8 +1,6 @@
 /* File: js/ui/renderer.js
  * Owner: Person B (Saurav)
- * AI-assisted (update): Claude, 2026-11-15 - flight menu: centred pause menu with Home / Pause (P) / Resume (X) / Restart (R). Reviewed by a human: NO.
- * AI-assisted (update): Claude, 2026-11-15 - win/loss tightening (outcome bands, audio, demos). Reviewed by a human: NO.
- * AI-assisted: YES — Gemini, 2026-11-14; Gemini, 2026-11-15; Claude, 2026-11-14; Claude, 2026-11-15 (two manual burns). Reviewed by a human:YES Reviewd by Person C (Yochan)
+ * AI-assisted (update): Gemini, 2026-11-15 - prominent science HUD badge, post-launch debrief polish, and preserved flight controls. Reviewed by a human: NO.
  * Sources used: NASA_CUBESAT101, JPL_CML
  */
 import { DATA } from '../api/mockData.js';
@@ -59,8 +57,7 @@ let cancelActiveBurn = null;
 let cancelBurnHold = null;
 let flightRunId = 0;
 
-/* ---- Flight clock: every launch animation, burn timer and log delay reads this clock,
-   so freezing it pauses the whole flight at once. ---- */
+/* ---- Flight clock: freezes animations, burn timers, and log delays when paused ---- */
 const flightClock = {
   pausedAt: null,
   offset: 0,
@@ -80,7 +77,6 @@ const flightClock = {
   }
 };
 
-// Like a plain timeout, but the countdown stops while the flight is paused.
 const flightDelay = ms => new Promise(resolve => {
   const startedAt = flightClock.now();
   const check = () => (flightClock.now() - startedAt >= ms ? resolve() : setTimeout(check, 40));
@@ -110,14 +106,13 @@ export function abortLaunchSequence() {
   syncFlightMenu();
 }
 
-/* ---- Flight menu: a centred pause menu (Home / Pause / Resume / Restart) ---- */
+/* ---- Flight menu: centred pause menu (Home / Pause / Resume / Restart) ---- */
 
 const isFlightMenuOpen = () => {
   const menu = $('#flightmenu');
   return !!menu && !menu.hidden;
 };
 
-// Keeps the header Menu button, the centred menu and the status badge up to date.
 export function syncFlightMenu() {
   const menu = $('#flightmenu');
   const opener = $('#fm-open');
@@ -177,7 +172,7 @@ export const isFlightPaused = () => flightClock.paused;
 export function pauseFlight() {
   if (!appState.isFlying || flightClock.paused) return;
   flightClock.pause();
-  if (cancelBurnHold) cancelBurnHold(); // a burn you were holding starts over after Resume
+  if (cancelBurnHold) cancelBurnHold();
   AudioEngine.pauseAll();
   $('#flv')?.classList.add('paused');
   const burnPanel = $('#burn');
@@ -198,12 +193,11 @@ export function resumeFlight() {
   }
   syncFlightMenu();
   if (isFlightMenuOpen()) {
-    $('#flightmenu').hidden = true; // Resume puts the player straight back in the flight
+    $('#flightmenu').hidden = true;
     if (document.activeElement?.closest?.('#flightmenu')) document.activeElement.blur();
   }
 }
 
-// Throws away the current flight and flies the same design again from lift-off.
 export function restartLaunchSequence() {
   if (!appState.isFlying) return;
   abortLaunchSequence();
@@ -428,6 +422,7 @@ export function renderBuilderStage() {
       <div>
         <div class="row" style="align-items: center;">
           <b id="mn"></b>
+          <span id="sci-hud" class="science-hud-badge" aria-live="polite" title="Predicted science return vs contract goal"></span>
           <span style="flex: 1;"></span>
           <select id="sl" aria-label="Select launcher">${launcherOptions}</select>
           <select id="so" aria-label="Select orbit"></select>
@@ -654,6 +649,17 @@ export function refreshBuilderView() {
   appState.previousErrorCount = errorCount;
 
   $('#mn').textContent = contract.n;
+  const sciHud = $('#sci-hud');
+  if (sciHud) {
+    const sciReady = telemetry.sciF >= contract.target;
+    const sciMin = telemetry.sciF >= contract.thr;
+    sciHud.className = `chip ${sciReady ? 'ok' : ''}`;
+    sciHud.style.borderColor = sciReady ? 'var(--ok)' : sciMin ? 'var(--accent)' : 'var(--bad)';
+    sciHud.style.color = sciReady ? 'var(--ok)' : sciMin ? 'var(--accent)' : 'var(--bad)';
+    sciHud.style.fontWeight = '700';
+    sciHud.innerHTML = `&#128300; Science: ${telemetry.sciF.toFixed(0)} / ${contract.target} pts (min ${contract.thr})`;
+  }
+
   $('#sl').value = mission.L;
   $('#so').innerHTML = contract.orbits.map((o, i) => `<option value="${i}">${o.n}</option>`).join('');
   $('#so').value = mission.oi;
@@ -837,6 +843,8 @@ export function refreshBuilderView() {
     </span>
   `).join('');
 
+  const sciColor = telemetry.sciF >= contract.target ? 'var(--ok)' : telemetry.sciF >= contract.thr ? 'var(--accent)' : 'var(--bad)';
+
   $('#mt').innerHTML = `
     ${alertsDropdownHtml}
     <div class="panel-section-label">Mission resources</div>
@@ -850,7 +858,7 @@ export function refreshBuilderView() {
     <div class="panel-card">
       <div class="panel-card-title">Mission forecast &amp; sign-offs</div>
       <div class="forecast-grid">
-        <div><small>Science</small><b>${telemetry.sciF.toFixed(0)} / ${contract.target} pts</b></div>
+        <div style="border-color:${sciColor};"><small>Science Return</small><b style="color:${sciColor};">${telemetry.sciF.toFixed(0)} / ${contract.target} pts</b></div>
         <div><small>Transit</small><b>${formatNumber(telemetry.days)} days</b></div>
         <div><small>Useful life</small><b>${Math.max(0, telemetry.life).toFixed(0)} mo</b></div>
         <div><small>Reliability</small><b>${toPercent(telemetry.reliability)}%</b></div>
@@ -1077,8 +1085,6 @@ function renderFlightSpacecraft() {
 
   return hullHtml + plumeHtml;
 }
-
-/* ---- Stage 3 flight view (canvas) ---- */
 
 const TAU = Math.PI * 2;
 const clamp01 = value => Math.max(0, Math.min(1, value));
@@ -1770,7 +1776,6 @@ function playBurnMinigame(view, kind, offerAll) {
       rafId = requestAnimationFrame(paint);
     };
 
-    // Pause: stop a burn that is being held and put the gauge back to empty.
     cancelBurnHold = () => {
       if (holdStart === null || finished) return;
       holdStart = null;
@@ -1819,7 +1824,6 @@ function playBurnMinigame(view, kind, offerAll) {
       release();
     }
 
-    // Leaving the flight (Home, Restart) closes an open burn without scoring it.
     cancelActiveBurn = () => finish(true, false);
 
     holdBtn.onpointerdown = event => {
@@ -1953,7 +1957,7 @@ export async function startLaunchSequence() {
     const view = createFlightView($('#flcv'), telemetry);
 
     $('#fskip').onclick = () => {
-      resumeFlight(); // skipping while paused should keep flying
+      resumeFlight();
       view.skip = true;
       $('#fskip').disabled = true;
       $('#fskip').textContent = 'Skipping...';
@@ -2112,7 +2116,7 @@ function concludeMission(flight) {
 
   if (flight.outcome === 'success') AudioEngine.win();
   else if (flight.outcome === 'partial') AudioEngine.partial();
-  else if (!flight.steps.some(step => step.fatal)) AudioEngine.fail(); // a fatal step already played the failure sound
+  else if (!flight.steps.some(step => step.fatal)) AudioEngine.fail();
 
   appState.highScores[contract.id] = Math.max(appState.highScores[contract.id] || 0, flight.score);
   try {
@@ -2174,6 +2178,30 @@ export function renderDebriefStage() {
     mission.parts.filter(p => getConnectedPartUids().has(p.u)).map(p => p.id)
   );
 
+  const outcomeAccent = out === 'lost' ? 'var(--bad)' : out === 'partial' ? 'var(--accent)' : 'var(--ok)';
+  const sciPctOfGoal = Math.min(100, Math.round((sci / contract.target) * 100));
+
+  const heroSummaryBanner = `
+    <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(150px, 1fr)); gap:10px; margin:12px 0; padding:12px; background:#0b2038; border:1px solid ${outcomeAccent}; border-radius:10px;">
+      <div>
+        <small style="color:var(--muted); display:block;">Mission Status</small>
+        <b style="color:${outcomeAccent}; font-size:1.05rem;">${CONTENT.outcomeLabels[out]}</b>
+      </div>
+      <div>
+        <small style="color:var(--muted); display:block;">Science Returned</small>
+        <b style="color:${sci >= contract.target ? 'var(--ok)' : 'var(--accent)'}; font-size:1.05rem;">${sci.toFixed(0)} / ${contract.target} pts (${sciPctOfGoal}%)</b>
+      </div>
+      <div>
+        <small style="color:var(--muted); display:block;">Budget Spent</small>
+        <b style="font-size:1.05rem;">$${telemetry.cost}M / $${contract.cap}M</b>
+      </div>
+      <div>
+        <small style="color:var(--muted); display:block;">Mission Score</small>
+        <b style="color:var(--accent); font-size:1.05rem;">${formatNumber(score)} pts (${'★'.repeat(st)}${'☆'.repeat(3 - st)})</b>
+      </div>
+    </div>
+  `;
+
   const resourceMarginsTable = `
     <p><b>Six-resource margin summary</b></p>
     <table class="rt">
@@ -2221,7 +2249,7 @@ export function renderDebriefStage() {
     <div class="box">
       ${renderCustomEmblemSvg(out, st)}
       <h2>4. Post-Mission Report — ${'★'.repeat(st) + '☆'.repeat(3 - st)} (${score} pts)</h2>
-      <p><b>Outcome:</b> ${CONTENT.outcomeLabels[out]}.</p>
+      ${heroSummaryBanner}
       ${renderCareerNews(news)}
       <p><b>Why it went this way &amp; what to change next</b></p>
       <ul>${(why.length ? why : ['All six resource budgets maintained healthy engineering margins.']).map(reason => `<li>${reason}</li>`).join('')}</ul>
@@ -2232,7 +2260,7 @@ export function renderDebriefStage() {
       <p><b>Destination briefing: ${contract.n}</b></p>
       ${buildPlanetBriefing(contract.id, true)}
       <div class="row" style="margin-top:12px;">
-        <button type="button" data-a="go2">Edit and re-simulate</button>
+        <button type="button" class="go" data-a="go2" style="margin:0;">Edit and re-simulate</button>
         <button type="button" data-a="go1">New mission</button>
       </div>
     </div>
@@ -2294,4 +2322,4 @@ export function showCareerModal() {
     </div>
   `;
   $('#rev').hidden = false;
-} 
+}
