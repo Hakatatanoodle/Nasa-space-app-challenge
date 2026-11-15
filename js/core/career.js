@@ -1,6 +1,6 @@
 /* File: js/core/career.js
  * Owner: ported from the Apogee-temp-asmin feature branch (lib/career.js, v3.2)
- * AI-assisted: YES — Claude, 2026-11-14; Gemini, 2026-11-15. Reviewed by a human: NO.
+ * AI-assisted: YES — Claude, 2026-11-14; Gemini, 2026-11-15. Reviewed by a human: YES Reviewd by Person C (Yochan)
  * Sources used: none (game design, not NASA data)
  */
 import { DATA } from '../api/mockData.js';

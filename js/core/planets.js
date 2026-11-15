@@ -1,6 +1,6 @@
 /* File: js/core/planets.js
  * Owner: ported from the Apogee-temp-asmin feature branch (lib/planets.js, v3.2)
- * AI-assisted: YES — Claude, 2026-11-14. Reviewed by a human: NO.
+ * AI-assisted: YES — Claude, 2026-11-14. Reviewed by a human: Yes Reviewed by Person C (Yochan).
  * Sources used: none (game design; planet facts are UNVERIFIED_MEMORY, see content.js)
  */
 import { DATA } from '../api/mockData.js';

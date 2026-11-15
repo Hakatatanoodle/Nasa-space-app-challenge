@@ -1,6 +1,6 @@
 /* File: js/core/state.js
  * Owner: Person A (Ashmin)
- * AI-assisted: YES — Gemini, 2026-11-15. Reviewed by a human: NO.
+ * AI-assisted: YES — Gemini, 2026-11-15. Reviewed by a human: Yes Reviewed by Person C (Yochan).
  * Sources used: none
  */
 import { DATA } from '../api/mockData.js';
