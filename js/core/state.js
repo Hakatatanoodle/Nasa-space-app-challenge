@@ -18,6 +18,7 @@ export function createInitialMission(contractIndex = 1) {
     parts: [],
     nu: 1,
     mirror: true,
+    locked: false,
     hard: 0,
     seed: DEFAULT_SEED
   };
@@ -37,12 +38,12 @@ export const appState = {
   dataSourceLabel: 'Offline sample',
   spaceWeather: {
     isLive: false,
-    flareClass: 'M1.4 (Baseline Sample)',
-    flareCount: 2,
-    cmeCount: 1,
+    flareClass: 'M1.4 (Baseline)',
+    flareCount: 3,
+    cmeCount: 2,
     stormLevel: 'Moderate',
     radiationMultiplier: 1.0,
-    summary: 'Nominal solar wind & moderate flare activity (offline reference profile).',
+    summary: 'Solar wind & flare baseline (offline fallback — check internet connection for live NASA DONKI telemetry).',
     src: 'SIMPLIFIED_FOR_GAMEPLAY'
   }
 };
@@ -329,4 +330,4 @@ export const AudioEngine = (() => {
       playTone(120, 0, 1.0, 'sawtooth', 0.22, 35);
     }
   };
-})(); 
+})();
