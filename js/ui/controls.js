@@ -29,7 +29,7 @@ import {
   buildFailingDemoSpacecraft,
   isStackNode
 } from '../core/engine.js';
-import { $, showToast } from './domElements.js';
+import { $, $$, showToast } from './domElements.js';
 import {
   navigateToStage,
   renderObjectiveStage,
@@ -42,7 +42,8 @@ import {
   showCompareModal,
   showDesignCodeModal,
   showCareerModal,
-  startLaunchSequence
+  startLaunchSequence,
+  abortLaunchSequence
 } from './renderer.js';
 
 function clientToWorldCoords(event) {
@@ -155,7 +156,6 @@ function syncAudioControls({ isSoundOn, volumePct }) {
 }
 
 export function bindGlobalControls() {
-  // Initialize volume slider state from saved AudioEngine volume
   syncAudioControls({
     isSoundOn: AudioEngine.isEnabled(),
     volumePct: AudioEngine.getVolume()
@@ -165,9 +165,10 @@ export function bindGlobalControls() {
     e.preventDefault();
   });
 
+  // Top-left APOGEE logo always returns to the landing page, even mid-flight
   $('#brand-home')?.addEventListener('click', e => {
     e.preventDefault();
-    if (appState.isFlying) return;
+    abortLaunchSequence();
     closeOpenModals();
     AudioEngine.click();
     $('#title').hidden = false;
@@ -498,6 +499,7 @@ export function bindGlobalControls() {
       if (a === 'hd') { appState.mission.hard = +v; saveMissionProgress(); return renderObjectiveStage(); }
       if (a === 'go2') return navigateToStage(2);
       if (a === 'go1') return navigateToStage(1);
+      if (a === 'deb') return navigateToStage(4);
       if (a === 'rot') return rotateSelectedPart(1);
       if (a === 'flp') return flipSelectedPart();
       if (a === 'del') return deleteSelectedPart();

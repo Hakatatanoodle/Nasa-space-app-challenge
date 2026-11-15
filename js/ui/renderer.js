@@ -50,6 +50,20 @@ import {
 import { $, $$, toPercent, formatNumber, delay, showToast } from './domElements.js';
 
 const WORLD_PAD_PX = 360;
+let activeFlightCleanup = null;
+
+export function abortLaunchSequence() {
+  if (activeFlightCleanup) {
+    activeFlightCleanup();
+    activeFlightCleanup = null;
+  }
+  appState.isFlying = false;
+  const burnPanel = $('#burn');
+  if (burnPanel) burnPanel.hidden = true;
+  $('#nav')?.querySelectorAll('button').forEach(btn => {
+    btn.disabled = btn.dataset.st === '3' || (btn.dataset.st === '4' && !appState.mission.res);
+  });
+}
 
 const renderDataBadge = isVerified =>
   isVerified
@@ -494,7 +508,6 @@ export function refreshBuilderView() {
   $('#so').innerHTML = contract.orbits.map((o, i) => `<option value="${i}">${o.n}</option>`).join('');
   $('#so').value = mission.oi;
 
-  // Generous scroll buffer around #world so centering never hits scroll bounds
   $('#wr').style.width = `${WORLD_PAD_PX * 2 + 960 * appState.canvasZoom}px`;
   $('#wr').style.height = `${WORLD_PAD_PX * 2 + 1100 * appState.canvasZoom}px`;
   $('#world').style.left = `${WORLD_PAD_PX}px`;
@@ -887,9 +900,7 @@ function renderFlightSpacecraft() {
   return hullHtml + plumeHtml;
 }
 
-/* ---- Stage 3 flight view (canvas) ----
- * The engine decides the outcome (resolveFlight). Everything below only DRAWS it, so the picture can
- * never disagree with the result. All visuals are drawn in code or use the team's own SVG assets. */
+/* ---- Stage 3 flight view (canvas) ---- */
 
 const TAU = Math.PI * 2;
 const clamp01 = value => Math.max(0, Math.min(1, value));
@@ -899,10 +910,9 @@ const smooth = t => {
   const x = clamp01(t);
   return x * x * (3 - 2 * x);
 };
-const EARTH_GLOBE_FILL = 0.85; // dest_earth.svg: the globe fills 85% of the picture's half-width
+const EARTH_GLOBE_FILL = 0.85;
 
 const flightImages = {};
-/** Loads a destination picture once. If it is missing the view falls back to a coloured circle. */
 function getFlightImage(key) {
   if (!flightImages[key]) {
     const img = new Image();
@@ -913,7 +923,6 @@ function getFlightImage(key) {
 }
 
 const flightBitmaps = {};
-/** A 512px copy of a destination picture. Scaling a bitmap every frame is far cheaper than re-drawing the SVG. */
 function getFlightBitmap(key) {
   if (flightBitmaps[key]) return flightBitmaps[key];
   const img = getFlightImage(key);
@@ -926,10 +935,6 @@ function getFlightBitmap(key) {
   return bitmap;
 }
 
-/**
- * Where everything sits on the map. Fractions of the view's half-size (see DATA.flightViz, not to scale).
- * Earth and Moon missions use a close-up around Earth; every other planet uses a Sun-centred map.
- */
 function buildFlightGeometry(dest, orbitIndex) {
   const viz = DATA.flightViz;
   if (dest === 'earth' || dest === 'moon') {
@@ -971,27 +976,26 @@ function createFlightView(canvas, telemetry) {
   const startAngle = (viz.startAngleDeg * Math.PI) / 180;
   const destName = getPlanetName(dest);
 
-  // Same seed = same stars (Rule 8). Cosmetic only.
   const random = createSeededRng(appState.mission.seed);
   const stars = Array.from({ length: 90 }, () => ({
     x: random(), y: random(), r: 0.5 + random() * 1.1, a: 0.35 + random() * 0.65, phase: random() * TAU
   }));
 
   const state = {
-    scene: 'ascent', // ascent | map | orbit
+    scene: 'ascent',
     sceneStart: performance.now(),
     ascent: 0,
     dim: 0,
-    heat: false, // Sun dive: let the orange glow of the page show through
-    craftT: 0, // 0..1 along the transfer arc
+    heat: false,
+    craftT: 0,
     showCraft: false,
-    burn: 0, // engine flame 0..1
-    dive: null, // 0..1 along the plunge path, or null
+    burn: 0,
+    dive: null,
     boom: null,
     pulse: null,
-    ready: false, // craft waiting for the burn
-    halted: false, // the ascent stopped early (tumble on the pad)
-    inset: 0 // pixels at the bottom kept free for the burn panel (eased)
+    ready: false,
+    halted: false,
+    inset: 0
   };
 
   const view = { skip: matchMedia('(prefers-reduced-motion: reduce)').matches };
@@ -1000,7 +1004,6 @@ function createFlightView(canvas, telemetry) {
   let width = 0;
   let height = 0;
 
-  /* ---- sizing and geometry helpers ---- */
   function resizeIfNeeded() {
     const dpr = Math.min(2, window.devicePixelRatio || 1);
     const w = canvas.clientWidth;
@@ -1020,11 +1023,9 @@ function createFlightView(canvas, telemetry) {
   const getCx = () => width / 2;
   const getCy = () => (height - state.inset) / 2;
 
-  /** Point on the transfer ellipse. Focus at the centre. t=0 is the departure ring, t=1 the target ring. */
   function arcPoint(t) {
     const half = getHalf();
     if (geo.r2 === 0) {
-      // Sun mission: there is no transfer ellipse (its far end is the Sun itself), only a straight drop inward.
       const r = geo.r1 * half * (1 - t);
       return { x: getCx() + r * Math.cos(startAngle), y: getCy() + r * Math.sin(startAngle) };
     }
@@ -1039,7 +1040,6 @@ function createFlightView(canvas, telemetry) {
     return { x: getCx() + r * Math.cos(angle), y: getCy() + r * Math.sin(angle) };
   }
 
-  /** Inward spiral used by the Sun dive. */
   function divePoint(u) {
     const r = geo.r1 * getHalf() * (1 - u) ** 1.4;
     const angle = startAngle + u * Math.PI * 1.5;
@@ -1051,7 +1051,6 @@ function createFlightView(canvas, telemetry) {
     y: getCy() + ringFraction * getHalf() * Math.sin(angle)
   });
 
-  /* ---- drawing helpers ---- */
   function drawBody(key, x, y, size) {
     const img = getFlightImage(key);
     if (key === 'sun') {
@@ -1126,14 +1125,6 @@ function createFlightView(canvas, telemetry) {
     }
   }
 
-  /* ---- scenes ---- */
-
-  /**
-   * The ascent is ONE continuous camera move. The camera follows the craft while it zooms out, so the
-   * flat ground becomes a curved horizon, then a globe, and the craft shrinks to the arrow used on the map.
-   * u runs 0..1. Everything is expressed relative to the final map layout, so the last frame of the
-   * ascent is exactly the first frame of the map (same Earth position and size, same craft position).
-   */
   function ascentCamera(u) {
     const craftH = craftWrap.offsetHeight || 540;
     const craftW = craftWrap.offsetWidth || 520;
@@ -1148,7 +1139,7 @@ function createFlightView(canvas, telemetry) {
     const thetaEnd = offEndLength > 1 ? Math.atan2(offEnd.y, offEnd.x) : Math.PI / 2;
     const gapEnd = offEndLength - surfaceEnd;
 
-    const surface0 = 7 * height; // so large at lift-off that the ground looks flat
+    const surface0 = 7 * height;
     const surface = surface0 * (surfaceEnd / surface0) ** (u ** 1.15);
     const sRel = (surface / surface0) ** 0.6;
     const scale = craftScale0 * sRel;
@@ -1171,15 +1162,14 @@ function createFlightView(canvas, telemetry) {
       craft,
       theta,
       earth: { x: craft.x + distance * Math.cos(theta), y: craft.y + distance * Math.sin(theta) },
-      atmosphere: clamp01(1 - u / 0.4) // 1 = daylight sky, 0 = space
+      atmosphere: clamp01(1 - u / 0.4)
     };
   }
 
-  function drawAscent(cam, now) {
+  function drawAscent(cam) {
     const u = state.ascent;
     const { surface, boxHalf, earth, craft, theta } = cam;
 
-    // Thin haze on the horizon. Drawn first because the planet covers its own inside.
     const haze = Math.max(2, surface * 0.035);
     const hazeAlpha = 0.55 * clamp01((surface - 40) / 200);
     if (hazeAlpha > 0) {
@@ -1192,7 +1182,6 @@ function createFlightView(canvas, telemetry) {
       ctx.fill();
     }
 
-    // Planet: green launch-site ground that turns to ocean blue, then the real Earth picture fades in.
     const mix = smooth(u / 0.3);
     const ground = [74, 107, 60];
     const ocean = [31, 95, 150];
@@ -1210,7 +1199,6 @@ function createFlightView(canvas, telemetry) {
     }
     ctx.globalAlpha = 1;
 
-    // Launch pad and two towers, only for the first moments.
     const padAlpha = clamp01(1 - u / 0.15);
     if (padAlpha > 0) {
       const top = { x: earth.x - surface * Math.cos(theta), y: earth.y - surface * Math.sin(theta) };
@@ -1225,7 +1213,6 @@ function createFlightView(canvas, telemetry) {
       ctx.globalAlpha = 1;
     }
 
-    // Once the rocket is too small to see, the arrow used on the map takes over.
     const domAlpha = clamp01((cam.sRel - 0.07) / 0.09);
     if (domAlpha < 1 && !state.halted) {
       const a = arcPoint(0);
@@ -1236,7 +1223,6 @@ function createFlightView(canvas, telemetry) {
     }
   }
 
-  /** Places the real rocket picture (a DOM element) on the camera's craft position. */
   function placeCraftDom(cam) {
     const domAlpha = clamp01((cam.sRel - 0.07) / 0.09);
     craftWrap.style.transform =
@@ -1261,7 +1247,6 @@ function createFlightView(canvas, telemetry) {
     });
     ctx.setLineDash([]);
 
-    // Earth is already on screen from the ascent, so it never fades; everything else fades in around it.
     const centerSize = geo.centerSize * half * 2;
     ctx.globalAlpha = geo.centerKey === 'earth' ? 1 : alpha;
     drawBody(geo.centerKey, cx, cy, centerSize);
@@ -1282,7 +1267,6 @@ function createFlightView(canvas, telemetry) {
       drawLabel(destName, target.x, target.y + size / 2 + 16);
     }
 
-    // Planned transfer path (dashed) and the part already flown (solid).
     if (dest !== 'sun') {
       ctx.setLineDash([4, 5]);
       tracePath(arcPoint, 0, 1);
@@ -1316,7 +1300,7 @@ function createFlightView(canvas, telemetry) {
 
   function drawMapCraft() {
     const age = state.boom ? performance.now() - state.boom.start : 0;
-    if (state.boom && age > 150) return; // the craft is gone once it explodes
+    if (state.boom && age > 150) return;
     if (state.dive !== null) {
       const point = divePoint(state.dive);
       const ahead = divePoint(Math.min(1, state.dive + 0.01));
@@ -1354,9 +1338,18 @@ function createFlightView(canvas, telemetry) {
     ctx.setLineDash([]);
 
     const ring = viz.orbitRings[orbitIndex] ?? viz.orbitRings[0];
-    const angle = startAngle - now * (0.0016 / (0.5 + ring));
+    // Crisp orbital survey speed so a full pass completes cleanly during operations
+    const angle = startAngle - now * (0.0032 / (0.5 + ring));
     const x = cx + ring * half * Math.cos(angle);
     const y = cy + ring * half * Math.sin(angle);
+
+    // Subtle sensor scan swath trail behind the orbiter
+    ctx.beginPath();
+    ctx.arc(cx, cy, ring * half, angle, angle + 0.65);
+    ctx.strokeStyle = 'rgba(127,227,184,0.45)';
+    ctx.lineWidth = 4;
+    ctx.stroke();
+
     drawCraft(x, y, angle - Math.PI / 2, 0, false);
     ctx.globalAlpha = 1;
   }
@@ -1390,15 +1383,13 @@ function createFlightView(canvas, telemetry) {
     ctx.strokeRect(0, 0, width, height);
   }
 
-  /* ---- main draw loop ---- */
   function frame(now) {
-    if (!canvas.isConnected) return; // a new launch replaced this view
+    if (!canvas.isConnected) return;
     requestAnimationFrame(frame);
-    if (canvas.offsetParent === null || !resizeIfNeeded()) return; // hidden stage: skip drawing
+    if (canvas.offsetParent === null || !resizeIfNeeded()) return;
 
     ctx.clearRect(0, 0, width, height);
 
-    // Slide the map up while the burn panel is open so the panel never hides the craft or the target.
     const panel = $('#burn');
     const insetTarget = panel && !panel.hidden ? panel.offsetHeight + 24 : 0;
     state.inset += (insetTarget - state.inset) * 0.2;
@@ -1430,7 +1421,7 @@ function createFlightView(canvas, telemetry) {
 
     const fade = clamp01((now - state.sceneStart) / 600);
     if (cam) {
-      drawAscent(cam, now);
+      drawAscent(cam);
       placeCraftDom(cam);
     } else if (state.scene === 'map') drawMap(fade);
     else drawOrbit(fade, now);
@@ -1439,7 +1430,6 @@ function createFlightView(canvas, telemetry) {
     drawPulse(now);
   }
 
-  /* ---- tweens ---- */
   const isSkipping = () => view.skip || document.hidden;
   function tween(ms, onFrame) {
     return new Promise(resolve => {
@@ -1461,11 +1451,10 @@ function createFlightView(canvas, telemetry) {
     canvas.setAttribute('aria-label', `${hudText.canvasLabel}: ${phase}${detail ? `, ${detail}` : ''}`);
   };
 
-  /* ---- public controls used by startLaunchSequence ---- */
   view.setScene = name => {
     state.scene = name;
     state.sceneStart = performance.now();
-    if (name !== 'ascent') craftWrap.style.opacity = '0'; // the arrow on the canvas takes over from the rocket picture
+    if (name !== 'ascent') craftWrap.style.opacity = '0';
   };
   view.ascend = () => {
     let shownPhase = '';
@@ -1479,7 +1468,6 @@ function createFlightView(canvas, telemetry) {
       }
     });
   };
-  /** The rocket is lost on the way up: freeze the camera and blow it up where it is. */
   view.haltAscent = () => {
     state.halted = true;
     state.boom = { start: performance.now(), at: { ...ascentCamera(state.ascent).craft } };
@@ -1500,7 +1488,7 @@ function createFlightView(canvas, telemetry) {
     const from = state.craftT;
     state.ready = false;
     state.burn = 0;
-    const ms = Math.max(500, viz.coastMs * (to - from));
+    const ms = Math.max(400, viz.coastMs * (to - from));
     return tween(ms, t => {
       state.craftT = lerp(from, to, easeInOut(t));
       const days = Math.round(state.craftT * telemetry.days);
@@ -1543,13 +1531,6 @@ function createFlightView(canvas, telemetry) {
 
 /* ---- Stage 3: manual burns ---- */
 
-/**
- * Plays one burn minigame ('departure' or 'insertion') and resolves with { burn, all }.
- * `burn` is scoreBurn(fill, kind), or null when the player picks Auto-pilot. `all` is true when they pick
- * "Auto-pilot all burns" (that button is only shown when `offerAll` is true).
- * Hold the button (or Space / Enter) and let go inside the green zone. One try, no retries.
- * The UI only measures how long the player held. The scoring is the engine's scoreBurn().
- */
 function playBurnMinigame(view, kind, offerAll) {
   const model = DATA.flightModel;
   const spec = model.burns[kind];
@@ -1573,7 +1554,6 @@ function playBurnMinigame(view, kind, offerAll) {
   holdBtn.textContent = text.hold;
   autoBtn.textContent = text.auto;
   allBtn.textContent = text.autoAll;
-  // The buttons are switched off when a burn ends, so switch them back on for the next one.
   holdBtn.disabled = false;
   autoBtn.disabled = false;
   allBtn.disabled = false;
@@ -1632,7 +1612,6 @@ function playBurnMinigame(view, kind, offerAll) {
       if (holdStart !== null) finish(false, false);
     };
 
-    // Space / Enter behave like holding the button, except when another button has focus.
     function onKeyDown(event) {
       if (event.key !== ' ' && event.key !== 'Enter') return;
       if (event.target.closest('button') && event.target.id !== 'burnbtn') return;
@@ -1663,7 +1642,6 @@ function playBurnMinigame(view, kind, offerAll) {
   });
 }
 
-/** Turns one engine flight step into a log line. The engine decides; this only describes. */
 function describeFlightStep(step) {
   if (step.key === 'event') {
     const text = CONTENT.eventText[step.values.eventId];
@@ -1677,7 +1655,9 @@ function describeFlightStep(step) {
 const getFlightStepClass = step =>
   !step.ok ? 'bad' : ['ascent', 'arrival', 'event', 'burn_departure', 'burn_insertion'].includes(step.key) ? 'ok' : '';
 
-function promptMidFlightDecision(logEl, eventId) {
+let pendingDecisionResolver = null;
+
+function promptMidFlightDecision(logEl, eventId, view) {
   const text = CONTENT.eventText[eventId];
   const choices = text?.choices;
   if (!choices || !choices.length) return Promise.resolve(null);
@@ -1692,15 +1672,29 @@ function promptMidFlightDecision(logEl, eventId) {
       </div>
     `;
     logEl.appendChild(box);
-    box.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+    $('#logbox').scrollTop = $('#logbox').scrollHeight;
+
+    const selectChoice = idx => {
+      if (!pendingDecisionResolver) return;
+      pendingDecisionResolver = null;
+      const chosen = choices[idx];
+      box.innerHTML = `<p class="ok"><b>Decision executed:</b> ${chosen.label} — ${chosen.note}</p>`;
+      resolve(chosen);
+    };
+
+    pendingDecisionResolver = () => selectChoice(0);
+
+    // If the user already pressed Skip animation, auto-execute the primary recovery maneuver
+    if (view?.skip) {
+      selectChoice(0);
+      return;
+    }
 
     box.addEventListener('click', e => {
       const btn = e.target.closest('[data-choice]');
       if (!btn) return;
       AudioEngine.click();
-      const chosen = choices[+btn.dataset.choice];
-      box.innerHTML = `<p class="ok"><b>Decision executed:</b> ${chosen.label} — ${chosen.note}</p>`;
-      resolve(chosen);
+      selectChoice(+btn.dataset.choice);
     });
   });
 }
@@ -1708,174 +1702,202 @@ function promptMidFlightDecision(logEl, eventId) {
 export async function startLaunchSequence() {
   const mission = appState.mission;
   const telemetry = mission.d;
-  // The Auto-pilot result. A manual burn can only add science to this, never take any away.
   let flight = resolveFlight(telemetry);
   mission.res = null;
+  let aborted = false;
 
   navigateToStage(3);
   appState.isFlying = true;
   AudioEngine.setMusic(null);
 
-  $('#s3').innerHTML = `
-    <div class="fl3">
-      <div id="flv">
-        <canvas id="flcv" role="img" aria-label="${CONTENT.flightHud.canvasLabel}"></canvas>
-        <div id="flcw"><div class="flc" id="fl">${renderFlightSpacecraft()}</div></div>
-        <div id="flhud"><span class="flph"></span><span class="flday"></span></div>
-        <button type="button" id="fskip">${CONTENT.flightHud.skip}</button>
-        <button type="button" class="go" id="fnext" hidden data-a="deb">See debrief &rarr;</button>
-        <div id="burn" hidden>
-          <p id="burntxt"></p>
-          <div id="burngauge" role="img"><div id="burnzone"></div><div id="burnmark"></div><div id="burnfill"></div></div>
-          <p id="burnstate"></p>
-          <div class="row">
-            <button type="button" class="go" id="burnbtn" aria-describedby="burntxt burnstate"></button>
-            <button type="button" id="burnauto"></button>
-            <button type="button" id="burnall" hidden></button>
+  activeFlightCleanup = () => {
+    aborted = true;
+    if (pendingDecisionResolver) {
+      pendingDecisionResolver();
+      pendingDecisionResolver = null;
+    }
+  };
+
+  try {
+    $('#s3').innerHTML = `
+      <div class="fl3">
+        <div id="flv">
+          <canvas id="flcv" role="img" aria-label="${CONTENT.flightHud.canvasLabel}"></canvas>
+          <div id="flcw"><div class="flc" id="fl">${renderFlightSpacecraft()}</div></div>
+          <div id="flhud"><span class="flph"></span><span class="flday"></span></div>
+          <button type="button" id="fskip">${CONTENT.flightHud.skip}</button>
+          <button type="button" class="go" id="fnext" hidden data-a="deb">See debrief &rarr;</button>
+          <div id="burn" hidden>
+            <p id="burntxt"></p>
+            <div id="burngauge" role="img"><div id="burnzone"></div><div id="burnmark"></div><div id="burnfill"></div></div>
+            <p id="burnstate"></p>
+            <div class="row">
+              <button type="button" class="go" id="burnbtn" aria-describedby="burntxt burnstate"></button>
+              <button type="button" id="burnauto"></button>
+              <button type="button" id="burnall" hidden></button>
+            </div>
           </div>
         </div>
+        <div class="box" id="logbox" aria-live="polite">
+          <h2>${CONTENT.flightHud.logTitle}</h2>
+          <div id="log"></div>
+        </div>
       </div>
-      <div class="box" id="logbox" aria-live="polite">
-        <h2>${CONTENT.flightHud.logTitle}</h2>
-        <div id="log"></div>
-      </div>
-    </div>
-  `;
-  $('#nav').querySelectorAll('button').forEach(btn => { btn.disabled = true; });
+    `;
+    $('#nav').querySelectorAll('button').forEach(btn => { btn.disabled = true; });
 
-  const logEl = $('#log');
-  const craftEl = $('#fl');
-  const view = createFlightView($('#flcv'), telemetry);
-  $('#fskip').onclick = () => { view.skip = true; };
+    const logEl = $('#log');
+    const craftEl = $('#fl');
+    const view = createFlightView($('#flcv'), telemetry);
 
-  const logMessage = async (html, statusClass = '') => {
-    AudioEngine.tick();
-    logEl.innerHTML += `<p class="${statusClass}">${html}</p>`;
-    $('#logbox').scrollTop = $('#logbox').scrollHeight; // newest line stays in view
-    await delay(view.skip ? 120 : 900);
-  };
-
-  void craftEl.offsetWidth;
-  craftEl.classList.add('fly');
-  AudioEngine.launch();
-
-  let steps = flight.steps;
-  let ascentDone = Promise.resolve();
-  let diveDone = Promise.resolve();
-  let haveMs = 0;
-  let needMs = 1;
-  let burnOffered = false;
-  let autoAll = false; // the player picked "Auto-pilot all burns"
-  const burns = {}; // the burns flown by hand so far: { departure, insertion }
-  let decisionMultiplier = 1.0; // Flight Director choices made during anomalies scale the final science
-  const decisionReasons = []; // kept apart from `flight`: a manual burn re-resolves it and would drop reasons pushed earlier
-
-  /**
-   * Offers one manual burn and shows the result. A burn flown by hand is re-resolved into the flight; steps
-   * up to the current one stay identical and the new burn step lands right after it, so playback just carries on.
-   * Resolves true when the player picked "Auto-pilot all burns".
-   */
-  const offerBurn = async (kind, offerAll) => {
-    const { burn, all } = await playBurnMinigame(view, kind, offerAll);
-    if (burn) {
-      burns[kind] = burn;
-      flight = resolveFlight(telemetry, burns);
-      steps = flight.steps;
-    }
-    $('#burnstate').textContent = all
-      ? CONTENT.burn.autoAllResult
-      : !burn
-        ? CONTENT.burn.autoResult
-        : burn.quality > 0
-          ? fillTemplate(CONTENT.burn.result, { precisionPct: burn.quality, bonusPct: burn.bonus })
-          : CONTENT.burn.missed;
-    view.pulse(!burn || burn.quality > 0);
-    await delay(view.skip ? 0 : 900);
-    $('#burn').hidden = true;
-    $('#flv').classList.remove('burning');
-    return all;
-  };
-
-  for (let i = 0; i < steps.length; i++) {
-    const step = steps[i];
-    const next = steps[i + 1];
-
-    if (step.key === 'liftoff') ascentDone = view.ascend();
-    if (step.key === 'ascent') {
-      await ascentDone;
-      view.showMap();
-    }
-    if (step.key === 'transfer') ({ haveMs, needMs } = step.values);
-    if (step.key === 'sun_dive' && $('#flv').classList.contains('sunhit') === false) {
-      $('#flv').classList.add('sunhit');
-      diveDone = view.startDive();
-    }
-    if (step.key === 'sun_boom') {
-      await diveDone;
-      await delay(view.skip ? 0 : 400);
-    }
-    if (step.key === 'deltav_short') await view.coast(Math.max(0.08, Math.min(0.92, haveMs / needMs)), true);
-    if (step.key === 'ion_short') await view.coast(0.18, true);
-    // The orbit insertion burn is offered on arrival, while the craft is still on the map at its target.
-    const canOfferInsertion = step.key === 'arrival' && !autoAll && flight.outcome !== 'lost';
-    if (step.key === 'arrival') {
-      await view.coast(1);
-      if (!canOfferInsertion) view.arrive(telemetry.O.n.toLowerCase());
-    }
-    if (step.key === 'event') view.pulse(step.ok);
-    if (step.fatal) {
-      if (step.key === 'tumble') {
-        craftEl.classList.add('boom');
-        view.haltAscent();
-      } else {
-        view.explode();
+    $('#fskip').onclick = () => {
+      view.skip = true;
+      $('#fskip').disabled = true;
+      $('#fskip').textContent = 'Skipping...';
+      // Immediately resolve any waiting Flight Director anomaly prompt so orbit animation finishes right away
+      if (pendingDecisionResolver) {
+        pendingDecisionResolver();
       }
-      AudioEngine.fail();
-    }
+    };
 
-    // A Flight Director decision from an earlier anomaly scales the science shown on the operations line.
-    if (step.key === 'operations' && decisionMultiplier !== 1.0) {
-      step.values = { ...step.values, science: flight.science * decisionMultiplier };
-    }
+    const logMessage = async (html, statusClass = '') => {
+      if (aborted) return;
+      AudioEngine.tick();
+      logEl.innerHTML += `<p class="${statusClass}">${html}</p>`;
+      $('#logbox').scrollTop = $('#logbox').scrollHeight;
+      if (!view.skip) {
+        await delay(420);
+      }
+    };
 
-    await logMessage(describeFlightStep(step), getFlightStepClass(step));
+    void craftEl.offsetWidth;
+    craftEl.classList.add('fly');
+    AudioEngine.launch();
 
-    // A failed anomaly asks the player how to respond. The answer scales the final science.
-    if (step.key === 'event' && !step.ok) {
-      const chosen = await promptMidFlightDecision(logEl, step.values.eventId);
-      if (chosen) {
-        decisionMultiplier *= chosen.bonusFactor;
-        decisionReasons.push(`Flight Director response (${CONTENT.eventText[step.values.eventId].n}): ${chosen.label}.`);
+    let steps = flight.steps;
+    let ascentDone = Promise.resolve();
+    let diveDone = Promise.resolve();
+    let haveMs = 0;
+    let needMs = 1;
+    let burnOffered = false;
+    let autoAll = false;
+    const burns = {};
+    let decisionMultiplier = 1.0;
+    const decisionReasons = [];
+
+    const offerBurn = async (kind, offerAll) => {
+      const { burn, all } = await playBurnMinigame(view, kind, offerAll);
+      if (aborted) return true;
+      if (burn) {
+        burns[kind] = burn;
+        flight = resolveFlight(telemetry, burns);
+        steps = flight.steps;
+      }
+      $('#burnstate').textContent = all
+        ? CONTENT.burn.autoAllResult
+        : !burn
+          ? CONTENT.burn.autoResult
+          : burn.quality > 0
+            ? fillTemplate(CONTENT.burn.result, { precisionPct: burn.quality, bonusPct: burn.bonus })
+            : CONTENT.burn.missed;
+      view.pulse(!burn || burn.quality > 0);
+      if (!view.skip) await delay(500);
+      $('#burn').hidden = true;
+      $('#flv').classList.remove('burning');
+      return all;
+    };
+
+    for (let i = 0; i < steps.length; i++) {
+      if (aborted) return;
+      const step = steps[i];
+      const next = steps[i + 1];
+
+      if (step.key === 'liftoff') ascentDone = view.ascend();
+      if (step.key === 'ascent') {
+        await ascentDone;
+        if (aborted) return;
+        view.showMap();
+      }
+      if (step.key === 'transfer') ({ haveMs, needMs } = step.values);
+      if (step.key === 'sun_dive' && !$('#flv').classList.contains('sunhit')) {
+        $('#flv').classList.add('sunhit');
+        diveDone = view.startDive();
+      }
+      if (step.key === 'sun_boom') {
+        await diveDone;
+        if (aborted) return;
+        if (!view.skip) await delay(300);
+      }
+      if (step.key === 'deltav_short') await view.coast(Math.max(0.08, Math.min(0.92, haveMs / needMs)), true);
+      if (step.key === 'ion_short') await view.coast(0.18, true);
+
+      const canOfferInsertion = step.key === 'arrival' && !autoAll && flight.outcome !== 'lost';
+      if (step.key === 'arrival') {
+        await view.coast(1);
+        if (aborted) return;
+        if (!canOfferInsertion) view.arrive(telemetry.O.n.toLowerCase());
+      }
+      if (step.key === 'event') view.pulse(step.ok);
+      if (step.fatal) {
+        if (step.key === 'tumble') {
+          craftEl.classList.add('boom');
+          view.haltAscent();
+        } else {
+          view.explode();
+        }
+        AudioEngine.fail();
+      }
+
+      if (step.key === 'operations' && decisionMultiplier !== 1.0) {
+        step.values = { ...step.values, science: flight.science * decisionMultiplier };
+      }
+
+      await logMessage(describeFlightStep(step), getFlightStepClass(step));
+      if (aborted) return;
+
+      if (step.key === 'event' && !step.ok) {
+        const chosen = await promptMidFlightDecision(logEl, step.values.eventId, view);
+        if (aborted) return;
+        if (chosen) {
+          decisionMultiplier *= chosen.bonusFactor;
+          decisionReasons.push(`Flight Director response (${CONTENT.eventText[step.values.eventId].n}): ${chosen.label}.`);
+        }
+      }
+
+      const canOfferBurn = step.key === 'transfer' && step.ok && next && next.key === 'arrival' && flight.outcome !== 'lost';
+      if (canOfferBurn && !burnOffered) {
+        burnOffered = true;
+        autoAll = await offerBurn('departure', true);
+      }
+
+      if (canOfferInsertion) {
+        await offerBurn('insertion', false);
+        if (aborted) return;
+        view.setReady(false);
+        view.arrive(telemetry.O.n.toLowerCase());
       }
     }
 
-    // Offer the departure burn once, right after the transfer line, only when the craft really survives it.
-    const canOfferBurn = step.key === 'transfer' && step.ok && next && next.key === 'arrival' && flight.outcome !== 'lost';
-    if (canOfferBurn && !burnOffered) {
-      burnOffered = true;
-      autoAll = await offerBurn('departure', true);
+    if (aborted) return;
+    flight.reasons.push(...decisionReasons);
+    if (decisionMultiplier !== 1.0) {
+      flight.science = flight.science * decisionMultiplier;
+      flight.outcome = flight.science >= telemetry.C.target ? 'success' : flight.science > 0 ? 'partial' : 'lost';
+      const rescored = scoreFlight(telemetry, flight.outcome, flight.science);
+      flight.stars = rescored.stars;
+      flight.score = rescored.score;
     }
 
-    // Then the orbit insertion burn (unless the player chose Auto-pilot all), and only then the orbit view.
-    if (canOfferInsertion) {
-      await offerBurn('insertion', false);
-      view.setReady(false);
-      view.arrive(telemetry.O.n.toLowerCase());
-    }
+    view.finish(flight.outcome);
+    $('#fskip').hidden = true;
+    concludeMission(flight);
+  } finally {
+    activeFlightCleanup = null;
+    appState.isFlying = false;
+    $('#nav').querySelectorAll('button').forEach(btn => {
+      btn.disabled = btn.dataset.st === '3' || (btn.dataset.st === '4' && !appState.mission.res);
+    });
   }
-
-  // Apply the Flight Director decisions to the final result before the flight view shows it.
-  flight.reasons.push(...decisionReasons);
-  if (decisionMultiplier !== 1.0) {
-    flight.science = flight.science * decisionMultiplier;
-    flight.outcome = flight.science >= telemetry.C.target ? 'success' : flight.science > 0 ? 'partial' : 'lost';
-    const rescored = scoreFlight(telemetry, flight.outcome, flight.science);
-    flight.stars = rescored.stars;
-    flight.score = rescored.score;
-  }
-
-  view.finish(flight.outcome);
-  concludeMission(flight);
 }
 
 function concludeMission(flight) {
@@ -1920,9 +1942,6 @@ function concludeMission(flight) {
 
   $('#fnext').hidden = false;
   $('#fnext').onclick = () => navigateToStage(4);
-  $('#nav').querySelectorAll('button').forEach(btn => {
-    btn.disabled = btn.dataset.st === '3';
-  });
 }
 
 /* ---- Stage 4: Post-Mission Report ---- */
