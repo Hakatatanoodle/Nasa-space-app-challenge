@@ -1,1 +1,1 @@
-/home/saurav_code/spaceapps/Nasa-space-app-challenge/assets/bg/space.mp4 : https://images-assets.nasa.gov/video/A%20Future%20in%20Orbit/A%20Future%20in%20Orbit~large.mp4
+space.mp4 : https://images-assets.nasa.gov/video/A%20Future%20in%20Orbit/A%20Future%20in%20Orbit~large.mp4
