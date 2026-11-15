@@ -1,5 +1,6 @@
 /* File: js/ui/renderer.js
  * Owner: Person B (Saurav)
+ * AI-assisted (update): Claude, 2026-11-15 - flight menu: pause / resume / restart + P shortcut. Reviewed by a human: NO.
  * AI-assisted (update): Claude, 2026-11-15 - win/loss tightening (outcome bands, audio, demos). Reviewed by a human: NO.
  * AI-assisted: YES — Gemini, 2026-11-14; Gemini, 2026-11-15; Claude, 2026-11-14; Claude, 2026-11-15 (two manual burns). Reviewed by a human:YES Reviewd by Person C (Yochan)
  * Sources used: NASA_CUBESAT101, JPL_CML
@@ -50,22 +51,124 @@ import {
   describeGateNeed,
   recordMission
 } from '../core/career.js';
-import { $, $$, toPercent, formatNumber, delay, showToast } from './domElements.js';
+import { $, $$, toPercent, formatNumber, showToast } from './domElements.js';
 
 const WORLD_PAD_PX = 360;
 let activeFlightCleanup = null;
+let cancelActiveBurn = null;
+let cancelBurnHold = null;
+let flightRunId = 0;
+
+/* ---- Flight clock: every launch animation, burn timer and log delay reads this clock,
+   so freezing it pauses the whole flight at once. ---- */
+const flightClock = {
+  pausedAt: null,
+  offset: 0,
+  now() {
+    return (this.pausedAt ?? performance.now()) - this.offset;
+  },
+  pause() {
+    if (this.pausedAt === null) this.pausedAt = performance.now();
+  },
+  resume() {
+    if (this.pausedAt === null) return;
+    this.offset += performance.now() - this.pausedAt;
+    this.pausedAt = null;
+  },
+  get paused() {
+    return this.pausedAt !== null;
+  }
+};
+
+// Like a plain timeout, but the countdown stops while the flight is paused.
+const flightDelay = ms => new Promise(resolve => {
+  const startedAt = flightClock.now();
+  const check = () => (flightClock.now() - startedAt >= ms ? resolve() : setTimeout(check, 40));
+  setTimeout(check, Math.min(ms, 40));
+});
 
 export function abortLaunchSequence() {
   if (activeFlightCleanup) {
     activeFlightCleanup();
     activeFlightCleanup = null;
   }
+  if (cancelActiveBurn) cancelActiveBurn();
+  flightClock.resume();
+  AudioEngine.resumeAll(false);
   appState.isFlying = false;
   const burnPanel = $('#burn');
-  if (burnPanel) burnPanel.hidden = true;
+  if (burnPanel) {
+    burnPanel.hidden = true;
+    burnPanel.inert = false;
+  }
   $('#nav')?.querySelectorAll('button').forEach(btn => {
     btn.disabled = btn.dataset.st === '3' || (btn.dataset.st === '4' && !appState.mission.res);
   });
+  syncFlightMenu();
+}
+
+/* ---- Flight menu (Pause / Resume / Restart) ---- */
+
+// Shows or hides the menu in the header and keeps its buttons and status badge up to date.
+export function syncFlightMenu() {
+  const menu = $('#flightmenu');
+  if (!menu) return;
+  const text = CONTENT.flightHud;
+  const flying = appState.isFlying;
+  const paused = flightClock.paused;
+
+  menu.hidden = !(appState.mission.stage === 3 && (flying || appState.mission.res));
+  $('#fm-label').textContent = text.menuLabel;
+  $('#fm-pause').textContent = text.pause;
+  $('#fm-resume').textContent = text.resume;
+  $('#fm-restart').textContent = text.restart;
+
+  const status = $('#fm-status');
+  status.textContent = !flying ? text.statusComplete : paused ? text.statusPaused : text.statusFlying;
+  status.classList.toggle('paused', flying && paused);
+  status.classList.toggle('done', !flying);
+
+  $('#fm-pause').disabled = !flying || paused;
+  $('#fm-resume').disabled = !flying || !paused;
+  $('#fm-restart').disabled = !flying;
+}
+
+export function pauseFlight() {
+  if (!appState.isFlying || flightClock.paused) return;
+  flightClock.pause();
+  if (cancelBurnHold) cancelBurnHold(); // a burn you were holding starts over after Resume
+  AudioEngine.pauseAll();
+  $('#flv')?.classList.add('paused');
+  const burnPanel = $('#burn');
+  if (burnPanel) burnPanel.inert = true;
+  syncFlightMenu();
+  $('#fm-resume')?.focus();
+}
+
+export function resumeFlight() {
+  if (!flightClock.paused) return;
+  flightClock.resume();
+  AudioEngine.resumeAll(true);
+  $('#flv')?.classList.remove('paused');
+  const burnPanel = $('#burn');
+  if (burnPanel) {
+    burnPanel.inert = false;
+    if (!burnPanel.hidden) $('#burnbtn')?.focus();
+  }
+  syncFlightMenu();
+}
+
+export function toggleFlightPause() {
+  if (flightClock.paused) resumeFlight();
+  else pauseFlight();
+}
+
+// Throws away the current flight and flies the same design again from lift-off.
+export function restartLaunchSequence() {
+  if (!appState.isFlying) return;
+  abortLaunchSequence();
+  showToast(CONTENT.flightHud.restarted);
+  startLaunchSequence();
 }
 
 const renderDataBadge = isVerified =>
@@ -126,6 +229,7 @@ export function navigateToStage(stageNumber) {
   if (stageNumber === 4) renderDebriefStage();
 
   updateCareerButton();
+  syncFlightMenu();
 }
 
 export function updateCareerButton() {
@@ -1017,7 +1121,7 @@ function createFlightView(canvas, telemetry) {
 
   const state = {
     scene: 'ascent',
-    sceneStart: performance.now(),
+    sceneStart: flightClock.now(),
     ascent: 0,
     dim: 0,
     heat: false,
@@ -1117,7 +1221,7 @@ function createFlightView(canvas, telemetry) {
     ctx.save();
     ctx.translate(x, y);
     if (halo) {
-      ctx.strokeStyle = `rgba(255,200,87,${0.35 + 0.35 * Math.sin(performance.now() / 220)})`;
+      ctx.strokeStyle = `rgba(255,200,87,${0.35 + 0.35 * Math.sin(flightClock.now() / 220)})`;
       ctx.lineWidth = 2;
       ctx.beginPath();
       ctx.arc(0, 0, 20, 0, TAU);
@@ -1333,7 +1437,7 @@ function createFlightView(canvas, telemetry) {
   }
 
   function drawMapCraft() {
-    const age = state.boom ? performance.now() - state.boom.start : 0;
+    const age = state.boom ? flightClock.now() - state.boom.start : 0;
     if (state.boom && age > 150) return;
     if (state.dive !== null) {
       const point = divePoint(state.dive);
@@ -1415,10 +1519,11 @@ function createFlightView(canvas, telemetry) {
     ctx.strokeRect(0, 0, width, height);
   }
 
-  function frame(now) {
+  function frame() {
     if (!canvas.isConnected) return;
     requestAnimationFrame(frame);
     if (canvas.offsetParent === null || !resizeIfNeeded()) return;
+    const now = flightClock.now();
 
     ctx.clearRect(0, 0, width, height);
 
@@ -1462,12 +1567,12 @@ function createFlightView(canvas, telemetry) {
     drawPulse(now);
   }
 
-  const isSkipping = () => view.skip || document.hidden;
+  const isSkipping = () => view.skip || (document.hidden && !flightClock.paused);
   function tween(ms, onFrame) {
     return new Promise(resolve => {
-      const startedAt = performance.now();
-      const tick = now => {
-        const t = isSkipping() ? 1 : clamp01((now - startedAt) / ms);
+      const startedAt = flightClock.now();
+      const tick = () => {
+        const t = isSkipping() ? 1 : clamp01((flightClock.now() - startedAt) / ms);
         onFrame(t);
         if (t >= 1) resolve();
         else requestAnimationFrame(tick);
@@ -1485,7 +1590,7 @@ function createFlightView(canvas, telemetry) {
 
   view.setScene = name => {
     state.scene = name;
-    state.sceneStart = performance.now();
+    state.sceneStart = flightClock.now();
     if (name !== 'ascent') craftWrap.style.opacity = '0';
   };
   view.ascend = () => {
@@ -1502,7 +1607,7 @@ function createFlightView(canvas, telemetry) {
   };
   view.haltAscent = () => {
     state.halted = true;
-    state.boom = { start: performance.now(), at: { ...ascentCamera(state.ascent).craft } };
+    state.boom = { start: flightClock.now(), at: { ...ascentCamera(state.ascent).craft } };
     view.setHud(hudText.lost);
   };
   view.showMap = () => {
@@ -1540,10 +1645,10 @@ function createFlightView(canvas, telemetry) {
     return tween(viz.diveMs, t => { state.dive = t ** 1.6; });
   };
   view.explode = () => {
-    state.boom = { start: performance.now() };
+    state.boom = { start: flightClock.now() };
     view.setHud(hudText.lost);
   };
-  view.pulse = good => { state.pulse = { start: performance.now(), good }; };
+  view.pulse = good => { state.pulse = { start: flightClock.now(), good }; };
   view.arrive = orbitName => {
     state.showCraft = false;
     view.setScene('orbit');
@@ -1605,7 +1710,7 @@ function playBurnMinigame(view, kind, offerAll) {
     let rafId = 0;
 
     const getFill = () =>
-      holdStart === null ? 0 : Math.min(1, (performance.now() - holdStart) / (spec.fillSeconds * 1000));
+      holdStart === null ? 0 : Math.min(1, (flightClock.now() - holdStart) / (spec.fillSeconds * 1000));
 
     const paint = () => {
       const fill = getFill();
@@ -1617,17 +1722,31 @@ function playBurnMinigame(view, kind, offerAll) {
     };
 
     const start = () => {
-      if (holdStart !== null || finished) return;
-      holdStart = performance.now();
+      if (holdStart !== null || finished || flightClock.paused) return;
+      holdStart = flightClock.now();
       holdBtn.textContent = text.firing;
       view.setBurn(true);
       AudioEngine.launch();
       rafId = requestAnimationFrame(paint);
     };
 
+    // Pause: stop a burn that is being held and put the gauge back to empty.
+    cancelBurnHold = () => {
+      if (holdStart === null || finished) return;
+      holdStart = null;
+      cancelAnimationFrame(rafId);
+      view.setBurn(false);
+      fillEl.style.width = '0%';
+      fillEl.classList.remove('in');
+      holdBtn.textContent = text.hold;
+      stateEl.textContent = text.ready;
+    };
+
     function finish(isAuto, isAll) {
       if (finished) return;
       finished = true;
+      cancelBurnHold = null;
+      cancelActiveBurn = null;
       cancelAnimationFrame(rafId);
       document.removeEventListener('keydown', onKeyDown);
       document.removeEventListener('keyup', onKeyUp);
@@ -1660,13 +1779,16 @@ function playBurnMinigame(view, kind, offerAll) {
       release();
     }
 
+    // Leaving the flight (Home, Restart) closes an open burn without scoring it.
+    cancelActiveBurn = () => finish(true, false);
+
     holdBtn.onpointerdown = event => {
       event.preventDefault();
       start();
     };
     holdBtn.oncontextmenu = event => event.preventDefault();
-    autoBtn.onclick = () => finish(true, false);
-    allBtn.onclick = () => finish(true, true);
+    autoBtn.onclick = () => { if (!flightClock.paused) finish(true, false); };
+    allBtn.onclick = () => { if (!flightClock.paused) finish(true, true); };
     document.addEventListener('keydown', onKeyDown);
     document.addEventListener('keyup', onKeyUp);
     window.addEventListener('pointerup', onPointerUp);
@@ -1731,6 +1853,8 @@ function promptMidFlightDecision(logEl, eventId, view) {
 }
 
 export async function startLaunchSequence() {
+  const runId = ++flightRunId;
+  flightClock.resume();
   const mission = appState.mission;
   const telemetry = mission.d;
   let flight = resolveFlight(telemetry);
@@ -1739,6 +1863,7 @@ export async function startLaunchSequence() {
 
   navigateToStage(3);
   appState.isFlying = true;
+  syncFlightMenu();
   AudioEngine.setMusic(null);
 
   activeFlightCleanup = () => {
@@ -1756,6 +1881,12 @@ export async function startLaunchSequence() {
           <canvas id="flcv" role="img" aria-label="${CONTENT.flightHud.canvasLabel}"></canvas>
           <div id="flcw"><div class="flc" id="fl">${renderFlightSpacecraft()}</div></div>
           <div id="flhud"><span class="flph"></span><span class="flday"></span></div>
+          <div id="flpause" aria-hidden="true">
+            <div class="flpause-box">
+              <strong>${CONTENT.flightHud.pausedTitle}</strong>
+              <span>${CONTENT.flightHud.pausedHint}</span>
+            </div>
+          </div>
           <button type="button" id="fskip">${CONTENT.flightHud.skip}</button>
           <button type="button" class="go" id="fnext" hidden data-a="deb">See debrief &rarr;</button>
           <div id="burn" hidden>
@@ -1782,6 +1913,7 @@ export async function startLaunchSequence() {
     const view = createFlightView($('#flcv'), telemetry);
 
     $('#fskip').onclick = () => {
+      resumeFlight(); // skipping while paused should keep flying
       view.skip = true;
       $('#fskip').disabled = true;
       $('#fskip').textContent = 'Skipping...';
@@ -1796,7 +1928,7 @@ export async function startLaunchSequence() {
       logEl.innerHTML += `<p class="${statusClass}">${html}</p>`;
       $('#logbox').scrollTop = $('#logbox').scrollHeight;
       if (!view.skip) {
-        await delay(420);
+        await flightDelay(420);
       }
     };
 
@@ -1831,7 +1963,7 @@ export async function startLaunchSequence() {
             ? fillTemplate(CONTENT.burn.result, { precisionPct: burn.quality, bonusPct: burn.bonus })
             : CONTENT.burn.missed;
       view.pulse(!burn || burn.quality > 0);
-      if (!view.skip) await delay(500);
+      if (!view.skip) await flightDelay(500);
       $('#burn').hidden = true;
       $('#flv').classList.remove('burning');
       return all;
@@ -1856,10 +1988,11 @@ export async function startLaunchSequence() {
       if (step.key === 'sun_boom') {
         await diveDone;
         if (aborted) return;
-        if (!view.skip) await delay(300);
+        if (!view.skip) await flightDelay(300);
       }
       if (step.key === 'deltav_short') await view.coast(Math.max(0.08, Math.min(0.92, haveMs / needMs)), true);
       if (step.key === 'ion_short') await view.coast(0.18, true);
+      if (aborted) return;
 
       const canOfferInsertion = step.key === 'arrival' && !autoAll && flight.arrived;
       if (step.key === 'arrival') {
@@ -1922,11 +2055,14 @@ export async function startLaunchSequence() {
     $('#fskip').hidden = true;
     concludeMission(flight);
   } finally {
-    activeFlightCleanup = null;
-    appState.isFlying = false;
-    $('#nav').querySelectorAll('button').forEach(btn => {
-      btn.disabled = btn.dataset.st === '3' || (btn.dataset.st === '4' && !appState.mission.res);
-    });
+    if (runId === flightRunId) {
+      activeFlightCleanup = null;
+      appState.isFlying = false;
+      $('#nav').querySelectorAll('button').forEach(btn => {
+        btn.disabled = btn.dataset.st === '3' || (btn.dataset.st === '4' && !appState.mission.res);
+      });
+      syncFlightMenu();
+    }
   }
 }
 
