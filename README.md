@@ -340,6 +340,8 @@ All tracks are in `assets/audio/`. Audio never autoplays; it starts only after t
 | Mission lost | `loss.mp3` | Kevin MacLeod (not AI-generated; track title to be added; CC BY 4.0 as stated by the team) | [incompetech.com](https://incompetech.com/) |
 | Pre-launch countdown | `countdown.mp3` | Countdown sound effect | Source not recorded in the repository yet; add the creator and licence before submission |
 
+Countdown music : https://audio.com/jade-compass/audio/countdown-from-10-by-voicebosch-royalty-free-music-983091
+
 Each track is used under the licence stated on its source page.
 
 ### Art and visuals
