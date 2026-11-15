@@ -1,5 +1,6 @@
 /* File: js/core/state.js
  * Owner: Person A (Ashmin)
+ * AI-assisted (update): Claude, 2026-11-15 - AudioEngine.pauseAll/resumeAll for the flight pause. Reviewed by a human: NO.
  * AI-assisted (update): Claude, 2026-11-15 - win/loss tightening (outcome bands, audio, demos). Reviewed by a human: NO.
  * AI-assisted: YES — Gemini, 2026-11-15. Reviewed by a human: Yes Reviewed by Person C (Yochan).
  * Sources used: none
@@ -186,6 +187,7 @@ export const AudioEngine = (() => {
   let isSoundOn = savedLevel > 0;
   let activeTrackKey = 'landing';
   let activeAudioEl = null;
+  let pausedMusicEl = null;
   let unlockBound = false;
 
   const trackElements = {};
@@ -392,6 +394,20 @@ export const AudioEngine = (() => {
       return { isSoundOn, volumePct: Math.round(masterLevel * 100) };
     },
     setMusic: (key, forceRestart = false) => playTrack(key, forceRestart),
+    // Flight pause: freeze sound effects and any playing music track.
+    pauseAll() {
+      if (ctx && ctx.state === 'running') ctx.suspend().catch(() => {});
+      if (activeAudioEl && !activeAudioEl.paused) {
+        pausedMusicEl = activeAudioEl;
+        activeAudioEl.pause();
+      }
+    },
+    // Resume after a pause. Pass false to forget the paused track instead of playing it (flight aborted).
+    resumeAll(playMusic = true) {
+      if (ctx && ctx.state === 'suspended') ctx.resume().catch(() => {});
+      if (pausedMusicEl && playMusic && pausedMusicEl === activeAudioEl) pausedMusicEl.play().catch(() => {});
+      pausedMusicEl = null;
+    },
     toggleMute() {
       isSoundOn = !isSoundOn;
       if (isSoundOn && masterLevel <= 0) {

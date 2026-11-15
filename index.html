@@ -1,5 +1,6 @@
 <!-- File: index.html
   Owner: Person B (Saurav)
+  AI-assisted (update): Claude, 2026-11-15 - flight menu markup (pause / resume / restart). Reviewed by a human: NO.
   AI-assisted: YES — Gemini, 2026-11-15. Reviewed by a human:YES Reviewd by Person C (Yochan).
   Sources used: SPACEAPPS_CHALLENGE
 -->
@@ -27,6 +28,13 @@
     <div class="audio-control" role="group" aria-label="Audio controls">
       <button type="button" id="mute" class="sound-on">Sound: on</button>
       <input type="range" id="vol" min="0" max="100" value="75" aria-label="Master volume" title="Master volume (75%)" />
+    </div>
+    <div id="flightmenu" class="flight-menu" role="group" aria-label="Flight menu" hidden>
+      <span id="fm-label" class="fm-label"></span>
+      <span id="fm-status" class="fm-status" role="status"></span>
+      <button type="button" id="fm-pause"></button>
+      <button type="button" id="fm-resume"></button>
+      <button type="button" id="fm-restart"></button>
     </div>
     <button type="button" id="copy">Share / Load code</button>
     <button type="button" id="hp">How to play</button>

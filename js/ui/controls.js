@@ -1,5 +1,6 @@
 /* File: js/ui/controls.js
  * Owner: Person B (Saurav)
+ * AI-assisted (update): Claude, 2026-11-15 - Flight menu buttons + P shortcut. Reviewed by a human: NO.
  * AI-assisted (update): Claude, 2026-11-15 - win/loss tightening (outcome bands, audio, demos). Reviewed by a human: NO.
  * AI-assisted: YES — Gemini, 2026-11-15. Reviewed by a human: YES Reviewd by Person C (Yochan)
  * Sources used: none
@@ -46,7 +47,11 @@ import {
   showDesignCodeModal,
   showCareerModal,
   startLaunchSequence,
-  abortLaunchSequence
+  abortLaunchSequence,
+  pauseFlight,
+  resumeFlight,
+  toggleFlightPause,
+  restartLaunchSequence
 } from './renderer.js';
 
 const DEVELOPER_CHEAT_CODE = 'Eventhorizon';
@@ -178,6 +183,17 @@ export function bindGlobalControls() {
     AudioEngine.setMusic('landing');
   });
 
+  // Flight menu (header): only usable while a launch is running
+  $('#fm-pause')?.addEventListener('click', () => pauseFlight());
+  $('#fm-resume')?.addEventListener('click', () => {
+    resumeFlight();
+    AudioEngine.click();
+  });
+  $('#fm-restart')?.addEventListener('click', () => {
+    AudioEngine.click();
+    restartLaunchSequence();
+  });
+
   let logoClicks = 0;
   let logoClickTimer = null;
   $('#tt')?.addEventListener('click', () => {
@@ -198,6 +214,12 @@ export function bindGlobalControls() {
       return;
     }
     if (/SELECT|TEXTAREA|INPUT/.test(e.target.tagName)) return;
+    // P pauses or resumes the flight
+    if (e.key && e.key.toLowerCase() === 'p' && !e.repeat && !e.ctrlKey && !e.metaKey && !e.altKey && appState.isFlying) {
+      e.preventDefault();
+      toggleFlightPause();
+      return;
+    }
     if (e.key && e.key.length === 1) {
       keyBuffer = (keyBuffer + e.key).slice(-DEVELOPER_CHEAT_CODE.length);
       if (keyBuffer === DEVELOPER_CHEAT_CODE) {

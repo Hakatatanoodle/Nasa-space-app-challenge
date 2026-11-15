@@ -1,5 +1,6 @@
 /* File: js/content.js
  * Owner: Person C (Yochan)
+ * AI-assisted (update): Claude, 2026-11-15 - flight menu text (pause / resume / restart). Reviewed by a human: NO.
  * AI-assisted (update): Claude, 2026-11-15 - win/loss tightening (outcome bands, audio, demos). Reviewed by a human: NO.
  * AI-assisted: YES — Gemini, 2026-11-14; Gemini, 2026-11-15; Claude, 2026-11-14; Claude, 2026-11-15 (two manual burns). Reviewed by a human: YES Reviewd by Person C (Yochan)
  * Sources used: NASA_CUBESAT101, JPL_CML
@@ -224,7 +225,17 @@ export const CONTENT = {
     orbit: 'In orbit: {orbit}',
     lost: 'Mission failed',
     complete: 'Operations complete',
-    notToScale: 'Not to scale'
+    notToScale: 'Not to scale',
+    menuLabel: 'Flight menu',
+    statusFlying: 'Flying',
+    statusPaused: 'Paused',
+    statusComplete: 'Complete',
+    pause: 'Pause',
+    resume: 'Resume',
+    restart: 'Restart',
+    pausedTitle: 'Flight paused',
+    pausedHint: 'Press P or Resume to continue.',
+    restarted: 'Flight restarted from lift-off.'
   },
   predictedFlight: {
     heading: 'Predicted flight',
@@ -330,6 +341,7 @@ export const CONTENT = {
     <p><b>Six resources:</b> Mass, Power, Budget, Data, Comms, and Time. Green = healthy reserve, Amber = thin reserve, Red = critical failure.</p>
     <p><b>Career progression:</b> Earth, the Moon, and Mars start open. Safe arrivals unlock Venus, Jupiter, Saturn, Uranus, Neptune, Mercury, and the Sun. Progress saves automatically in your browser.</p>
     <p><b>Manual burns:</b> During launch you can fly two burns yourself: the departure burn that sends you on your way, and the orbit insertion burn when you arrive. Hold the button (or Space) and let go inside the green zone. The insertion zone is narrower, so it is harder. A clean pair adds up to 6% extra science in total. Press Auto-pilot to skip one burn, or Auto-pilot all burns to skip both: no bonus, no penalty. The result never depends on luck.</p>
+    <p><b>Pause, resume, restart:</b> While you fly, the Flight menu in the header lets you pause (press <code>P</code> to pause or resume), resume, or restart the flight from lift-off with the same design. If you pause while holding a burn, the burn starts over when you resume.</p>
     <p><b>How a mission ends:</b> <b>Mission accomplished</b> means you reached orbit <i>and</i> returned at least the baseline science. <b>Partial success</b> means you reached orbit and met the minimum (threshold) science, but fell short of the baseline. <b>Mission failed</b> means you never arrived, or arrived but returned less than the minimum. Only Mission accomplished plays the victory music.</p>
     <p><b>Stars:</b> 1&#9733; partial success, 2&#9733; meet baseline science, 3&#9733; earn all four role sign-offs and spend under 85% of budget.</p>
   `

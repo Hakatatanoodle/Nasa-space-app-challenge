@@ -1,5 +1,6 @@
 /* File: css/components.css
  * Owner: Person B (Saurav)
+ * AI-assisted (update): Claude, 2026-11-15 - flight menu styles. Reviewed by a human: NO.
  * AI-assisted: YES — Gemini, 2026-11-15. Reviewed by a human: YES Reviewd by Person C (Yochan)
  * Sources used: none
  */
@@ -478,4 +479,38 @@
   background: #0b2038;
   border-left: 3px solid var(--accent);
   border-radius: 6px;
+}
+
+/* Flight menu: Pause / Resume / Restart, shown in the header during the launch stage */
+.flight-menu {
+  display: inline-flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 10px;
+  background: #0f2944;
+  border: 2px solid var(--accent);
+  border-radius: 8px;
+}
+
+.fm-label {
+  font-weight: 700;
+  color: var(--accent);
+}
+
+.fm-status {
+  padding: 2px 12px;
+  font-size: 0.85rem;
+  font-weight: 700;
+  color: #0b2038;
+  background: var(--ok);
+  border-radius: 999px;
+}
+
+.fm-status.paused {
+  background: var(--accent);
+}
+
+.fm-status.done {
+  background: var(--muted);
 }

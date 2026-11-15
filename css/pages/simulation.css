@@ -1,5 +1,6 @@
 /* File: css/pages/simulation.css
  * Owner: Person B (Saurav)
+ * AI-assisted (update): Claude, 2026-11-15 - pause overlay for the flight view. Reviewed by a human: NO.
  * AI-assisted: YES — Gemini, 2026-11-14; Gemini, 2026-11-15; Claude, 2026-11-14 (flight view and burn panel styles); Claude, 2026-11-15 (burn panel buttons). Reviewed by a human: YES Reviewd by Person C (Yochan)
  * Sources used: none
  */
@@ -835,4 +836,48 @@ b.bad { color: var(--bad); }
   #flv.burning {
     height: max(600px, 78vh);
   }
+}
+
+/* The Flight menu makes the header two rows tall, so the flight view gets a little less height. */
+body:has(#flightmenu:not([hidden])) #flv {
+  height: calc(100vh - 200px);
+  min-height: 520px;
+}
+
+/* Pause overlay: dims the flight view and freezes the CSS animations */
+#flpause {
+  position: absolute;
+  inset: 0;
+  z-index: 4;
+  display: none;
+  align-items: flex-start;
+  justify-content: center;
+  padding-top: 56px;
+  background: rgba(4, 12, 24, 0.6);
+}
+
+#flv.paused #flpause {
+  display: flex;
+}
+
+.flpause-box {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 16px 26px;
+  text-align: center;
+  background: rgba(8, 22, 40, 0.95);
+  border: 2px solid var(--accent);
+  border-radius: 12px;
+}
+
+.flpause-box strong {
+  font-size: 1.4rem;
+  letter-spacing: 1px;
+  color: var(--accent);
+}
+
+#flv.paused .flc,
+#flv.paused .flc * {
+  animation-play-state: paused;
 }
