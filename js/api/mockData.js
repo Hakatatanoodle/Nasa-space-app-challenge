@@ -1,6 +1,6 @@
 /* File: js/api/mockData.js
  * Owner: Person A (Ashmin - structure), Person C (Yochan - values)
- * AI-assisted: YES — Gemini, 2026-11-15; Claude, 2026-11-14. Reviewed by a human: NO.
+ * AI-assisted: YES — Gemini, 2026-11-14; Gemini, 2026-11-15; Claude, 2026-11-14; Claude, 2026-11-15 (two manual burns). Reviewed by a human: NO.
  * Sources used: NASA_CUBESAT101, JPL_CML, NASA_SE_WEBINAR
  */
 
@@ -184,9 +184,44 @@ export const DATA = {
     reviewFailPenalty: 0.06,
     reliabilityMin: 0.1,
     reliabilityMax: 0.99,
+    // Manual burns (optional skill bonus), in mission order. For each one the player holds a button and lets go
+    // inside a target zone. fill 0..1 is how full the gauge is at release; the zone is target +/- zoneHalfWidth.
+    // The insertion zone is narrower, so it is harder. Auto-pilot = no burn = no bonus, never a penalty.
+    // burnBonusMax is the most extra science (a fraction) ALL burns together can add. Each burn's `weight` is its
+    // share of that cap, so the weights must add up to 1.
+    burnBonusMax: 0.06,
+    burns: {
+      departure: { target: 0.8, zoneHalfWidth: 0.15, fillSeconds: 2.2, weight: 0.5 },
+      insertion: { target: 0.65, zoneHalfWidth: 0.08, fillSeconds: 2.4, weight: 0.5 }
+    },
     src: 'SIMPLIFIED_FOR_GAMEPLAY',
     verified: false,
-    note: 'Gameplay constants. Balance limits are in screen pixels between centre of mass and thrust line.'
+    note: 'Gameplay constants. Balance limits are in screen pixels between centre of mass and thrust line. Burn values: the bonus is a simplified gameplay reward (up to +6% science for both burns together), not a real engine model.'
+  },
+
+  /**
+   * Layout of the launch-view canvas (Stage 3). VISUALS ONLY: nothing here decides an outcome.
+   * Orbit rings are NOT to scale (real distances would put Mercury on top of the Sun), they are spaced
+   * so every planet fits on screen. Radii are fractions of the view's half-size.
+   */
+  flightViz: {
+    startAngleDeg: 135,
+    fitRadius: 0.92,
+    sunSize: 0.07,
+    ringRadius: { mercury: 0.16, venus: 0.26, earth: 0.36, mars: 0.48, jupiter: 0.6, saturn: 0.72, uranus: 0.84, neptune: 0.95 },
+    local: { earthSize: 0.11, parkRing: 0.2, earthRings: [0.34, 0.5, 0.66], moonRing: 0.82 },
+    orbitRings: [0.4, 0.58, 0.76],
+    bodyPx: { earth: 22, moon: 18, planet: 28 },
+    color: {
+      sun: '#ffb347', mercury: '#b5a79a', venus: '#e8c98a', earth: '#4fa3e0', moon: '#cfcfcf', mars: '#d96b45',
+      jupiter: '#d9b38c', saturn: '#e6d3a1', uranus: '#8fe0e6', neptune: '#5b7de8'
+    },
+    ascendMs: 8000,
+    coastMs: 5500,
+    diveMs: 4500,
+    src: 'SIMPLIFIED_FOR_GAMEPLAY',
+    verified: false,
+    note: 'Display layout only. Not to scale and not real orbital data.'
   },
 
   scoringWeights: {

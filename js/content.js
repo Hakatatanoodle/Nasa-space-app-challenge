@@ -1,6 +1,6 @@
 /* File: js/content.js
  * Owner: Person C (Yochan)
- * AI-assisted: YES — Gemini, 2026-11-15; Claude, 2026-11-14. Reviewed by a human: NO.
+ * AI-assisted: YES — Gemini, 2026-11-14; Gemini, 2026-11-15; Claude, 2026-11-14; Claude, 2026-11-15 (two manual burns). Reviewed by a human: NO.
  * Sources used: NASA_CUBESAT101, JPL_CML
  */
 
@@ -148,6 +148,10 @@ export const CONTENT = {
     transfer: '<b>Transfer burn.</b> Need {needMs} m/s, spacecraft has {haveMs} m/s.',
     deltav_short: 'Propellant depleted {shortMs} m/s short of target orbit.',
     ion_short: 'Ion thruster power below {needW} W threshold; orbit transfer incomplete.',
+    burn_departure: '<b>Departure burn.</b> Precision {precisionPct}%: science return +{bonusPct}%.',
+    burn_departure_miss: '<b>Departure burn.</b> You missed the target zone, so there is no bonus. The craft still has the delta-v it needs.',
+    burn_insertion: '<b>Orbit insertion burn.</b> Precision {precisionPct}%: science return +{bonusPct}%.',
+    burn_insertion_miss: '<b>Orbit insertion burn.</b> You missed the narrow target zone, so there is no bonus. The craft still settles into orbit.',
     arrival: '<b>Arrived</b> after {days} days. Entering {orbit}.',
     feasibility:
       '<b>Feasibility check for {name}:</b> <span class="{cls}">{label}</span>. {notes}. Your craft has {haveMs} m/s of delta-v for {needMs} m/s needed, {haveW} W of power for {needW} W needed, and a trip of {days} days.',
@@ -168,11 +172,57 @@ export const CONTENT = {
       why: 'The ion thruster did not get the 1500 W it needs, so the orbit transfer never finished.',
       fix: 'Add solar wings to supply at least 1500 W for electric propulsion.'
     },
+    burn: '{name}: {precisionPct}% precision added {bonusPct}% to your science return (simplified gameplay bonus).',
+    burnMiss: '{name}: you let go outside the target zone, so there was no bonus. Next time release while the gauge is inside the green zone.',
+    burnSkipped: '{name}: Auto-pilot flew it, so there was no bonus and no penalty.',
+    burnAuto: 'Tip: fly the departure burn and the orbit insertion burn by hand for up to {maxBonusPct}% extra science in total. Auto-pilot gives no bonus and no penalty.',
     dataReturn: 'Data downlink: only {returnedPct}% reached Earth. Upgrade antenna or add data storage.',
     eventLoss: 'Science reduced by {lossPct}%.',
     reliability:
       'Launch reliability {reliabilityPct}% (launcher {launcherPct}% x bus {busPct}%, adjusted by {adjustmentPct} points for thin margins, balance, sign-offs and review). Your final score is multiplied by {reliabilityPct}%.',
     reliabilityFix: ' Fix: turn amber rows green, balance the ship, or pick a more reliable launcher or bus.'
+  },
+  burn: {
+    departure: {
+      name: 'Departure burn',
+      prompt: 'Departure burn. Hold the button (or press and hold Space) to fire the engine. Let go while the bar is inside the green zone. A clean burn adds up to {maxBonusPct}% science.'
+    },
+    insertion: {
+      name: 'Orbit insertion burn',
+      prompt: 'Orbit insertion burn. Same controls, but the green zone is narrower and in a different place. A clean burn adds up to {maxBonusPct}% science.',
+      hud: 'Ready for orbit insertion'
+    },
+    hold: 'Hold to burn',
+    firing: 'Burning...',
+    auto: 'Auto-pilot (no bonus)',
+    autoAll: 'Auto-pilot all burns',
+    ready: 'Ready. Hold to start the burn.',
+    low: 'Too early: keep holding.',
+    inZone: 'In the zone: let go now!',
+    high: 'Too late: you are over-burning.',
+    result: 'Burn precision {precisionPct}%. Science bonus +{bonusPct}%.',
+    missed: 'Burn missed the green zone. No bonus.',
+    autoResult: 'Auto-pilot flies the burn. No bonus.',
+    autoAllResult: 'Auto-pilot flies both burns. No bonus.',
+    gaugeLabel: 'Burn gauge. The green zone runs from {zoneStartPct}% to {zoneEndPct}% full.'
+  },
+  flightHud: {
+    canvasLabel: 'Flight view',
+    skip: 'Skip animation',
+    logTitle: 'Mission log',
+    ascent: 'Ascent',
+    atmosphere: 'Leaving the atmosphere',
+    reachOrbit: 'Reaching orbit',
+    ready: 'Ready for departure burn',
+    burning: 'Burning',
+    coast: 'Coasting to {name}',
+    day: 'Day {day} of {days}',
+    stalled: 'Out of propellant',
+    dive: 'Falling toward the Sun',
+    orbit: 'In orbit: {orbit}',
+    lost: 'Mission lost',
+    complete: 'Operations complete',
+    notToScale: 'Not to scale'
   },
   predictedFlight: {
     heading: 'Predicted flight',
@@ -277,6 +327,7 @@ export const CONTENT = {
     <p><b>Center of mass &amp; thrust:</b> Keep the yellow Center of Mass aligned with the dashed green engine thrust line so the rocket does not tumble.</p>
     <p><b>Six resources:</b> Mass, Power, Budget, Data, Comms, and Time. Green = healthy reserve, Amber = thin reserve, Red = critical failure.</p>
     <p><b>Career progression:</b> Earth, the Moon, and Mars start open. Safe arrivals unlock Venus, Jupiter, Saturn, Uranus, Neptune, Mercury, and the Sun. Progress saves automatically in your browser.</p>
+    <p><b>Manual burns:</b> During launch you can fly two burns yourself: the departure burn that sends you on your way, and the orbit insertion burn when you arrive. Hold the button (or Space) and let go inside the green zone. The insertion zone is narrower, so it is harder. A clean pair adds up to 6% extra science in total. Press Auto-pilot to skip one burn, or Auto-pilot all burns to skip both: no bonus, no penalty. The result never depends on luck.</p>
     <p><b>Stars:</b> 1&#9733; survive mission, 2&#9733; meet baseline science, 3&#9733; earn all four role sign-offs and spend under 85% of budget.</p>
   `
 };

@@ -1,6 +1,6 @@
 /* File: css/pages/simulation.css
  * Owner: Person B (Saurav)
- * AI-assisted: YES — Gemini, 2026-11-15. Reviewed by a human: NO.
+ * AI-assisted: YES — Gemini, 2026-11-14; Gemini, 2026-11-15; Claude, 2026-11-14 (flight view and burn panel styles); Claude, 2026-11-15 (burn panel buttons). Reviewed by a human: NO.
  * Sources used: none
  */
 #b3 {
@@ -552,7 +552,7 @@ b.bad { color: var(--bad); }
 
 .fl3 {
   display: grid;
-  grid-template-columns: minmax(320px, 540px) 1fr;
+  grid-template-columns: minmax(0, 1fr) clamp(250px, 24vw, 340px);
   gap: 16px;
 }
 
@@ -561,7 +561,7 @@ b.bad { color: var(--bad); }
   display: flex;
   justify-content: center;
   height: calc(100vh - 140px);
-  min-height: 460px;
+  min-height: 520px;
   overflow: hidden;
   background: linear-gradient(#0a1b3099, #14375a99);
   border: 1px solid var(--line);
@@ -572,8 +572,6 @@ b.bad { color: var(--bad); }
   position: relative;
   width: 520px;
   height: 540px;
-  margin-top: 10px;
-  transition: transform 4.5s ease-in;
 }
 
 .flc .pt {
@@ -582,10 +580,6 @@ b.bad { color: var(--bad); }
 
 .flc .plume {
   opacity: 0;
-}
-
-.flc.fly {
-  transform: translateY(-640px);
 }
 
 .flc.fly .plume {
@@ -632,6 +626,9 @@ b.bad { color: var(--bad); }
   .fl3 {
     grid-template-columns: 1fr;
   }
+  .fl3 .box {
+    max-height: 40vh;
+  }
   #pal,
   #mt {
     max-height: none;
@@ -641,7 +638,8 @@ b.bad { color: var(--bad); }
     min-height: 360px;
   }
   #flv {
-    height: 380px;
+    height: min(66vh, 560px);
+    min-height: 380px;
   }
 }
 
@@ -664,4 +662,177 @@ b.bad { color: var(--bad); }
 .flc.burn {
   filter: sepia(1) saturate(8) brightness(1.5);
   transition: filter 1.5s;
+}
+
+/* ---- Stage 3 flight view: canvas, HUD and the manual burn panel ---- */
+#flcv {
+  position: absolute;
+  inset: 0;
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+/* The camera moves this wrapper (see placeCraftDom in renderer.js). The rocket picture sits inside it. */
+#flcw {
+  position: absolute;
+  top: 0;
+  left: 0;
+  z-index: 1;
+  width: 520px;
+  height: 540px;
+  pointer-events: none;
+  will-change: transform, opacity;
+}
+
+/* The flight window is the main focus; the log beside it is secondary. */
+.fl3 .box {
+  max-height: calc(100vh - 140px);
+  min-height: 0;
+  overflow-y: auto;
+}
+
+.fl3 .box h2 {
+  margin: 0 0 6px;
+  font-size: 1rem;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
+#fnext {
+  position: absolute;
+  bottom: 14px;
+  left: 50%;
+  z-index: 3;
+  transform: translateX(-50%);
+}
+
+.flc.gone {
+  opacity: 0;
+  pointer-events: none;
+  transition: transform 4.5s ease-in, opacity 0.6s;
+}
+
+#flhud {
+  position: absolute;
+  top: 10px;
+  left: 12px;
+  z-index: 2;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 6px 10px;
+  max-width: calc(100% - 170px);
+  pointer-events: none;
+  background: rgba(8, 22, 40, 0.7);
+  border-radius: 8px;
+  text-shadow: 0 1px 3px #000;
+}
+
+#flhud .flph {
+  font-size: 1.05rem;
+  font-weight: 700;
+  color: var(--accent);
+}
+
+#flhud .flday {
+  font-size: 1rem;
+  color: var(--muted);
+}
+
+#fskip {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  z-index: 3;
+}
+
+#burn {
+  position: absolute;
+  left: 50%;
+  bottom: 12px;
+  z-index: 3;
+  width: min(560px, calc(100% - 24px));
+  transform: translateX(-50%);
+  padding: 12px 14px;
+  background: rgba(8, 22, 40, 0.93);
+  border: 1px solid var(--line);
+  border-radius: 12px;
+}
+
+#burntxt {
+  margin: 0 0 8px;
+}
+
+#burngauge {
+  position: relative;
+  height: 30px;
+  overflow: hidden;
+  background: #0a1b30;
+  border: 2px solid var(--line);
+  border-radius: 15px;
+}
+
+#burnzone {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  z-index: 2;
+  background: rgba(127, 227, 184, 0.28);
+  border-right: 2px solid var(--ok);
+  border-left: 2px solid var(--ok);
+}
+
+#burnmark {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  z-index: 2;
+  width: 2px;
+  margin-left: -1px;
+  background: var(--ok);
+}
+
+#burnfill {
+  position: relative;
+  z-index: 1;
+  width: 0;
+  height: 100%;
+  background: var(--accent);
+}
+
+#burnfill.in {
+  background: var(--ok);
+}
+
+#burnstate {
+  min-height: 1.5em;
+  margin: 8px 0;
+  font-weight: 700;
+}
+
+#burn .row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+/* .go adds a top margin for normal pages; inside the burn panel it would make the buttons uneven. */
+#burn .row button {
+  margin-top: 0;
+}
+
+#burnbtn {
+  min-width: 160px;
+  touch-action: none;
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+/* Small screens: give the map room above the burn panel while the panel is open */
+@media (max-width: 1024px) {
+  #flv.burning {
+    height: max(600px, 78vh);
+  }
 }
