@@ -199,6 +199,215 @@ export function buildFailingDemoSpacecraft() {
   attachParts(radar, 'in', bus, 'R1');
 }
 
+/* ---- Developer Mode Prebuilt Reference Designs (3-Star Perfect Configurations) ---- */
+
+export const DEVELOPER_PREBUILTS = [
+  {
+    id: 'dev_earth',
+    contractId: 'earth',
+    oi: 0,
+    launcher: 'medium',
+    hard: 1,
+    title: 'Earth · Blue Sentinel (3★ Polar Mapper)',
+    note: 'Balanced chemical orbiter with mirrored large solar wings, high-gain downlink, and full climate suite.',
+    bus: 'bus_red',
+    tanks: 1,
+    engine: 'chem',
+    ant: 'ant_hg',
+    pairs: [['sol_l', 'bus', 1], ['bat', 'tank', 1], ['rec', 'tank', 2]],
+    singles: [['i_cam', 'bus', 'R2'], ['i_spec', 'bus', 'L2']]
+  },
+  {
+    id: 'dev_moon',
+    contractId: 'moon',
+    oi: 0,
+    launcher: 'heavy',
+    hard: 1,
+    title: 'Moon · Selene Watch (3★ Lunar Surveyor)',
+    note: '2-tank chemical transfer stack with mirrored solar wings, dual batteries, and mineral/ice instruments.',
+    bus: 'bus_red',
+    tanks: 2,
+    engine: 'chem',
+    ant: 'ant_hg',
+    pairs: [['sol_l', 'bus', 1], ['bat', 0, 1], ['rec', 0, 2]],
+    singles: [['i_spec', 'bus', 'R2'], ['i_therm', 'bus', 'L2']]
+  },
+  {
+    id: 'dev_mars',
+    contractId: 'mars',
+    oi: 1,
+    launcher: 'heavy',
+    hard: 1,
+    title: 'Mars · Red Survey (3★ Deep-Space Orbiter)',
+    note: '3-tank chemical orbiter with 4x large solar wings for 0.43 AU flux, high-gain dish, and subsurface spectrometer.',
+    bus: 'bus_red',
+    tanks: 3,
+    engine: 'chem',
+    ant: 'ant_hg',
+    pairs: [['sol_l', 'bus', 1], ['sol_l', 0, 1], ['bat', 1, 1], ['rec', 1, 2]],
+    singles: [['i_spec', 'bus', 'R2'], ['i_cam', 'bus', 'L2']]
+  },
+  {
+    id: 'dev_mercury',
+    contractId: 'mercury',
+    oi: 1,
+    launcher: 'super',
+    hard: 1,
+    title: 'Mercury · Hot Rock (3★ Nuclear Thermal)',
+    note: 'High-Isp nuclear thermal stage delivering >14 km/s delta-v for Mercury insertion with redundant avionics.',
+    bus: 'bus_red',
+    tanks: 3,
+    engine: 'nuclear',
+    ant: 'ant_hg',
+    pairs: [['sol_s', 'bus', 1], ['bat', 0, 1], ['rec', 0, 2]],
+    singles: [['i_spec', 'bus', 'R2'], ['i_therm', 'bus', 1, 'L2']]
+  },
+  {
+    id: 'dev_venus',
+    contractId: 'venus',
+    oi: 1,
+    launcher: 'heavy',
+    hard: 1,
+    title: 'Venus · Veiled Sister (3★ Cloud Penetrator)',
+    note: '3-tank chemical orbiter with mirrored solar arrays, recorder, and spectrometer + thermal imager.',
+    bus: 'bus_red',
+    tanks: 3,
+    engine: 'chem',
+    ant: 'ant_hg',
+    pairs: [['sol_l', 'bus', 1], ['bat', 0, 1], ['rec', 0, 2]],
+    singles: [['i_spec', 'bus', 'R2'], ['i_therm', 'bus', 'L2']]
+  },
+  {
+    id: 'dev_jupiter',
+    contractId: 'jupiter',
+    oi: 2,
+    launcher: 'heavy',
+    hard: 1,
+    title: 'Jupiter · King’s Gamble (3★ RTG Nuclear)',
+    note: 'Twin RTGs + nuclear thermal engine to conquer 3.7% sunlight and Jovian radiation belts.',
+    bus: 'bus_red',
+    tanks: 2,
+    engine: 'nuclear',
+    ant: 'ant_hg',
+    pairs: [['rtg', 'bus', 1], ['rtg', 0, 1], ['bat', 0, 2], ['rec', 1, 1]],
+    singles: [['i_spec', 'bus', 'R2'], ['i_mag', 'bus', 'L2']]
+  },
+  {
+    id: 'dev_saturn',
+    contractId: 'saturn',
+    oi: 2,
+    launcher: 'heavy',
+    hard: 1,
+    title: 'Saturn · Ring Lord (3★ Cassini-Class)',
+    note: 'Nuclear thermal propulsion with quadruple RTGs for 1.1% solar flux and high-gain DSN downlink.',
+    bus: 'bus_red',
+    tanks: 2,
+    engine: 'nuclear',
+    ant: 'ant_hg',
+    pairs: [['rtg', 'bus', 1], ['rtg', 0, 1], ['bat', 0, 2], ['rec', 1, 1]],
+    singles: [['i_spec', 'bus', 'R2'], ['i_mag', 'bus', 'L2']]
+  },
+  {
+    id: 'dev_uranus',
+    contractId: 'uranus',
+    oi: 2,
+    launcher: 'super',
+    hard: 1,
+    title: 'Uranus · Sideways World (3★ Ice Giant Probe)',
+    note: '3-tank nuclear stage with quadruple RTGs, low-data spectrometer + magnetometer for 1.8% DSN rate.',
+    bus: 'bus_red',
+    tanks: 3,
+    engine: 'nuclear',
+    ant: 'ant_hg',
+    pairs: [['rtg', 'bus', 1], ['rtg', 0, 1], ['bat', 0, 2], ['rec', 1, 1]],
+    singles: [['i_spec', 'bus', 'R2'], ['i_mag', 'bus', 'L2']]
+  },
+  {
+    id: 'dev_neptune',
+    contractId: 'neptune',
+    oi: 2,
+    launcher: 'super',
+    hard: 1,
+    title: 'Neptune · Edge of the Map (3★ Deepest Orbit)',
+    note: '4-tank nuclear thermal flagship with quadruple RTGs and ultra-lean telemetry for 0.012x DSN comms.',
+    bus: 'bus_red',
+    tanks: 4,
+    engine: 'nuclear',
+    ant: 'ant_hg',
+    pairs: [['rtg', 'bus', 1], ['rtg', 0, 1], ['bat', 0, 2], ['rec', 1, 1]],
+    singles: [['i_spec', 'bus', 'R2'], ['i_mag', 'bus', 'L2']]
+  },
+  {
+    id: 'dev_sun',
+    contractId: 'sun',
+    oi: 1,
+    launcher: 'super',
+    hard: 0,
+    title: 'The Sun · Solar Dive (Physics Demo)',
+    note: 'Maximum-delta-v nuclear dive configuration to demonstrate why nothing survives solar entry.',
+    bus: 'bus_red',
+    tanks: 4,
+    engine: 'nuclear',
+    ant: 'ant_hg',
+    pairs: [['sol_s', 'bus', 1], ['bat', 0, 1]],
+    singles: [['i_spec', 'bus', 'R2'], ['i_mag', 'bus', 'L2']]
+  }
+];
+
+export function buildDeveloperPrebuilt(prebuiltId) {
+  const spec = DEVELOPER_PREBUILTS.find(p => p.id === prebuiltId);
+  if (!spec) return null;
+
+  const contractIndex = DATA.contracts.findIndex(c => c.id === spec.contractId);
+  if (contractIndex === -1) return null;
+
+  appState.mission.ci = contractIndex;
+  appState.mission.oi = spec.oi;
+  appState.mission.L = spec.launcher;
+  appState.mission.hard = spec.hard;
+  appState.mission.locked = false;
+  appState.mission.parts = [];
+  appState.mission.nu = 1;
+
+  const centerX = 480;
+  const bus = createPartInstance(spec.bus, centerX, 340);
+  const tanks = [];
+  let prevHost = bus;
+
+  for (let i = 0; i < spec.tanks; i++) {
+    const tank = createPartInstance('tank', centerX, 460 + i * 120);
+    attachParts(tank, 'top', prevHost, 'bottom');
+    tanks.push(tank);
+    prevHost = tank;
+  }
+
+  const engine = createPartInstance(spec.engine, centerX, 460 + spec.tanks * 120);
+  attachParts(engine, 'top', prevHost, 'bottom');
+
+  if (spec.ant) {
+    const ant = createPartInstance(spec.ant, 0, 0);
+    attachParts(ant, 'base', bus, 'top');
+  }
+
+  const resolveHost = ref => (ref === 'bus' ? bus : tanks[ref] || bus);
+
+  (spec.pairs || []).forEach(([partId, hostRef, tier]) => {
+    const host = resolveHost(hostRef);
+    const rightPart = createPartInstance(partId, 0, 0);
+    attachParts(rightPart, 'in', host, `R${tier}`);
+    const leftPart = createPartInstance(partId, 0, 0);
+    attachParts(leftPart, 'in', host, `L${tier}`);
+  });
+
+  (spec.singles || []).forEach(([partId, hostRef, nodeName]) => {
+    const host = resolveHost(hostRef);
+    const part = createPartInstance(partId, 0, 0);
+    attachParts(part, 'in', host, nodeName);
+  });
+
+  return spec;
+}
+
 export function autoAttachPart(partId) {
   const category = getNodeCategory(partId);
   const connected = getConnectedPartUids();
@@ -606,21 +815,12 @@ export function scoreFlight(telemetry, outcome, science) {
 
 const clamp01 = value => Math.max(0, Math.min(1, Number(value) || 0));
 
-/** The manual burns in mission order. Their settings live in DATA.flightModel.burns. */
 const BURN_ORDER = ['departure', 'insertion'];
 
-/** Precision (0..1) of a burn the player flew, or null when it was left to Auto-pilot. */
 function getBurnQuality(burns, kind) {
   return burns && burns[kind] ? clamp01(burns[kind].quality) : null;
 }
 
-/**
- * Scores one manual burn. Pure. `kind` is 'departure' or 'insertion'. `fill` (0..1) is how full the burn
- * gauge was when the player let go. Inside the target zone the precision is 1 at the centre and falls to 0
- * at the edges; outside the zone it is 0.
- * Returns { kind, fill, quality, bonus }: quality 0..1, bonus = THIS burn's share of the extra science as a
- * fraction (0.03 = +3%). An unknown kind scores 0.
- */
 export function scoreBurn(fill, kind = 'departure') {
   const model = DATA.flightModel;
   const spec = model.burns[kind];
@@ -630,18 +830,6 @@ export function scoreBurn(fill, kind = 'departure') {
   return { kind, fill: clamped, quality, bonus: quality * spec.weight * model.burnBonusMax };
 }
 
-/**
- * Resolves a whole flight from the design's numbers. Pure and deterministic.
- * The launch screen (a canvas flight view) only PLAYS the returned `steps`; it never decides the outcome.
- *
- * `burns` is optional: { departure, insertion }, each a scoreBurn() result ({ quality }) when the player flew
- * that burn by hand. A missing burn (or burns = null) is Auto-pilot: no bonus, never a penalty.
- * Flying every burn perfectly adds at most DATA.flightModel.burnBonusMax of science in total.
- * Same design + same burn qualities = same result.
- *
- * steps: ordered [{ key, ok, fatal, values }]. `key` names a CONTENT.flightLog template,
- * `values` holds the raw numbers for it, `fatal` means the mission ends on that step.
- */
 export function resolveFlight(telemetry, burns = null) {
   const model = DATA.flightModel;
   const contract = telemetry.C;
@@ -712,8 +900,6 @@ export function resolveFlight(telemetry, burns = null) {
     return lose('ion_short', { needW: telemetry.E.pw }, 'ion');
   }
 
-  // Optional manual burns: they only ever add science. The UI offers them only for flights that survive the transfer.
-  // Each burn's bonus is its precision x its share (weight) of the cap. A burn left to Auto-pilot adds 0.
   const burnShare = kind => {
     const quality = getBurnQuality(burns, kind);
     return quality === null ? 0 : quality * model.burns[kind].weight * model.burnBonusMax;
@@ -729,9 +915,9 @@ export function resolveFlight(telemetry, burns = null) {
     });
   };
 
-  pushBurnStep('departure'); // leaving the parking orbit, before the coast
+  pushBurnStep('departure');
   steps.push({ key: 'arrival', ok: true, values: { days: telemetry.days, orbit: telemetry.O.n.toLowerCase() } });
-  pushBurnStep('insertion'); // slowing down into orbit at the destination
+  pushBurnStep('insertion');
   steps.push({ key: 'briefing', ok: true, values: { contractId: contract.id } });
 
   const events = getTriggeredEvents(telemetry);

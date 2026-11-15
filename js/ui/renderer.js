@@ -28,7 +28,8 @@ import {
   scoreBurn,
   createSeededRng,
   scoreFlight,
-  buildStarterSpacecraft
+  buildStarterSpacecraft,
+  DEVELOPER_PREBUILTS
 } from '../core/engine.js';
 import { getFeasibility, buildPlanetBriefing } from '../core/planets.js';
 import {
@@ -138,6 +139,7 @@ export function renderObjectiveStage() {
   const mission = appState.mission;
   const contract = DATA.contracts[mission.ci];
   const weather = appState.spaceWeather;
+  const devMode = isDeveloperMode();
 
   const contractCards = DATA.contracts
     .map((c, index) => [c, index])
@@ -146,6 +148,7 @@ export function renderObjectiveStage() {
       const open = isContractOpen(c.id);
       const feasibility = getFeasibility(c);
       const lock = open ? null : getLockInfo(c);
+      const devPrebuilt = devMode ? DEVELOPER_PREBUILTS.find(p => p.contractId === c.id) : null;
       return `
     <div class="card ${index === mission.ci ? 'sel' : ''} ${open ? '' : 'lkd'}" role="button" ${open ? `tabindex="0" data-a="ci" data-v="${index}"` : 'aria-disabled="true"'}>
       <img src="assets/dest_${c.dest}.svg" alt="${c.n}">
@@ -155,6 +158,7 @@ export function renderObjectiveStage() {
         <small>Baseline science ${c.target} (threshold ${c.thr}) · budget $${c.cap}M · ${c.months} months${appState.highScores[c.id] ? ' · best ' + appState.highScores[c.id] : ''}</small>
         <span class="fb ${feasibility.cls}">${feasibility.lab}</span><small class="fn">${feasibility.notes.join(' · ')}</small>
         ${lock ? `<span class="lk">LOCKED - Level ${lock.level}: ${lock.need}</span>` : ''}
+        ${devPrebuilt ? `<div style="margin-top:8px;"><button type="button" data-load-prebuilt="${devPrebuilt.id}" style="min-height:34px; padding:4px 10px; font-size:0.82rem; border-color:var(--ok); color:var(--ok);">Load 3&#9733; Prebuilt &rarr;</button></div>` : ''}
       </div>
     </div>
   `;
@@ -185,7 +189,7 @@ export function renderObjectiveStage() {
 
   $('#s1').innerHTML = `
     <div>
-      <h2>1. Choose your mission objective <span class="badge-source ${weather.isLive ? '' : 'offline'}">${appState.dataSourceLabel}</span>${isDeveloperMode() ? ' <span class="badge-simplified">Developer Mode</span>' : ''}</h2>
+      <h2>1. Choose your mission objective <span class="badge-source ${weather.isLive ? '' : 'offline'}">${appState.dataSourceLabel}</span>${devMode ? ' <span class="badge-simplified">Developer Mode</span>' : ''}</h2>
       <div class="weather-banner ${weather.isLive ? '' : 'offline'}">
         <span><b>Space Weather Telemetry:</b> ${weather.summary}</span>
         <small>Solar Activity: <b>${weather.stormLevel}</b> (${weather.src})</small>
@@ -480,7 +484,7 @@ export function centerBuilderCanvas() {
   }
 }
 
-function autoFitBuilderCanvas() {
+export function autoFitBuilderCanvas() {
   const cv = $('#cv');
   if (!cv) return;
   const idealZoom = Math.max(0.8, Math.min(1.05, +(cv.clientWidth / 820).toFixed(2)));
@@ -726,15 +730,42 @@ export function refreshBuilderView() {
           : 'Design review and launch';
 }
 
-/* ---- Modals: Saved Builds, Design Review, Trade Space, Share/Load Code ---- */
+/* ---- Modals: Saved Builds, Developer Prebuilts, Design Review, Trade Space, Share/Load Code ---- */
 
 export function showSavedBuildsModal() {
   const builds = appState.savedBuilds;
   const defaultName = `${DATA.contracts[appState.mission.ci]?.n || 'Spacecraft'} #${builds.length + 1}`;
+  const devMode = isDeveloperMode();
+
+  const devPrebuiltsHtml = devMode
+    ? `
+      <div style="margin-top: 18px; padding-top: 14px; border-top: 1px solid var(--line);">
+        <h3 style="margin-top: 0;">Developer Mode: 3&#9733; Prebuilt Mission Library</h3>
+        <p><small>Verified, symmetric reference spacecraft engineered to achieve 3&#9733; completion for each Solar System destination.</small></p>
+        <table class="rt">
+          <tr><th>Mission &amp; Prebuilt</th><th>Orbit &amp; Launcher</th><th>Propulsion &amp; Policy</th><th>Action</th></tr>
+          ${DEVELOPER_PREBUILTS.map(p => {
+            const contract = DATA.contracts.find(c => c.id === p.contractId);
+            const orbitName = contract?.orbits[p.oi]?.n || '';
+            const launcherName = DATA.launchers[p.launcher]?.n || p.launcher;
+            const engineName = DATA.engines[p.engine]?.n || p.engine;
+            return `
+              <tr>
+                <td><b>${p.title}</b><br><small>${p.note}</small></td>
+                <td>${orbitName}<br><small>${launcherName}</small></td>
+                <td>${engineName} (${p.tanks} tank${p.tanks > 1 ? 's' : ''})<br><small>${p.hard ? 'NASA CML 4 (35%)' : 'Rookie (10%)'}</small></td>
+                <td><button type="button" data-load-prebuilt="${p.id}" style="border-color:var(--ok); color:var(--ok);">Load &amp; Open</button></td>
+              </tr>
+            `;
+          }).join('')}
+        </table>
+      </div>
+    `
+    : '';
 
   $('#rev').innerHTML = `
-    <div class="box modal-box" style="width: min(860px, 96vw);">
-      ${renderModalHeader('My Saved Spacecraft Builds')}
+    <div class="box modal-box" style="width: min(920px, 96vw);">
+      ${renderModalHeader(devMode ? 'My Saved Builds & Developer Prebuilts' : 'My Saved Spacecraft Builds')}
       <div class="row" style="align-items: center; margin-bottom: 12px;">
         <input type="text" id="new-build-name" placeholder="Build name (e.g. Mars Relay Mk II)" value="${defaultName}" style="flex: 1; min-width: 220px;" />
         <button type="button" class="go" id="confirm-save-build" style="margin: 0;">Save current build</button>
@@ -755,7 +786,8 @@ export function showSavedBuildsModal() {
               </tr>
             `).join('')}
           </table>`
-        : '<p><small>No saved builds yet. Name your current spacecraft above and click <b>Save current build</b> to store it in your browser.</small></p>'}
+        : '<p><small>No personal saved builds yet. Name your current spacecraft above and click <b>Save current build</b> to store it in your browser.</small></p>'}
+      ${devPrebuiltsHtml}
     </div>
   `;
   $('#rev').hidden = false;
@@ -2084,4 +2116,4 @@ export function showCareerModal() {
     </div>
   `;
   $('#rev').hidden = false;
-}
+} 
