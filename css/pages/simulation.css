@@ -6,6 +6,7 @@
  * AI-assisted (update): Claude, 2026-11-15 - pause overlay for the flight view. Reviewed by a human: NO.
  * AI-assisted (update): Claude, 2026-11-15 - zoom -/+ buttons keep a 44px minimum width on every screen size. Reviewed by a human: NO.
  * AI-assisted: YES — Gemini, 2026-11-14; Gemini, 2026-11-15; Claude, 2026-11-14 (flight view and burn panel styles); Claude, 2026-11-15 (burn panel buttons). Reviewed by a human: YES Reviewd by Person C (Yochan)
+ * AI-assisted (update): Gemini, 2026-11-15 - CAD crosshair snap indicators, 60fps GPU-composited drag performance, and prominent Science HUD meter. Reviewed by a human: NO.
  * Sources used: none
  */
 #b3 {
@@ -30,6 +31,7 @@
   max-height: calc(100vh - 88px);
   overflow-y: auto;
   box-shadow: 0 8px 28px #040d1866;
+  contain: layout style;
 }
 
 #pal h3 {
@@ -68,13 +70,13 @@
   cursor: grab;
   user-select: none;
   touch-action: pan-y;
-  transition: transform 0.14s ease, border-color 0.14s ease, background 0.14s ease;
+  transition: transform 0.14s ease, border-color 0.14s ease, background-color 0.14s ease;
 }
 
 .tile:hover {
   border-color: var(--accent);
   background: #163a61ee;
-  transform: translateX(3px);
+  transform: translate3d(3px, 0, 0);
 }
 
 .tile img {
@@ -91,7 +93,49 @@
   color: var(--muted);
 }
 
-/* Full-bleed blueprint grid across the entire canvas viewport at every zoom level */
+/* Prominent Science Return HUD Pill & Progress Bar in Builder */
+.science-hud-wrap {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  padding: 5px 12px;
+  background: linear-gradient(135deg, #0b223d, #133559);
+  border: 1.5px solid var(--line);
+  border-radius: 999px;
+  box-shadow: 0 2px 10px #040d1866;
+  transition: border-color 0.2s ease, box-shadow 0.2s ease;
+}
+
+.science-hud-wrap.goal-met {
+  border-color: var(--ok);
+  box-shadow: 0 0 14px #7fe3b833;
+}
+
+.science-hud-wrap.min-met {
+  border-color: var(--accent);
+}
+
+.science-hud-wrap.low {
+  border-color: var(--bad);
+}
+
+.science-hud-bar {
+  width: 74px;
+  height: 8px;
+  background: #061322;
+  border-radius: 999px;
+  overflow: hidden;
+  border: 1px solid #295c8f88;
+}
+
+.science-hud-bar > i {
+  display: block;
+  height: 100%;
+  border-radius: 999px;
+  transition: width 0.22s ease, background-color 0.22s ease;
+}
+
+/* Full-bleed blueprint grid across the entire canvas viewport */
 #cv {
   position: relative;
   width: 100%;
@@ -119,6 +163,7 @@
   border-radius: 12px;
   touch-action: none;
   cursor: grab;
+  contain: strict;
 }
 
 #cv.design-locked {
@@ -147,6 +192,7 @@
   width: 960px;
   height: 1100px;
   transform-origin: 0 0;
+  will-change: transform;
   background-image:
     radial-gradient(2px 2px at 140px 180px, #ffffff55, transparent),
     radial-gradient(1.5px 1.5px at 780px 240px, #7fe3b866, transparent),
@@ -157,13 +203,13 @@
   background-size: 960px 1100px;
 }
 
+/* Zero expensive SVG filter passes during idle or drag for 60fps smoothness */
 .pt {
   position: absolute;
   user-select: none;
   touch-action: none;
   -webkit-user-drag: none;
-  filter: drop-shadow(0 3px 6px #040d18aa);
-  transition: filter 0.15s ease;
+  backface-visibility: hidden;
 }
 
 #world .pt {
@@ -171,67 +217,99 @@
 }
 
 #world .pt:hover {
-  filter: drop-shadow(0 3px 6px #040d18aa) drop-shadow(0 0 8px #7fe3b8aa);
+  outline: 1.5px dashed #7fe3b888;
+  outline-offset: 2px;
+  border-radius: 6px;
 }
 
 .pt.dragging {
   cursor: grabbing !important;
-  filter: drop-shadow(0 8px 16px #040d18dd) drop-shadow(0 0 10px #ffc857aa);
+  opacity: 0.92;
+  will-change: left, top;
 }
 
 .pt.sel {
-  filter: drop-shadow(0 0 10px #ffc857) drop-shadow(0 0 2px #fff);
+  outline: 2px solid var(--accent);
+  outline-offset: 3px;
+  border-radius: 6px;
+  background: #ffc85712;
 }
 
 .pt.float {
-  opacity: 0.78;
-  filter: drop-shadow(0 0 8px #ff856d);
+  opacity: 0.72;
+  outline: 2px dashed var(--bad);
+  outline-offset: 2px;
+  border-radius: 6px;
 }
 
+/* Sleek CAD Precision Crosshair Port Indicators (Only shown while dragging or part selected) */
 .nd {
   position: absolute;
-  width: 16px;
-  height: 16px;
-  margin: -8px;
-  border: 2px solid var(--accent);
+  width: 14px;
+  height: 14px;
+  margin: -7px;
   border-radius: 50%;
-  background: #ffc85755;
-  box-shadow: 0 0 8px #ffc85788;
+  border: 1.5px solid #7fe3b8cc;
+  background: #08182bcc;
   z-index: 50;
   pointer-events: none;
-  transition: transform 0.12s ease, background 0.12s ease;
+  transition: transform 0.1s ease, border-color 0.1s ease, background-color 0.1s ease;
 }
 
-.nd.idle {
-  width: 10px;
-  height: 10px;
-  margin: -5px;
-  border: 1.5px solid #7fe3b899;
-  background: #7fe3b822;
-  box-shadow: none;
+.nd::before,
+.nd::after {
+  content: '';
+  position: absolute;
+  background: currentColor;
+  color: #7fe3b8;
+}
+
+.nd::before {
+  left: 50%;
+  top: 2px;
+  bottom: 2px;
+  width: 1.5px;
+  margin-left: -0.75px;
+}
+
+.nd::after {
+  top: 50%;
+  left: 2px;
+  right: 2px;
+  height: 1.5px;
+  margin-top: -0.75px;
 }
 
 .nd.own {
-  border-color: var(--ok);
-  background: #7fe3b844;
-  box-shadow: 0 0 8px #7fe3b888;
+  border-color: #60a5fa;
+  opacity: 0.75;
+}
+
+.nd.own::before,
+.nd.own::after {
+  color: #60a5fa;
 }
 
 .nd.hot {
-  background: var(--accent);
-  transform: scale(1.75);
-  box-shadow: 0 0 14px #ffc857;
+  border-color: var(--accent);
+  background: #ffc85733;
+  transform: scale(1.55);
+  box-shadow: 0 0 12px #ffc857aa;
+}
+
+.nd.hot::before,
+.nd.hot::after {
+  color: var(--accent);
 }
 
 .com {
   position: absolute;
-  width: 16px;
-  height: 16px;
-  margin: -8px;
+  width: 14px;
+  height: 14px;
+  margin: -7px;
   border: 2px solid #fff;
   border-radius: 50%;
   background: radial-gradient(#ffc857 42%, #10243b 48%);
-  box-shadow: 0 0 10px #ffc857aa;
   z-index: 49;
   pointer-events: none;
 }
@@ -240,7 +318,7 @@
   position: absolute;
   width: 0;
   border-left: 2px dashed var(--ok);
-  opacity: 0.85;
+  opacity: 0.75;
   z-index: 48;
   pointer-events: none;
 }
@@ -933,7 +1011,6 @@ b.bad { color: var(--bad); }
   }
 }
 
-/* Sun mission: the dive sequence heats the whole launch view */
 #flv.sunhit {
   background: radial-gradient(circle at 50% -10%, #fff3b0, #ffb347 25%, #ff5a1f 55%, #3a0d05) !important;
   transition: background 3s;
@@ -953,7 +1030,6 @@ b.bad { color: var(--bad); }
   height: 100%;
 }
 
-/* The camera moves this wrapper (see placeCraftDom in renderer.js). The rocket picture sits inside it. */
 #flcw {
   position: absolute;
   top: 0;
@@ -965,7 +1041,6 @@ b.bad { color: var(--bad); }
   will-change: transform, opacity;
 }
 
-/* The flight window is the main focus; the log beside it is secondary. */
 .fl3 .box {
   max-height: calc(100vh - 140px);
   max-height: calc(100dvh - 140px);
@@ -1003,12 +1078,12 @@ b.bad { color: var(--bad); }
   display: flex;
   flex-direction: column;
   gap: 2px;
-  padding: 6px 10px;
+  padding: 8px 12px;
   max-width: calc(100% - 170px);
   pointer-events: none;
-  background: rgba(8, 22, 40, 0.7);
+  background: rgba(8, 22, 40, 0.82);
+  border: 1px solid #295c8f88;
   border-radius: 8px;
-  text-shadow: 0 1px 3px #000;
 }
 
 #flhud .flph {
@@ -1018,8 +1093,15 @@ b.bad { color: var(--bad); }
 }
 
 #flhud .flday {
-  font-size: 1rem;
+  font-size: 0.95rem;
   color: var(--muted);
+}
+
+#flhud .flsci {
+  font-size: 0.88rem;
+  font-weight: 700;
+  color: var(--ok);
+  margin-top: 2px;
 }
 
 #fskip {
@@ -1099,7 +1181,6 @@ b.bad { color: var(--bad); }
   gap: 8px;
 }
 
-/* .go adds a top margin for normal pages; inside the burn panel it would make the buttons uneven. */
 #burn .row button {
   margin-top: 0;
 }
@@ -1119,7 +1200,6 @@ b.bad { color: var(--bad); }
   }
 }
 
-/* Pause overlay: dims the flight view and freezes the CSS animations */
 #flpause {
   position: absolute;
   inset: 0;

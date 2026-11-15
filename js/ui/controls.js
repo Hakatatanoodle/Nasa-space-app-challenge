@@ -4,6 +4,7 @@
  * AI-assisted (update): Claude, 2026-11-15 - centred flight menu (M opens it; Home / Pause P / Resume X / Restart R). Reviewed by a human: NO.
  * AI-assisted (update): Claude, 2026-11-15 - win/loss tightening (outcome bands, audio, demos). Reviewed by a human: NO.
  * AI-assisted: YES — Gemini, 2026-11-15. Reviewed by a human: YES Reviewd by Person C (Yochan)
+ * AI-assisted (update): Gemini, 2026-11-15 - rAF-throttled 60fps drag pipeline and clean snap nodes. Reviewed by a human: NO.
  * Sources used: none
  */
 import { DATA } from '../api/mockData.js';
@@ -15,7 +16,6 @@ import {
   saveUndoSnapshot,
   saveMissionProgress,
   saveNamedBuild,
-  deleteSavedBuild,
   AudioEngine
 } from '../core/state.js';
 import {
@@ -158,7 +158,6 @@ function closeOpenModals() {
   closeFlightMenu();
 }
 
-// Leaves the flight (if any) and shows the home / title screen.
 function goHome() {
   abortLaunchSequence();
   closeOpenModals();
@@ -238,11 +237,9 @@ export function bindGlobalControls() {
     AudioEngine.click();
     restartLaunchSequence();
   });
-  // Clicking the dark area around the panel closes the menu
   flightMenu?.addEventListener('click', e => {
     if (e.target === flightMenu) closeFlightMenu();
   });
-  // Keep Tab inside the open menu
   flightMenu?.addEventListener('keydown', e => {
     if (e.key !== 'Tab') return;
     const items = [...flightMenu.querySelectorAll('button:not(:disabled)')];
@@ -261,14 +258,12 @@ export function bindGlobalControls() {
     }
   });
 
-  // Flight shortcuts: Backspace = home, M = menu, P = pause, X = resume, R = restart (only while a launch is running)
   document.addEventListener('keydown', e => {
     if (e.repeat || e.ctrlKey || e.metaKey || e.altKey) return;
     const tag = e.target.tagName;
     if (/SELECT|TEXTAREA/.test(tag) || (tag === 'INPUT' && e.target.type !== 'range')) return;
     const key = (e.key || '').toLowerCase();
 
-    // M opens or closes the flight menu whenever the header Menu button is showing
     if (key === 'm' && !$('#fm-open').hidden) {
       e.preventDefault();
       AudioEngine.click();
@@ -276,7 +271,6 @@ export function bindGlobalControls() {
       else closeFlightMenu();
       return;
     }
-    // Backspace goes Home from the flight screen (same as the Home button)
     if (e.key === 'Backspace' && !$('#fm-open').hidden) {
       e.preventDefault();
       goHome();
@@ -315,7 +309,6 @@ export function bindGlobalControls() {
     }
   });
 
-  // Case-sensitive developer cheat code: exact "Eventhorizon" (only E capital)
   let keyBuffer = '';
   document.addEventListener('keydown', e => {
     if (e.key === 'Escape') {
@@ -332,6 +325,9 @@ export function bindGlobalControls() {
       }
     }
   });
+
+  let dragRafPending = false;
+  let latestDragEvent = null;
 
   document.addEventListener('pointerdown', e => {
     if (appState.mission.stage !== 2) return;
@@ -387,9 +383,11 @@ export function bindGlobalControls() {
     };
   });
 
-  document.addEventListener('pointermove', e => {
+  const processDragFrame = () => {
+    dragRafPending = false;
+    const e = latestDragEvent;
     const drag = appState.activeDrag;
-    if (!drag || e.pointerId !== drag.pointerId) return;
+    if (!e || !drag) return;
 
     if (!drag.mv) {
       if (Math.hypot(e.clientX - drag.x, e.clientY - drag.y) < 7) return;
@@ -513,12 +511,23 @@ export function bindGlobalControls() {
     }
 
     updateBuilderLiveDrag();
+  };
+
+  document.addEventListener('pointermove', e => {
+    const drag = appState.activeDrag;
+    if (!drag || e.pointerId !== drag.pointerId) return;
+    latestDragEvent = e;
+    if (!dragRafPending) {
+      dragRafPending = true;
+      requestAnimationFrame(processDragFrame);
+    }
   });
 
   const finishPointerDrag = e => {
     const drag = appState.activeDrag;
     if (!drag || (e.pointerId !== undefined && e.pointerId !== drag.pointerId)) return;
     appState.activeDrag = null;
+    latestDragEvent = null;
 
     if (!drag.mv) {
       if (drag.nid && e.type !== 'pointercancel') {
@@ -756,7 +765,7 @@ export function bindGlobalControls() {
     if (e.target.id === 'demo-ok') {
       $('#title').hidden = true;
       appState.mission.locked = false;
-      appState.mission.ci = 1; // Moon, so the demo always meets its goal
+      appState.mission.ci = 1;
       appState.mission.oi = 0;
       appState.mission.L = 'medium';
       appState.mission.hard = 0;

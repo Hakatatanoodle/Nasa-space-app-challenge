@@ -5,6 +5,7 @@
  * AI-assisted (update): Claude, 2026-11-15 - flight menu: centred pause menu with Home / Pause (P) / Resume (X) / Restart (R). Reviewed by a human: NO.
  * AI-assisted (update): Claude, 2026-11-15 - win/loss tightening (outcome bands, audio, demos). Reviewed by a human: NO.
  * AI-assisted: YES — Gemini, 2026-11-14; Gemini, 2026-11-15; Claude, 2026-11-14; Claude, 2026-11-15 (two manual burns). Reviewed by a human:YES Reviewd by Person C (Yochan)
+ * AI-assisted (update): Gemini, 2026-11-15 - clean context-aware CAD snap crosshairs, prominent science progress meter, and high-FPS live drag. Reviewed by a human: NO.
  * Sources used: NASA_CUBESAT101, JPL_CML
  */
 import { DATA } from '../api/mockData.js';
@@ -34,7 +35,8 @@ import {
   scoreFlight,
   classifyOutcome,
   buildStarterSpacecraft,
-  DEVELOPER_PREBUILTS
+  DEVELOPER_PREBUILTS,
+  isStackNode
 } from '../core/engine.js';
 import { getFeasibility, buildPlanetBriefing } from '../core/planets.js';
 import {
@@ -61,8 +63,7 @@ let cancelActiveBurn = null;
 let cancelBurnHold = null;
 let flightRunId = 0;
 
-/* ---- Flight clock: every launch animation, burn timer and log delay reads this clock,
-   so freezing it pauses the whole flight at once. ---- */
+/* ---- Flight clock: freezes animations, burn timers, and log delays when paused ---- */
 const flightClock = {
   pausedAt: null,
   offset: 0,
@@ -82,7 +83,6 @@ const flightClock = {
   }
 };
 
-// Like a plain timeout, but the countdown stops while the flight is paused.
 const flightDelay = ms => new Promise(resolve => {
   const startedAt = flightClock.now();
   const check = () => (flightClock.now() - startedAt >= ms ? resolve() : setTimeout(check, 40));
@@ -112,14 +112,13 @@ export function abortLaunchSequence() {
   syncFlightMenu();
 }
 
-/* ---- Flight menu: a centred pause menu (Home / Pause / Resume / Restart) ---- */
+/* ---- Flight menu: centred pause menu (Home / Pause / Resume / Restart) ---- */
 
 const isFlightMenuOpen = () => {
   const menu = $('#flightmenu');
   return !!menu && !menu.hidden;
 };
 
-// Keeps the header Menu button, the centred menu and the status badge up to date.
 export function syncFlightMenu() {
   const menu = $('#flightmenu');
   const opener = $('#fm-open');
@@ -179,7 +178,7 @@ export const isFlightPaused = () => flightClock.paused;
 export function pauseFlight() {
   if (!appState.isFlying || flightClock.paused) return;
   flightClock.pause();
-  if (cancelBurnHold) cancelBurnHold(); // a burn you were holding starts over after Resume
+  if (cancelBurnHold) cancelBurnHold();
   AudioEngine.pauseAll();
   $('#flv')?.classList.add('paused');
   const burnPanel = $('#burn');
@@ -200,12 +199,11 @@ export function resumeFlight() {
   }
   syncFlightMenu();
   if (isFlightMenuOpen()) {
-    $('#flightmenu').hidden = true; // Resume puts the player straight back in the flight
+    $('#flightmenu').hidden = true;
     if (document.activeElement?.closest?.('#flightmenu')) document.activeElement.blur();
   }
 }
 
-// Throws away the current flight and flies the same design again from lift-off.
 export function restartLaunchSequence() {
   if (!appState.isFlying) return;
   abortLaunchSequence();
@@ -303,7 +301,7 @@ export function renderObjectiveStage() {
       <div>
         <b>${c.n}</b>
         <p>${CONTENT.contractBriefs[c.id]}</p>
-        <small>Baseline science ${c.target} (threshold ${c.thr}) · budget $${c.cap}M · ${c.months} months${appState.highScores[c.id] ? ' · best ' + appState.highScores[c.id] : ''}</small>
+        <small>Baseline science <b>${c.target}</b> (min ${c.thr}) · budget $${c.cap}M · ${c.months} months${appState.highScores[c.id] ? ' · best ' + appState.highScores[c.id] : ''}</small>
         <span class="fb ${feasibility.cls}">${feasibility.lab}</span><small class="fn">${feasibility.notes.join(' · ')}</small>
         ${lock ? `<span class="lk">LOCKED - Level ${lock.level}: ${lock.need}</span>` : ''}
         ${devPrebuilt ? `<div style="margin-top:8px;"><button type="button" data-load-prebuilt="${devPrebuilt.id}" style="min-height:44px; padding:4px 12px; font-size:0.85rem; border-color:var(--ok); color:var(--ok);">Load 3&#9733; Prebuilt &rarr;</button></div>` : ''}
@@ -430,6 +428,7 @@ export function renderBuilderStage() {
       <div class="b-main">
         <div class="row builder-head" style="align-items: center;">
           <b id="mn"></b>
+          <div id="sci-hud" class="science-hud-wrap" aria-live="polite"></div>
           <span style="flex: 1;"></span>
           <select id="sl" aria-label="Select launcher">${launcherOptions}</select>
           <select id="so" aria-label="Select orbit"></select>
@@ -521,24 +520,42 @@ const getPartZIndex = part => {
   return part.u === appState.selectedPartUid ? 35 : base;
 };
 
+/* Clean, context-aware CAD snap crosshairs: invisible when idle so the rocket looks crisp,
+   and only displays compatible attachment ports while actively dragging a part! */
 function renderAttachmentNodesHtml() {
   if (appState.mission.locked) return '';
-  const occupied = getOccupiedNodes();
   const drag = appState.activeDrag;
   const isDragging = drag && drag.mv;
-  const draggedSubtree = isDragging ? new Set(getSubtreeUids(drag.u)) : new Set();
+  if (!isDragging) return '';
+
+  const draggedPart = findPartByUid(drag.u);
+  if (!draggedPart || getNodeCategory(draggedPart.id) === 'bus') return '';
+
+  const occupied = getOccupiedNodes();
+  const draggedSubtree = new Set(getSubtreeUids(drag.u));
+  const draggedNodes = ATTACHMENT_NODES[getNodeCategory(draggedPart.id)].filter(
+    ([childNode]) => !occupied.has(`${draggedPart.u}:${childNode}`)
+  );
+
+  const acceptsStack = draggedNodes.some(([n]) => isStackNode(n));
+  const acceptsRadial = draggedNodes.some(([n]) => !isStackNode(n));
 
   let html = '';
   appState.mission.parts.forEach(part => {
+    const isOwn = draggedSubtree.has(part.u);
     ATTACHMENT_NODES[getNodeCategory(part.id)].forEach(([nodeName]) => {
       if (occupied.has(`${part.u}:${nodeName}`)) return;
+      if (!isOwn) {
+        const nodeIsStack = isStackNode(nodeName);
+        if (nodeIsStack && !acceptsStack) return;
+        if (!nodeIsStack && !acceptsRadial) return;
+      }
       const [x, y] = getNodeWorldPosition(part, nodeName);
-      const nodeCls = isDragging ? (draggedSubtree.has(part.u) ? 'own' : '') : 'idle';
-      html += `<i class="nd ${nodeCls}" style="left:${x}px; top:${y}px;"></i>`;
+      html += `<i class="nd ${isOwn ? 'own' : ''}" style="left:${x}px; top:${y}px;"></i>`;
     });
   });
 
-  if (isDragging && drag.sn) {
+  if (drag.sn) {
     const [snapX, snapY] = getNodeWorldPosition(findPartByUid(drag.sn.h), drag.sn.hn);
     html += `<i class="nd hot" style="left:${snapX}px; top:${snapY}px;"></i>`;
   }
@@ -658,6 +675,23 @@ export function refreshBuilderView() {
   appState.previousErrorCount = errorCount;
 
   $('#mn').textContent = contract.n;
+  const sciHud = $('#sci-hud');
+  if (sciHud) {
+    const sciReady = telemetry.sciF >= contract.target;
+    const sciMin = telemetry.sciF >= contract.thr;
+    const fillPct = Math.min(100, Math.round((telemetry.sciF / Math.max(1, contract.target)) * 100));
+    const statusCls = sciReady ? 'goal-met' : sciMin ? 'min-met' : 'low';
+    const barColor = sciReady ? 'var(--ok)' : sciMin ? 'var(--accent)' : 'var(--bad)';
+    sciHud.className = `science-hud-wrap ${statusCls}`;
+    sciHud.innerHTML = `
+      <span style="color:${barColor}; font-weight:700; font-size:0.88rem;">&#128300; Science: ${telemetry.sciF.toFixed(0)} / ${contract.target} pts</span>
+      <span class="science-hud-bar" title="${fillPct}% of baseline science goal (minimum ${contract.thr} pts)">
+        <i style="width:${fillPct}%; background:${barColor};"></i>
+      </span>
+      <small style="color:var(--muted); font-size:0.78rem;">min ${contract.thr}</small>
+    `;
+  }
+
   $('#sl').value = mission.L;
   $('#so').innerHTML = contract.orbits.map((o, i) => `<option value="${i}">${o.n}</option>`).join('');
   $('#so').value = mission.oi;
@@ -674,7 +708,7 @@ export function refreshBuilderView() {
     ? `<b>${getPartDisplayName(selectedPart.id)}</b> <small>${formatPartSpecs(selectedPart.id)}</small> <button type="button" data-a="rot" ${isLocked ? 'disabled' : ''}>Rotate (R)</button><button type="button" data-a="flp" ${isLocked ? 'disabled' : ''}>Flip (F)</button><button type="button" data-a="del" ${isLocked ? 'disabled' : ''}>Delete</button>`
     : isLocked
       ? '<small>&#128274; Design is locked. Click <b>Design locked: ON</b> above to unlock and customize parts.</small>'
-      : '<small>Drag any part on the ship to separate &amp; re-attach, drag from palette, or click a part to rotate, flip, or delete.</small>';
+      : '<small>Drag any part on the ship to separate &amp; re-attach (crosshair ports light up while dragging), or click a part to rotate, flip, or delete.</small>';
 
   const openMap = {};
   $$('#mt details[data-dd]').forEach(el => {
@@ -841,6 +875,8 @@ export function refreshBuilderView() {
     </span>
   `).join('');
 
+  const sciColor = telemetry.sciF >= contract.target ? 'var(--ok)' : telemetry.sciF >= contract.thr ? 'var(--accent)' : 'var(--bad)';
+
   $('#mt').innerHTML = `
     ${alertsDropdownHtml}
     <div class="panel-section-label">Mission resources</div>
@@ -854,7 +890,7 @@ export function refreshBuilderView() {
     <div class="panel-card">
       <div class="panel-card-title">Mission forecast &amp; sign-offs</div>
       <div class="forecast-grid">
-        <div><small>Science</small><b>${telemetry.sciF.toFixed(0)} / ${contract.target} pts</b></div>
+        <div style="border-color:${sciColor};"><small>Science Return</small><b style="color:${sciColor};">${telemetry.sciF.toFixed(0)} / ${contract.target} pts</b></div>
         <div><small>Transit</small><b>${formatNumber(telemetry.days)} days</b></div>
         <div><small>Useful life</small><b>${Math.max(0, telemetry.life).toFixed(0)} mo</b></div>
         <div><small>Reliability</small><b>${toPercent(telemetry.reliability)}%</b></div>
@@ -958,7 +994,7 @@ const renderPredictedFlight = telemetry => {
   return `
     <h3>${text.heading}</h3>
     <p><small>${text.note}</small></p>
-    <p><b>${CONTENT.outcomeLabels[flight.outcome]}</b>: science ${flight.science.toFixed(0)} (threshold ${contract.thr}, baseline ${contract.target}), launch reliability ${toPercent(flight.reliability)}%, ${flight.stars}&#9733;, ${flight.score} pts.</p>
+    <p><b>${CONTENT.outcomeLabels[flight.outcome]}</b>: science <b>${flight.science.toFixed(0)}</b> (threshold ${contract.thr}, baseline ${contract.target}), launch reliability ${toPercent(flight.reliability)}%, ${flight.stars}&#9733;, ${flight.score} pts.</p>
     <ul>${eventItems}</ul>
   `;
 };
@@ -1081,8 +1117,6 @@ function renderFlightSpacecraft() {
 
   return hullHtml + plumeHtml;
 }
-
-/* ---- Stage 3 flight view (canvas) ---- */
 
 const TAU = Math.PI * 2;
 const clamp01 = value => Math.max(0, Math.min(1, value));
@@ -1408,7 +1442,7 @@ function createFlightView(canvas, telemetry) {
   function placeCraftDom(cam) {
     const domAlpha = clamp01((cam.sRel - 0.07) / 0.09);
     craftWrap.style.transform =
-      `translate(${cam.craft.x}px, ${cam.craft.y}px) translate(-50%, -50%) rotate(${cam.theta - Math.PI / 2}rad) scale(${cam.scale})`;
+      `translate3d(${cam.craft.x}px, ${cam.craft.y}px, 0) translate(-50%, -50%) rotate(${cam.theta - Math.PI / 2}rad) scale(${cam.scale})`;
     craftWrap.style.opacity = String(domAlpha);
   }
 
@@ -1460,20 +1494,14 @@ function createFlightView(canvas, telemetry) {
         tracePath(arcPoint, 0, state.craftT);
         ctx.strokeStyle = '#ffc857';
         ctx.lineWidth = 2.5;
-        ctx.shadowColor = '#ffc857';
-        ctx.shadowBlur = 8;
         ctx.stroke();
-        ctx.shadowBlur = 0;
       }
     }
     if (state.dive !== null && state.dive > 0) {
       tracePath(divePoint, 0, state.dive);
       ctx.strokeStyle = '#ff7a3d';
       ctx.lineWidth = 2.5;
-      ctx.shadowColor = '#ff5a1f';
-      ctx.shadowBlur = 10;
       ctx.stroke();
-      ctx.shadowBlur = 0;
     }
 
     ctx.globalAlpha = 1;
@@ -1631,6 +1659,13 @@ function createFlightView(canvas, telemetry) {
     hud.querySelector('.flday').textContent = detail;
     canvas.setAttribute('aria-label', `${hudText.canvasLabel}: ${phase}${detail ? `, ${detail}` : ''}`);
   };
+  view.setScienceHud = (currentSci, targetSci) => {
+    const sciEl = hud.querySelector('.flsci');
+    if (sciEl) {
+      sciEl.textContent = `🔬 Projected Science: ${Math.round(currentSci)} / ${targetSci} pts`;
+      sciEl.style.color = currentSci >= targetSci ? 'var(--ok)' : 'var(--accent)';
+    }
+  };
 
   view.setScene = name => {
     state.scene = name;
@@ -1774,7 +1809,6 @@ function playBurnMinigame(view, kind, offerAll) {
       rafId = requestAnimationFrame(paint);
     };
 
-    // Pause: stop a burn that is being held and put the gauge back to empty.
     cancelBurnHold = () => {
       if (holdStart === null || finished) return;
       holdStart = null;
@@ -1823,7 +1857,6 @@ function playBurnMinigame(view, kind, offerAll) {
       release();
     }
 
-    // Leaving the flight (Home, Restart) closes an open burn without scoring it.
     cancelActiveBurn = () => finish(true, false);
 
     holdBtn.onpointerdown = event => {
@@ -1924,7 +1957,7 @@ export async function startLaunchSequence() {
         <div id="flv">
           <canvas id="flcv" role="img" aria-label="${CONTENT.flightHud.canvasLabel}"></canvas>
           <div id="flcw"><div class="flc" id="fl">${renderFlightSpacecraft()}</div></div>
-          <div id="flhud"><span class="flph"></span><span class="flday"></span></div>
+          <div id="flhud"><span class="flph"></span><span class="flday"></span><span class="flsci"></span></div>
           <div id="flpause" aria-hidden="true">
             <div class="flpause-box">
               <strong>${CONTENT.flightHud.pausedTitle}</strong>
@@ -1955,9 +1988,10 @@ export async function startLaunchSequence() {
     const logEl = $('#log');
     const craftEl = $('#fl');
     const view = createFlightView($('#flcv'), telemetry);
+    view.setScienceHud(flight.science, telemetry.C.target);
 
     $('#fskip').onclick = () => {
-      resumeFlight(); // skipping while paused should keep flying
+      resumeFlight();
       view.skip = true;
       $('#fskip').disabled = true;
       $('#fskip').textContent = 'Skipping...';
@@ -1998,6 +2032,7 @@ export async function startLaunchSequence() {
         burns[kind] = burn;
         flight = resolveFlight(telemetry, burns);
         steps = flight.steps;
+        view.setScienceHud(flight.science * decisionMultiplier, telemetry.C.target);
       }
       $('#burnstate').textContent = all
         ? CONTENT.burn.autoAllResult
@@ -2052,6 +2087,7 @@ export async function startLaunchSequence() {
         } else {
           view.explode();
         }
+        view.setScienceHud(0, telemetry.C.target);
         AudioEngine.fail();
       }
 
@@ -2067,6 +2103,7 @@ export async function startLaunchSequence() {
         if (aborted) return;
         if (chosen) {
           decisionMultiplier *= chosen.bonusFactor;
+          view.setScienceHud(flight.science * decisionMultiplier, telemetry.C.target);
           decisionReasons.push(`Flight Director response (${CONTENT.eventText[step.values.eventId].n}): ${chosen.label}.`);
         }
       }
@@ -2116,7 +2153,7 @@ function concludeMission(flight) {
 
   if (flight.outcome === 'success') AudioEngine.win();
   else if (flight.outcome === 'partial') AudioEngine.partial();
-  else if (!flight.steps.some(step => step.fatal)) AudioEngine.fail(); // a fatal step already played the failure sound
+  else if (!flight.steps.some(step => step.fatal)) AudioEngine.fail();
 
   appState.highScores[contract.id] = Math.max(appState.highScores[contract.id] || 0, flight.score);
   try {
@@ -2178,6 +2215,30 @@ export function renderDebriefStage() {
     mission.parts.filter(p => getConnectedPartUids().has(p.u)).map(p => p.id)
   );
 
+  const outcomeAccent = out === 'lost' ? 'var(--bad)' : out === 'partial' ? 'var(--accent)' : 'var(--ok)';
+  const sciPctOfGoal = Math.min(100, Math.round((sci / contract.target) * 100));
+
+  const heroSummaryBanner = `
+    <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(150px, 1fr)); gap:10px; margin:12px 0; padding:12px; background:#0b2038; border:1px solid ${outcomeAccent}; border-radius:10px;">
+      <div>
+        <small style="color:var(--muted); display:block;">Mission Status</small>
+        <b style="color:${outcomeAccent}; font-size:1.05rem;">${CONTENT.outcomeLabels[out]}</b>
+      </div>
+      <div>
+        <small style="color:var(--muted); display:block;">Science Returned</small>
+        <b style="color:${sci >= contract.target ? 'var(--ok)' : 'var(--accent)'}; font-size:1.05rem;">${sci.toFixed(0)} / ${contract.target} pts (${sciPctOfGoal}%)</b>
+      </div>
+      <div>
+        <small style="color:var(--muted); display:block;">Budget Spent</small>
+        <b style="font-size:1.05rem;">$${telemetry.cost}M / $${contract.cap}M</b>
+      </div>
+      <div>
+        <small style="color:var(--muted); display:block;">Mission Score</small>
+        <b style="color:var(--accent); font-size:1.05rem;">${formatNumber(score)} pts (${'★'.repeat(st)}${'☆'.repeat(3 - st)})</b>
+      </div>
+    </div>
+  `;
+
   const resourceMarginsTable = `
     <p><b>Six-resource margin summary</b></p>
     <table class="rt">
@@ -2225,7 +2286,7 @@ export function renderDebriefStage() {
     <div class="box">
       ${renderCustomEmblemSvg(out, st)}
       <h2>4. Post-Mission Report — ${'★'.repeat(st) + '☆'.repeat(3 - st)} (${score} pts)</h2>
-      <p><b>Outcome:</b> ${CONTENT.outcomeLabels[out]}.</p>
+      ${heroSummaryBanner}
       ${renderCareerNews(news)}
       <p><b>Why it went this way &amp; what to change next</b></p>
       <ul>${(why.length ? why : ['All six resource budgets maintained healthy engineering margins.']).map(reason => `<li>${reason}</li>`).join('')}</ul>
@@ -2236,7 +2297,7 @@ export function renderDebriefStage() {
       <p><b>Destination briefing: ${contract.n}</b></p>
       ${buildPlanetBriefing(contract.id, true)}
       <div class="row" style="margin-top:12px;">
-        <button type="button" data-a="go2">Edit and re-simulate</button>
+        <button type="button" class="go" data-a="go2" style="margin:0;">Edit and re-simulate</button>
         <button type="button" data-a="go1">New mission</button>
       </div>
     </div>
@@ -2298,4 +2359,4 @@ export function showCareerModal() {
     </div>
   `;
   $('#rev').hidden = false;
-} 
+}
