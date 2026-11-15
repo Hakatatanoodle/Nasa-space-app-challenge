@@ -251,9 +251,11 @@ export function renderBuilderStage() {
     .map(k => `<option value="${k}">${DATA.launchers[k].n}</option>`)
     .join('');
 
+  const isLocked = !!appState.mission.locked;
+
   $('#s2').innerHTML = `
     <div id="b3">
-      <div id="pal" aria-label="Spacecraft parts palette">${paletteHtml}</div>
+      <div id="pal" aria-label="Spacecraft parts palette" class="${isLocked ? 'lock' : ''}">${paletteHtml}</div>
       <div>
         <div class="row" style="align-items: center;">
           <b id="mn"></b>
@@ -265,16 +267,19 @@ export function renderBuilderStage() {
           <label class="team-toggle" for="mir">
             <input type="checkbox" id="mir" ${appState.mission.mirror ? 'checked' : ''}> Mirror symmetry
           </label>
-          <button type="button" data-a="undo">Undo</button>
-          <button type="button" id="stk">Starter ship</button>
-          <button type="button" id="clr">Clear</button>
+          <button type="button" id="lck" class="lock-toggle ${isLocked ? 'locked-on' : ''}" aria-pressed="${isLocked}">
+            ${isLocked ? '&#128274; Design locked: ON' : '&#128275; Lock design: OFF'}
+          </button>
+          <button type="button" data-a="undo" ${isLocked ? 'disabled' : ''}>Undo</button>
+          <button type="button" id="stk" ${isLocked ? 'disabled' : ''}>Starter ship</button>
+          <button type="button" id="clr" ${isLocked ? 'disabled' : ''}>Clear</button>
           <button type="button" id="cand">Save candidate</button>
           <button type="button" id="cmp">Compare</button>
           <span style="flex: 1;"></span>
           <button type="button" data-a="zo" aria-label="Zoom out">-</button>
           <button type="button" data-a="zi" aria-label="Zoom in">+</button>
         </div>
-        <div id="cv"><div id="wr"><div id="world"></div></div></div>
+        <div id="cv" class="${isLocked ? 'design-locked' : ''}"><div id="wr"><div id="world"></div></div></div>
         <div id="insp" aria-live="polite"></div>
       </div>
       <div id="mt" aria-live="polite"></div>
@@ -285,7 +290,20 @@ export function renderBuilderStage() {
   $('#so').onchange = e => { appState.mission.oi = +e.target.value; refreshBuilderView(); };
   $('#mir').onchange = e => { appState.mission.mirror = e.target.checked; saveMissionProgress(); };
 
+  $('#lck').onclick = () => {
+    appState.mission.locked = !appState.mission.locked;
+    saveMissionProgress();
+    AudioEngine.click();
+    showToast(
+      appState.mission.locked
+        ? 'Design locked: spacecraft parts are fixed in place.'
+        : 'Design unlocked: drag, separate, rotate, or customize parts freely.'
+    );
+    renderBuilderStage();
+  };
+
   $('#clr').onclick = () => {
+    if (appState.mission.locked) return showToast('Design is locked. Click "Design locked: ON" to unlock.');
     saveUndoSnapshot();
     appState.mission.parts = [];
     appState.selectedPartUid = null;
@@ -304,6 +322,7 @@ export function renderBuilderStage() {
 
   $('#cmp').onclick = showCompareModal;
   $('#stk').onclick = () => {
+    if (appState.mission.locked) return showToast('Design is locked. Click "Design locked: ON" to unlock.');
     saveUndoSnapshot();
     buildStarterSpacecraft();
     appState.selectedPartUid = null;
@@ -320,6 +339,7 @@ const getPartZIndex = part => {
 };
 
 function renderAttachmentNodesHtml() {
+  if (appState.mission.locked) return '';
   const occupied = getOccupiedNodes();
   const drag = appState.activeDrag;
   const isDragging = drag && drag.mv;
@@ -426,6 +446,7 @@ export function refreshBuilderView() {
   const mission = appState.mission;
   const telemetry = (mission.d = calculateTelemetry());
   const contract = telemetry.C;
+  const isLocked = !!mission.locked;
   saveMissionProgress();
 
   const errorCount =
@@ -440,13 +461,6 @@ export function refreshBuilderView() {
   $('#so').innerHTML = contract.orbits.map((o, i) => `<option value="${i}">${o.n}</option>`).join('');
   $('#so').value = mission.oi;
 
-  // Keep full-bleed blueprint grid scaled cleanly across the entire #cv viewport at all zoom levels
-  const cv = $('#cv');
-  if (cv) {
-    cv.style.setProperty('--grid-lg', `${(80 * appState.canvasZoom).toFixed(1)}px`);
-    cv.style.setProperty('--grid-sm', `${(20 * appState.canvasZoom).toFixed(1)}px`);
-  }
-
   $('#wr').style.width = `${960 * appState.canvasZoom}px`;
   $('#wr').style.height = `${1100 * appState.canvasZoom}px`;
   $('#world').style.transform = `scale(${appState.canvasZoom})`;
@@ -454,8 +468,10 @@ export function refreshBuilderView() {
 
   const selectedPart = appState.selectedPartUid && findPartByUid(appState.selectedPartUid);
   $('#insp').innerHTML = selectedPart
-    ? `<b>${getPartDisplayName(selectedPart.id)}</b> <small>${formatPartSpecs(selectedPart.id)}</small> <button type="button" data-a="rot">Rotate (R)</button><button type="button" data-a="flp">Flip (F)</button><button type="button" data-a="del">Delete</button>`
-    : '<small>Click a part in the palette (or drag it onto a glowing dot) to attach. Click a placed part to rotate, flip, or delete.</small>';
+    ? `<b>${getPartDisplayName(selectedPart.id)}</b> <small>${formatPartSpecs(selectedPart.id)}</small> <button type="button" data-a="rot" ${isLocked ? 'disabled' : ''}>Rotate (R)</button><button type="button" data-a="flp" ${isLocked ? 'disabled' : ''}>Flip (F)</button><button type="button" data-a="del" ${isLocked ? 'disabled' : ''}>Delete</button>`
+    : isLocked
+      ? '<small>&#128274; Design is locked. Click <b>Design locked: ON</b> above to unlock and customize parts.</small>'
+      : '<small>Drag any part on the ship to separate &amp; re-attach, drag from palette, or click a part to rotate, flip, or delete.</small>';
 
   const openMap = {};
   $$('#mt details[data-dd]').forEach(el => {
@@ -661,7 +677,7 @@ export function refreshBuilderView() {
           : 'Design review and launch';
 }
 
-/* ---- Modals: Design Review, Trade Space, Share/Load Code ---- */
+/* ---- Modals ---- */
 
 const renderPredictedFlight = telemetry => {
   const flight = resolveFlight(telemetry);
@@ -764,7 +780,7 @@ export function showDesignCodeModal() {
   $('#rev').hidden = false;
 }
 
-/* ---- Stage 3: Deterministic Launch Sequence with Mid-Flight Interactive Decisions ---- */
+/* ---- Stage 3: Launch Sequence ---- */
 
 function renderFlightSpacecraft() {
   const connected = getConnectedPartUids();
