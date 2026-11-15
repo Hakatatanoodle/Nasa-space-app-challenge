@@ -4,7 +4,7 @@
  * Sources used: none
  */
 import { DATA } from '../api/mockData.js';
-import { isContractOpen, toggleDeveloperMode, resetCareer } from '../core/career.js';
+import { isContractOpen, isDeveloperMode, toggleDeveloperMode, resetCareer } from '../core/career.js';
 import { ATTACHMENT_NODES, MAX_PARTS, SNAP_RADIUS_PX } from '../config.js';
 import {
   appState,
@@ -27,6 +27,7 @@ import {
   autoAttachPart,
   buildStarterSpacecraft,
   buildFailingDemoSpacecraft,
+  buildDeveloperPrebuilt,
   isStackNode
 } from '../core/engine.js';
 import { $, showToast } from './domElements.js';
@@ -35,6 +36,7 @@ import {
   renderObjectiveStage,
   refreshBuilderView,
   centerBuilderCanvas,
+  autoFitBuilderCanvas,
   updateBuilderLiveDrag,
   updateCareerButton,
   showSavedBuildsModal,
@@ -128,7 +130,7 @@ function activateDeveloperMode() {
   if (appState.mission.stage === 1) renderObjectiveStage();
   showToast(
     enabled
-      ? 'Developer Mode active: all Solar System destinations unlocked.'
+      ? 'Developer Mode active: all destinations & 3★ prebuilt rockets unlocked in My builds.'
       : 'Developer Mode off: standard Career locks restored.'
   );
 }
@@ -187,7 +189,7 @@ export function bindGlobalControls() {
     }
   });
 
-  // Case-sensitive developer cheat code: type exact "Eventhorizon" (only E capital)
+  // Case-sensitive developer cheat code: exact "Eventhorizon" (only E capital)
   let keyBuffer = '';
   document.addEventListener('keydown', e => {
     if (e.key === 'Escape') {
@@ -479,6 +481,24 @@ export function bindGlobalControls() {
     if (e.target.closest('[data-close-modal]') || e.target.id === 'rev' || e.target.id === 'help') {
       AudioEngine.click();
       closeOpenModals();
+      return;
+    }
+
+    const prebuiltBtn = e.target.closest('[data-load-prebuilt]');
+    if (prebuiltBtn) {
+      e.stopPropagation();
+      if (!isDeveloperMode()) return showToast('Unlock Developer Mode first to load prebuilt reference rockets.');
+      saveUndoSnapshot();
+      const loaded = buildDeveloperPrebuilt(prebuiltBtn.dataset.loadPrebuilt);
+      if (loaded) {
+        appState.selectedPartUid = null;
+        saveMissionProgress();
+        AudioEngine.attach();
+        $('#rev').hidden = true;
+        navigateToStage(2);
+        autoFitBuilderCanvas();
+        showToast(`Loaded 3★ Prebuilt: ${loaded.title}`);
+      }
       return;
     }
 
