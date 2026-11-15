@@ -1,6 +1,6 @@
 /* File: js/core/engine.js
  * Owner: Person A (Ashmin)
- * AI-assisted: YES — Gemini, 2026-11-14; Claude, 2026-11-14. Reviewed by a human: NO.
+ * AI-assisted: YES — Gemini, 2026-11-14; Claude, 2026-11-14; Claude, 2026-11-15 (two manual burns). Reviewed by a human: NO.
  * Sources used: NASA_CUBESAT101, JPL_CML
  */
 import { DATA } from '../api/mockData.js';
@@ -607,15 +607,45 @@ function scoreFlight(telemetry, outcome, science) {
   return { stars, score };
 }
 
+const clamp01 = value => Math.max(0, Math.min(1, Number(value) || 0));
+
+/** The manual burns in mission order. Their settings live in DATA.flightModel.burns. */
+const BURN_ORDER = ['departure', 'insertion'];
+
+/** Precision (0..1) of a burn the player flew, or null when it was left to Auto-pilot. */
+function getBurnQuality(burns, kind) {
+  return burns && burns[kind] ? clamp01(burns[kind].quality) : null;
+}
+
+/**
+ * Scores one manual burn. Pure. `kind` is 'departure' or 'insertion'. `fill` (0..1) is how full the burn
+ * gauge was when the player let go. Inside the target zone the precision is 1 at the centre and falls to 0
+ * at the edges; outside the zone it is 0.
+ * Returns { kind, fill, quality, bonus }: quality 0..1, bonus = THIS burn's share of the extra science as a
+ * fraction (0.03 = +3%). An unknown kind scores 0.
+ */
+export function scoreBurn(fill, kind = 'departure') {
+  const model = DATA.flightModel;
+  const spec = model.burns[kind];
+  const clamped = clamp01(fill);
+  if (!spec) return { kind, fill: clamped, quality: 0, bonus: 0 };
+  const quality = clamp01(1 - Math.abs(clamped - spec.target) / spec.zoneHalfWidth);
+  return { kind, fill: clamped, quality, bonus: quality * spec.weight * model.burnBonusMax };
+}
+
 /**
  * Resolves a whole flight from the design's numbers. Pure and deterministic.
- * The launch screen (text today, a visual simulation later) only PLAYS the returned
- * `steps`; it never decides the outcome.
+ * The launch screen (a canvas flight view) only PLAYS the returned `steps`; it never decides the outcome.
+ *
+ * `burns` is optional: { departure, insertion }, each a scoreBurn() result ({ quality }) when the player flew
+ * that burn by hand. A missing burn (or burns = null) is Auto-pilot: no bonus, never a penalty.
+ * Flying every burn perfectly adds at most DATA.flightModel.burnBonusMax of science in total.
+ * Same design + same burn qualities = same result.
  *
  * steps: ordered [{ key, ok, fatal, values }]. `key` names a CONTENT.flightLog template,
  * `values` holds the raw numbers for it, `fatal` means the mission ends on that step.
  */
-export function resolveFlight(telemetry) {
+export function resolveFlight(telemetry, burns = null) {
   const model = DATA.flightModel;
   const contract = telemetry.C;
   const steps = [];
@@ -686,7 +716,26 @@ export function resolveFlight(telemetry) {
     return lose('ion_short', { needW: telemetry.E.pw }, 'ion');
   }
 
+  // Optional manual burns: they only ever add science. The UI offers them only for flights that survive the transfer.
+  // Each burn's bonus is its precision x its share (weight) of the cap. A burn left to Auto-pilot adds 0.
+  const burnShare = kind => {
+    const quality = getBurnQuality(burns, kind);
+    return quality === null ? 0 : quality * model.burns[kind].weight * model.burnBonusMax;
+  };
+  const burnBonus = Math.min(model.burnBonusMax, BURN_ORDER.reduce((total, kind) => total + burnShare(kind), 0));
+  const pushBurnStep = kind => {
+    const quality = getBurnQuality(burns, kind);
+    if (quality === null) return;
+    steps.push({
+      key: quality > 0 ? `burn_${kind}` : `burn_${kind}_miss`,
+      ok: true,
+      values: { precisionPct: quality, bonusPct: burnShare(kind) }
+    });
+  };
+
+  pushBurnStep('departure'); // leaving the parking orbit, before the coast
   steps.push({ key: 'arrival', ok: true, values: { days: telemetry.days, orbit: telemetry.O.n.toLowerCase() } });
+  pushBurnStep('insertion'); // slowing down into orbit at the destination
   steps.push({ key: 'briefing', ok: true, values: { contractId: contract.id } });
 
   const events = getTriggeredEvents(telemetry);
@@ -694,7 +743,7 @@ export function resolveFlight(telemetry) {
     steps.push({ key: 'event', ok: event.immune, values: { eventId: event.id, scienceFactor: event.scienceFactor } });
   });
 
-  const science = events.reduce((total, event) => total * event.scienceFactor, telemetry.sciF);
+  const science = events.reduce((total, event) => total * event.scienceFactor, telemetry.sciF) * (1 + burnBonus);
   steps.push({
     key: 'operations',
     ok: true,
@@ -716,6 +765,22 @@ export function resolveFlight(telemetry) {
     const text = CONTENT.eventText[event.id];
     reasons.push(`${text.n}: ${text.hitT} ${fillTemplate(CONTENT.flightFailures.eventLoss, { lossPct: 1 - event.scienceFactor })} Fix: ${text.fix}`);
   });
+
+  if (BURN_ORDER.every(kind => getBurnQuality(burns, kind) === null)) {
+    reasons.push(fillTemplate(CONTENT.flightFailures.burnAuto, { maxBonusPct: model.burnBonusMax }));
+  } else {
+    BURN_ORDER.forEach(kind => {
+      const quality = getBurnQuality(burns, kind);
+      const name = CONTENT.burn[kind].name;
+      if (quality === null) {
+        reasons.push(fillTemplate(CONTENT.flightFailures.burnSkipped, { name }));
+      } else if (quality > 0) {
+        reasons.push(fillTemplate(CONTENT.flightFailures.burn, { name, precisionPct: quality, bonusPct: burnShare(kind) }));
+      } else {
+        reasons.push(fillTemplate(CONTENT.flightFailures.burnMiss, { name }));
+      }
+    });
+  }
 
   const reliabilityLine = fillTemplate(CONTENT.flightFailures.reliability, {
     reliabilityPct: telemetry.reliability,
