@@ -4,7 +4,7 @@
  * Sources used: none
  */
 import { DATA } from '../api/mockData.js';
-import { isContractOpen, toggleGodMode, resetCareer } from '../core/career.js';
+import { isContractOpen, toggleDeveloperMode, resetCareer } from '../core/career.js';
 import { ATTACHMENT_NODES, MAX_PARTS, SNAP_RADIUS_PX } from '../config.js';
 import {
   appState,
@@ -45,6 +45,8 @@ import {
   startLaunchSequence,
   abortLaunchSequence
 } from './renderer.js';
+
+const DEVELOPER_CHEAT_CODE = 'Eventhorizon';
 
 function clientToWorldCoords(event) {
   const rect = $('#world').getBoundingClientRect();
@@ -120,14 +122,14 @@ function undoLastAction() {
   refreshBuilderView();
 }
 
-function activateSecretGodMode() {
-  const enabled = toggleGodMode();
+function activateDeveloperMode() {
+  const enabled = toggleDeveloperMode();
   updateCareerButton();
   if (appState.mission.stage === 1) renderObjectiveStage();
   showToast(
     enabled
-      ? 'Director Override active: all Solar System destinations unlocked.'
-      : 'Director Override off: standard Career locks restored.'
+      ? 'Developer Mode active: all Solar System destinations unlocked.'
+      : 'Developer Mode off: standard Career locks restored.'
   );
 }
 
@@ -164,7 +166,6 @@ export function bindGlobalControls() {
     e.preventDefault();
   });
 
-  // Top-left APOGEE logo always returns to the landing page, even mid-flight
   $('#brand-home')?.addEventListener('click', e => {
     e.preventDefault();
     abortLaunchSequence();
@@ -182,10 +183,11 @@ export function bindGlobalControls() {
     logoClickTimer = setTimeout(() => { logoClicks = 0; }, 2200);
     if (logoClicks >= 5) {
       logoClicks = 0;
-      activateSecretGodMode();
+      activateDeveloperMode();
     }
   });
 
+  // Case-sensitive developer cheat code: type exact "Eventhorizon" (only E capital)
   let keyBuffer = '';
   document.addEventListener('keydown', e => {
     if (e.key === 'Escape') {
@@ -194,10 +196,10 @@ export function bindGlobalControls() {
     }
     if (/SELECT|TEXTAREA|INPUT/.test(e.target.tagName)) return;
     if (e.key && e.key.length === 1) {
-      keyBuffer = (keyBuffer + e.key.toLowerCase()).slice(-6);
-      if (keyBuffer === 'apogee') {
+      keyBuffer = (keyBuffer + e.key).slice(-DEVELOPER_CHEAT_CODE.length);
+      if (keyBuffer === DEVELOPER_CHEAT_CODE) {
         keyBuffer = '';
-        activateSecretGodMode();
+        activateDeveloperMode();
       }
     }
   });

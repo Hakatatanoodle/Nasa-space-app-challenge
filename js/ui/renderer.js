@@ -35,7 +35,7 @@ import {
   ACHIEVEMENTS,
   GATES,
   getCareer,
-  isGodMode,
+  isDeveloperMode,
   isContractOpen,
   getContractSortKey,
   getLockInfo,
@@ -185,7 +185,7 @@ export function renderObjectiveStage() {
 
   $('#s1').innerHTML = `
     <div>
-      <h2>1. Choose your mission objective <span class="badge-source ${weather.isLive ? '' : 'offline'}">${appState.dataSourceLabel}</span>${isGodMode() ? ' <span class="badge-simplified">Director Override</span>' : ''}</h2>
+      <h2>1. Choose your mission objective <span class="badge-source ${weather.isLive ? '' : 'offline'}">${appState.dataSourceLabel}</span>${isDeveloperMode() ? ' <span class="badge-simplified">Developer Mode</span>' : ''}</h2>
       <div class="weather-banner ${weather.isLive ? '' : 'offline'}">
         <span><b>Space Weather Telemetry:</b> ${weather.summary}</span>
         <small>Solar Activity: <b>${weather.stormLevel}</b> (${weather.src})</small>
@@ -1338,12 +1338,10 @@ function createFlightView(canvas, telemetry) {
     ctx.setLineDash([]);
 
     const ring = viz.orbitRings[orbitIndex] ?? viz.orbitRings[0];
-    // Crisp orbital survey speed so a full pass completes cleanly during operations
     const angle = startAngle - now * (0.0032 / (0.5 + ring));
     const x = cx + ring * half * Math.cos(angle);
     const y = cy + ring * half * Math.sin(angle);
 
-    // Subtle sensor scan swath trail behind the orbiter
     ctx.beginPath();
     ctx.arc(cx, cy, ring * half, angle, angle + 0.65);
     ctx.strokeStyle = 'rgba(127,227,184,0.45)';
@@ -1684,7 +1682,6 @@ function promptMidFlightDecision(logEl, eventId, view) {
 
     pendingDecisionResolver = () => selectChoice(0);
 
-    // If the user already pressed Skip animation, auto-execute the primary recovery maneuver
     if (view?.skip) {
       selectChoice(0);
       return;
@@ -1754,7 +1751,6 @@ export async function startLaunchSequence() {
       view.skip = true;
       $('#fskip').disabled = true;
       $('#fskip').textContent = 'Skipping...';
-      // Immediately resolve any waiting Flight Director anomaly prompt so orbit animation finishes right away
       if (pendingDecisionResolver) {
         pendingDecisionResolver();
       }
