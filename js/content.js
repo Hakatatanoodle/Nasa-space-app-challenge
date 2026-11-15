@@ -15,7 +15,7 @@ export const CONTENT = {
     landing: 'assets/audio/Landing.mp3',
     design: 'assets/audio/design.mp3',
     win: 'assets/audio/win.mp3',
-    loss: 'assets/audio/lost.mp3'
+    loss: 'assets/audio/loss.mp3'
   },
   disclaimer: 'Mission design simulation — live NASA DONKI space weather + simplified spacecraft engineering model.',
   stageNames: ['Objective', 'Build', 'Launch', 'Debrief'],
