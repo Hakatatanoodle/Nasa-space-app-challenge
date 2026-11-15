@@ -1,10 +1,17 @@
 /* File: css/base.css
  * Owner: Person B (Saurav)
- * AI-assisted: YES — Gemini, 2026-11-14. Reviewed by a human: NO.
+ * AI-assisted: YES — Gemini, 2026-11-15. Reviewed by a human: NO.
  * Sources used: none
  */
 * {
   box-sizing: border-box;
+}
+
+img {
+  user-select: none;
+  -webkit-user-select: none;
+  -webkit-user-drag: none;
+  -webkit-touch-callout: none;
 }
 
 body {
@@ -19,13 +26,29 @@ body {
 
 header {
   position: relative;
+  z-index: 5;
   display: flex;
   flex-wrap: wrap;
   align-items: center;
   gap: 8px;
   padding: 8px 14px;
-  background: #12304fee;
+  background: #0d2640f2;
   border-bottom: 1px solid var(--line);
+}
+
+.home-link {
+  text-decoration: none;
+  display: inline-flex;
+  align-items: center;
+  cursor: pointer;
+}
+
+.home-link h1 {
+  margin: 0 10px 0 0;
+}
+
+.home-link:hover h1 {
+  opacity: 0.85;
 }
 
 h1 {
@@ -57,6 +80,7 @@ textarea {
   background: var(--panel);
   border: 1px solid #3c78b5;
   border-radius: 6px;
+  transition: background-color 0.15s ease, border-color 0.15s ease, transform 0.1s ease;
 }
 
 button {
@@ -66,6 +90,11 @@ button {
 
 button:hover:not(:disabled) {
   background: #3570ab;
+  border-color: #63a4e6;
+}
+
+button:active:not(:disabled) {
+  transform: translateY(1px);
 }
 
 button:focus-visible,
@@ -80,6 +109,41 @@ textarea:focus-visible,
 button:disabled {
   opacity: 0.45;
   cursor: not-allowed;
+}
+
+/* Integrated Audio Mute Button + Volume Slider */
+.audio-control {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 44px;
+  padding: 0 10px 0 0;
+  background: #102a46;
+  border: 1px solid #3c78b5;
+  border-radius: 6px;
+}
+
+.audio-control #mute {
+  border: 0;
+  border-right: 1px solid #295c8f;
+  border-radius: 5px 0 0 5px;
+  min-height: 42px;
+}
+
+.audio-control input[type="range"] {
+  width: 78px;
+  height: 6px;
+  padding: 0;
+  min-height: 0;
+  accent-color: var(--ok);
+  background: #08182b;
+  border-radius: 4px;
+  cursor: pointer;
+}
+
+.audio-control.is-muted input[type="range"] {
+  accent-color: var(--muted);
+  opacity: 0.6;
 }
 
 .team-toggle {
@@ -156,7 +220,27 @@ button:disabled {
   object-fit: cover;
   z-index: 0;
   pointer-events: none;
-  opacity: 0.75;
+  opacity: 0.92;
+  transform: translateZ(0);
+  will-change: transform;
+}
+
+@media (max-width: 640px) {
+  header {
+    padding: 6px 10px;
+    gap: 6px;
+  }
+  button,
+  select {
+    padding: 6px 10px;
+    font-size: 0.9rem;
+  }
+  .audio-control input[type="range"] {
+    width: 62px;
+  }
+  #app {
+    padding: 10px 10px;
+  }
 }
 
 @media (prefers-reduced-motion: reduce) {

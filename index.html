@@ -1,6 +1,6 @@
 <!-- File: index.html
   Owner: Person B (Saurav)
-  AI-assisted: YES — Gemini, 2026-11-14. Reviewed by a human: NO.
+  AI-assisted: YES — Gemini, 2026-11-15. Reviewed by a human: NO.
   Sources used: SPACEAPPS_CHALLENGE
 -->
 <!DOCTYPE html>
@@ -19,14 +19,15 @@
   <video id="bg" muted loop playsinline></video>
 
   <header>
-    <h1 id="hn"></h1>
+    <a href="./index.html" class="home-link" id="brand-home" aria-label="Go to APOGEE home">
+      <h1 id="hn"></h1>
+    </a>
     <nav id="nav" aria-label="Mission stages"></nav>
-    <label class="team-toggle" for="team">
-      <input type="checkbox" id="team" /> Team of 4
-    </label>
-    <button type="button" id="pass" hidden></button>
     <button type="button" id="car"></button>
-    <button type="button" id="mute">Sound: off</button>
+    <div class="audio-control" role="group" aria-label="Audio controls">
+      <button type="button" id="mute" class="sound-on">Sound: on</button>
+      <input type="range" id="vol" min="0" max="100" value="75" aria-label="Master volume" title="Master volume (75%)" />
+    </div>
     <button type="button" id="copy">Share / Load code</button>
     <button type="button" id="hp">How to play</button>
   </header>

@@ -1,11 +1,11 @@
 /* File: css/pages/simulation.css
  * Owner: Person B (Saurav)
- * AI-assisted: YES — Gemini, 2026-11-14; Claude, 2026-11-14 (flight view and burn panel styles); Claude, 2026-11-15 (burn panel buttons). Reviewed by a human: NO.
+ * AI-assisted: YES — Gemini, 2026-11-14; Gemini, 2026-11-15; Claude, 2026-11-14 (flight view and burn panel styles); Claude, 2026-11-15 (burn panel buttons). Reviewed by a human: NO.
  * Sources used: none
  */
 #b3 {
   display: grid;
-  grid-template-columns: clamp(220px, 19vw, 270px) minmax(420px, 1fr) clamp(280px, 23vw, 350px);
+  grid-template-columns: clamp(220px, 19vw, 270px) minmax(400px, 1fr) clamp(300px, 25vw, 380px);
   gap: 14px;
   align-items: start;
 }
@@ -13,15 +13,33 @@
 #pal,
 #mt {
   padding: 12px 14px;
-  background: #12304fe6;
+  background: #102a46f2;
   border: 1px solid var(--line);
   border-radius: 12px;
   max-height: calc(100vh - 88px);
   overflow-y: auto;
+  box-shadow: 0 8px 28px #040d1866;
 }
 
 #pal h3 {
   margin: 12px 0 6px;
+}
+
+#mute.sound-on {
+  border-color: var(--ok);
+  color: var(--ok);
+  background: #12304f;
+}
+
+.lock-toggle {
+  border-color: #4c8fd1;
+}
+
+.lock-toggle.locked-on {
+  border-color: var(--accent);
+  background: #ffc85726;
+  color: var(--accent);
+  font-weight: 700;
 }
 
 .tile {
@@ -62,20 +80,42 @@
   color: var(--muted);
 }
 
+/* Full-bleed blueprint grid across the entire canvas viewport at every zoom level */
 #cv {
   position: relative;
   width: 100%;
-  height: calc(100vh - 210px);
+  height: calc(100vh - 208px);
   min-height: 480px;
   margin: 0;
   overflow: auto;
-  background:
-    radial-gradient(circle at 50% 42%, #1a436e55, #071526cc 78%);
-  border: 1.5px solid #3c78b5;
-  box-shadow: inset 0 0 36px #040d18cc, 0 4px 20px #00000055;
+  background-color: #08182be0;
+  background-image:
+    linear-gradient(#5da9ff1e 1px, transparent 1px),
+    linear-gradient(90deg, #5da9ff1e 1px, transparent 1px),
+    linear-gradient(#5da9ff0c 1px, transparent 1px),
+    linear-gradient(90deg, #5da9ff0c 1px, transparent 1px),
+    radial-gradient(circle at 50% 48%, #1d4b7a66, #08182be8 78%);
+  background-size:
+    80px 80px,
+    80px 80px,
+    20px 20px,
+    20px 20px,
+    100% 100%;
+  background-attachment: local, local, local, local, scroll;
+  border: 1.5px solid #4484c4;
+  box-shadow: inset 0 0 42px #040d18dd, 0 8px 28px #00000066;
   border-radius: 12px;
   touch-action: none;
   cursor: grab;
+}
+
+#cv.design-locked {
+  border-color: var(--accent);
+  box-shadow: inset 0 0 42px #040d18dd, 0 0 0 1px #ffc85766;
+}
+
+#cv.design-locked #world .pt {
+  cursor: pointer;
 }
 
 #cv:active {
@@ -84,20 +124,25 @@
 
 #wr {
   position: relative;
+  min-width: 100%;
+  min-height: 100%;
   margin: 0 auto;
 }
 
+/* Keep transform-origin: 0 0 so controls.js clientToWorldCoords() stays exact */
 #world {
   position: relative;
   width: 960px;
   height: 1100px;
   transform-origin: 0 0;
   background-image:
-    linear-gradient(#5da9ff18 1px, transparent 1px),
-    linear-gradient(90deg, #5da9ff18 1px, transparent 1px),
-    linear-gradient(#5da9ff0a 1px, transparent 1px),
-    linear-gradient(90deg, #5da9ff0a 1px, transparent 1px);
-  background-size: 80px 80px, 80px 80px, 20px 20px, 20px 20px;
+    radial-gradient(2px 2px at 140px 180px, #ffffff55, transparent),
+    radial-gradient(1.5px 1.5px at 780px 240px, #7fe3b866, transparent),
+    radial-gradient(2px 2px at 260px 620px, #ffc85755, transparent),
+    radial-gradient(1.5px 1.5px at 720px 760px, #ffffff44, transparent),
+    radial-gradient(1.5px 1.5px at 480px 120px, #ffffff44, transparent),
+    linear-gradient(90deg, transparent 479px, #ffc8572e 479px, #ffc8572e 481px, transparent 481px);
+  background-size: 960px 1100px;
 }
 
 .pt {
@@ -105,6 +150,7 @@
   user-select: none;
   touch-action: none;
   -webkit-user-drag: none;
+  filter: drop-shadow(0 3px 6px #040d18aa);
   transition: filter 0.15s ease;
 }
 
@@ -113,7 +159,12 @@
 }
 
 #world .pt:hover {
-  filter: drop-shadow(0 0 8px #7fe3b8aa);
+  filter: drop-shadow(0 3px 6px #040d18aa) drop-shadow(0 0 8px #7fe3b8aa);
+}
+
+.pt.dragging {
+  cursor: grabbing !important;
+  filter: drop-shadow(0 8px 16px #040d18dd) drop-shadow(0 0 10px #ffc857aa);
 }
 
 .pt.sel {
@@ -186,7 +237,7 @@
   min-height: 46px;
   padding: 8px 10px;
   margin-top: 6px;
-  background: #12304fcc;
+  background: #102a46f2;
   border: 1px solid var(--line);
   border-radius: 8px;
   display: flex;
@@ -195,18 +246,249 @@
   gap: 8px;
 }
 
+/* Unified Section & Metric Boxes */
+.panel-section-label {
+  margin: 4px 0 6px;
+  font-size: 0.85rem;
+  font-weight: 700;
+  letter-spacing: 0.6px;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.resource-system,
+.resource-card,
+.panel-card {
+  margin-top: 8px;
+  background: #0b2038a8;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  overflow: hidden;
+  transition: border-color 0.2s ease, background-color 0.2s ease;
+}
+
+.resource-card,
+.panel-card {
+  padding: 8px 10px;
+}
+
+.resource-card .m:first-child {
+  margin-top: 0;
+}
+
+.resource-system.bad,
+.resource-card.bad {
+  border-color: #ff856d88;
+}
+
+.resource-system.w,
+.resource-card.w {
+  border-color: #ffc85788;
+}
+
+.panel-card-title {
+  margin-bottom: 6px;
+  font-size: 0.9rem;
+  font-weight: 700;
+  color: var(--accent);
+}
+
+.forecast-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 6px 10px;
+}
+
+.forecast-grid > div {
+  padding: 5px 8px;
+  background: #12304f99;
+  border: 1px solid #295c8f66;
+  border-radius: 6px;
+}
+
+.forecast-grid small {
+  display: block;
+  font-size: 0.74rem;
+  color: var(--muted);
+}
+
+.forecast-grid b {
+  font-size: 0.88rem;
+  color: var(--text);
+}
+
+.resource-system > summary {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  min-height: 44px;
+  padding: 8px 10px;
+  cursor: pointer;
+  list-style: none;
+  user-select: none;
+}
+
+.resource-system > summary::-webkit-details-marker {
+  display: none;
+}
+
+.resource-system > summary::before {
+  content: '▸';
+  font-size: 0.85rem;
+  color: var(--accent);
+  transition: transform 0.15s ease;
+}
+
+.resource-system[open] > summary::before {
+  transform: rotate(90deg);
+}
+
+.resource-system > summary:hover {
+  background: #163a61aa;
+}
+
+.topic-title {
+  flex: 1;
+  font-size: 0.94rem;
+}
+
+.topic-sub {
+  color: var(--muted);
+  font-size: 0.8rem;
+}
+
+.topic-badge {
+  font-size: 0.8rem;
+  letter-spacing: 0.4px;
+  white-space: nowrap;
+}
+
+.resource-system-content {
+  padding: 4px 10px 10px;
+  border-top: 1px solid #295c8f66;
+}
+
+.resource-system-content .m:first-child {
+  margin-top: 4px;
+}
+
+.sub-branch {
+  color: var(--accent);
+  font-weight: 700;
+}
+
+/* Compact Engineering Alerts Reminder Dropdown */
+.alerts-box {
+  margin-bottom: 10px;
+  background: #0b2038cc;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+.alerts-box.bad {
+  border-color: var(--bad);
+}
+
+.alerts-box.w {
+  border-color: var(--accent);
+}
+
+.alerts-box.ok {
+  border-color: var(--ok);
+}
+
+.alerts-box > summary {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  min-height: 44px;
+  padding: 6px 10px;
+  cursor: pointer;
+  list-style: none;
+  user-select: none;
+  font-size: 0.92rem;
+}
+
+.alerts-box > summary::-webkit-details-marker {
+  display: none;
+}
+
+.alerts-box > summary::before {
+  content: '▸';
+  font-size: 0.85rem;
+  color: var(--accent);
+  transition: transform 0.15s ease;
+}
+
+.alerts-box[open] > summary::before {
+  transform: rotate(90deg);
+}
+
+.alerts-list {
+  padding: 6px 10px 10px;
+  border-top: 1px solid #295c8f66;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.alert-item {
+  font-size: 0.84rem;
+  line-height: 1.4;
+  padding: 5px 8px;
+  border-radius: 6px;
+  background: #12304fbb;
+  border-left: 3px solid var(--line);
+}
+
+.alert-item.bad {
+  border-left-color: var(--bad);
+}
+
+.alert-item.w {
+  border-left-color: var(--accent);
+}
+
+.alert-pill {
+  display: inline-block;
+  margin-right: 5px;
+  padding: 1px 5px;
+  font-size: 0.72rem;
+  font-weight: 700;
+  border-radius: 4px;
+  border: 1px solid currentColor;
+}
+
+.alert-pill.bad {
+  color: var(--bad);
+}
+
+.alert-pill.w {
+  color: var(--accent);
+}
+
+.alert-clear {
+  margin: 0;
+  font-size: 0.84rem;
+  color: var(--ok);
+}
+
 .m {
   display: grid;
-  grid-template-columns: 112px 1fr 56px;
+  grid-template-columns: 118px 1fr 56px;
   align-items: center;
-  gap: 2px 8px;
+  gap: 3px 8px;
   margin-top: 8px;
 }
 
 .m.sub {
-  margin-top: 2px;
-  padding-left: 12px;
-  opacity: 0.92;
+  margin-top: 6px;
+  padding-left: 10px;
+  border-left: 2px solid #3c78b566;
+  opacity: 0.95;
 }
 
 .m i {
@@ -244,18 +526,24 @@ b.bad { color: var(--bad); }
 
 .why {
   grid-column: 1 / 4;
-  margin: 2px 0 4px;
-  font-size: 0.85rem;
+  margin: 3px 0 2px;
+  padding: 5px 8px;
+  font-size: 0.84rem;
+  line-height: 1.4;
   color: #dbe8f5;
+  background: #12304f88;
+  border-radius: 5px;
 }
 
-.m span b {
+.m span b,
+.resource-number {
   color: var(--accent);
+  font-weight: 700;
 }
 
 .chk {
-  margin: 4px 0;
-  font-size: 0.9rem;
+  margin: 5px 0;
+  font-size: 0.88rem;
 }
 
 .chk.ok { color: var(--ok); }
@@ -346,13 +634,25 @@ b.bad { color: var(--bad); }
     max-height: none;
   }
   #cv {
-    height: 460px;
+    height: 420px;
+    min-height: 360px;
   }
   #flv {
     height: min(66vh, 560px);
     min-height: 380px;
   }
 }
+
+@media (max-width: 480px) {
+  #cv {
+    height: 360px;
+    min-height: 320px;
+  }
+  .m {
+    grid-template-columns: 102px 1fr 48px;
+  }
+}
+
 /* Sun mission: the dive sequence heats the whole launch view */
 #flv.sunhit {
   background: radial-gradient(circle at 50% -10%, #fff3b0, #ffb347 25%, #ff5a1f 55%, #3a0d05) !important;

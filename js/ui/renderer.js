@@ -1,6 +1,6 @@
 /* File: js/ui/renderer.js
  * Owner: Person B (Saurav)
- * AI-assisted: YES — Gemini, 2026-11-14; Claude, 2026-11-14; Claude, 2026-11-15 (two manual burns). Reviewed by a human: NO.
+ * AI-assisted: YES — Gemini, 2026-11-14; Gemini, 2026-11-15; Claude, 2026-11-14; Claude, 2026-11-15 (two manual burns). Reviewed by a human: NO.
  * Sources used: NASA_CUBESAT101, JPL_CML
  */
 import { DATA } from '../api/mockData.js';
@@ -10,8 +10,9 @@ import {
   appState,
   getNodeCategory,
   getAssetFilename,
-  getLockClass,
   saveUndoSnapshot,
+  saveMissionProgress,
+  saveNamedBuild,
   AudioEngine
 } from '../core/state.js';
 import {
@@ -26,6 +27,7 @@ import {
   resolveFlight,
   scoreBurn,
   createSeededRng,
+  scoreFlight,
   buildStarterSpacecraft
 } from '../core/engine.js';
 import { getFeasibility, buildPlanetBriefing } from '../core/planets.js';
@@ -33,6 +35,7 @@ import {
   ACHIEVEMENTS,
   GATES,
   getCareer,
+  isGodMode,
   isContractOpen,
   getContractSortKey,
   getLockInfo,
@@ -46,16 +49,48 @@ import {
 } from '../core/career.js';
 import { $, $$, toPercent, formatNumber, delay, showToast } from './domElements.js';
 
+const WORLD_PAD_PX = 360;
+
 const renderDataBadge = isVerified =>
   isVerified
-    ? '<span class="badge-source">verified source</span>'
-    : '<span class="badge-simplified">simplified</span>';
+    ? ''
+    : '<span class="badge-simplified" title="Simplified engineering model parameter for gameplay">Sim Model</span>';
+
+const renderModalHeader = (titleText, titleId = '') => `
+  <div class="modal-header">
+    <h2 ${titleId ? `id="${titleId}"` : ''}>${titleText}</h2>
+    <button type="button" class="modal-close-x" data-close-modal="1" aria-label="Close window">&times;</button>
+  </div>
+`;
+
+export function renderHelpModal() {
+  const paragraphs = CONTENT.helpHtml
+    .trim()
+    .split('\n')
+    .map(line => line.trim())
+    .filter(Boolean)
+    .map(pHtml => `<div class="help-card">${pHtml}</div>`)
+    .join('');
+
+  $('#help-body').innerHTML = `
+    ${renderModalHeader('Mission Control Field Guide', 'help-title')}
+    <div class="help-grid">${paragraphs}</div>
+  `;
+}
 
 /* ---- Stage Navigation ---- */
 
 export function navigateToStage(stageNumber) {
   if (appState.isFlying) return;
   appState.mission.stage = stageNumber;
+  saveMissionProgress();
+
+  const isTitleVisible = $('#title') && !$('#title').hidden;
+  if (isTitleVisible) {
+    AudioEngine.setMusic('landing');
+  } else if (stageNumber === 1 || stageNumber === 2) {
+    AudioEngine.setMusic('design');
+  }
 
   $$('.st').forEach((section, index) => {
     section.classList.toggle('on', index + 1 === stageNumber);
@@ -73,13 +108,11 @@ export function navigateToStage(stageNumber) {
   if (stageNumber === 2) renderBuilderStage();
   if (stageNumber === 4) renderDebriefStage();
 
-  $('#pass').hidden = !appState.isTeamMode;
-  $('#pass').textContent = `Role: ${appState.activeRole} — pass keyboard`;
   updateCareerButton();
 }
 
 export function updateCareerButton() {
-  $('#car').textContent = getCareerButtonLabel();
+  $('#car').textContent = `★ ${getCareerButtonLabel()}`;
 }
 
 /* ---- Stage 1: Objective Selection ---- */
@@ -90,8 +123,8 @@ const formatOrbitSummary = orbit =>
 export function renderObjectiveStage() {
   const mission = appState.mission;
   const contract = DATA.contracts[mission.ci];
+  const weather = appState.spaceWeather;
 
-  // Career mode: unlocked planets sit in solar-system order, locked ones wait at the end (still listed, not selectable).
   const contractCards = DATA.contracts
     .map((c, index) => [c, index])
     .sort((a, b) => getContractSortKey(a[0]) - getContractSortKey(b[0]))
@@ -103,7 +136,7 @@ export function renderObjectiveStage() {
     <div class="card ${index === mission.ci ? 'sel' : ''} ${open ? '' : 'lkd'}" role="button" ${open ? `tabindex="0" data-a="ci" data-v="${index}"` : 'aria-disabled="true"'}>
       <img src="assets/dest_${c.dest}.svg" alt="${c.n}">
       <div>
-        <b>${c.n}</b> ${renderDataBadge(c.verified)}
+        <b>${c.n}</b>
         <p>${CONTENT.contractBriefs[c.id]}</p>
         <small>Baseline science ${c.target} (threshold ${c.thr}) · budget $${c.cap}M · ${c.months} months${appState.highScores[c.id] ? ' · best ' + appState.highScores[c.id] : ''}</small>
         <span class="fb ${feasibility.cls}">${feasibility.lab}</span><small class="fn">${feasibility.notes.join(' · ')}</small>
@@ -116,7 +149,7 @@ export function renderObjectiveStage() {
   const orbitCards = contract.orbits.map((o, index) => `
     <div class="card o ${index === mission.oi ? 'sel' : ''}" role="button" tabindex="0" data-a="oi" data-v="${index}">
       <div>
-        <b>${o.n}</b> — ${CONTENT.orbitDescriptions[o.n]} ${renderDataBadge(o.verified)}<br>
+        <b>${o.n}</b> — ${CONTENT.orbitDescriptions[o.n]}<br>
         <small>${formatOrbitSummary(o)}</small>
       </div>
     </div>
@@ -128,7 +161,7 @@ export function renderObjectiveStage() {
       <div class="card ${mission.L === key ? 'sel' : ''}" role="button" tabindex="0" data-a="L" data-v="${key}">
         <img src="assets/${l.img}.svg" alt="${l.n}">
         <div>
-          <b>${l.n}</b> ${renderDataBadge(l.verified)}
+          <b>${l.n}</b>
           <p>Lifts ${formatNumber(l.cap)} kg</p>
           <small>$${l.c}M · ${toPercent(l.rel)}% reliable</small>
         </div>
@@ -137,8 +170,12 @@ export function renderObjectiveStage() {
   }).join('');
 
   $('#s1').innerHTML = `
-    <div class="${getLockClass('plan')}">
-      <h2>1. Choose your mission objective <small style="font-size:0.85rem;font-weight:400;">(${appState.dataSourceLabel})</small></h2>
+    <div>
+      <h2>1. Choose your mission objective <span class="badge-source ${weather.isLive ? '' : 'offline'}">${appState.dataSourceLabel}</span>${isGodMode() ? ' <span class="badge-simplified">Director Override</span>' : ''}</h2>
+      <div class="weather-banner ${weather.isLive ? '' : 'offline'}">
+        <span><b>Space Weather Telemetry:</b> ${weather.summary}</span>
+        <small>Solar Activity: <b>${weather.stormLevel}</b> (${weather.src})</small>
+      </div>
       <div class="row">${contractCards}</div>
       <h3>Orbit: where will it work?</h3>
       <div class="row">${orbitCards}</div>
@@ -152,10 +189,10 @@ export function renderObjectiveStage() {
     <p><small title="${CONTENT.marginFormulaTooltip}">${CONTENT.marginFormulaTooltip}</small></p>
     <div class="row">
       <div class="card o ${mission.hard ? '' : 'sel'}" role="button" tabindex="0" data-a="hd" data-v="0">
-        <div><b>Rookie: 10% reserve</b> ${renderDataBadge(DATA.marginPolicies.easy.verified)} — ${DATA.marginPolicies.easy.src}</div>
+        <div><b>Rookie: 10% reserve</b> — ${DATA.marginPolicies.easy.src}</div>
       </div>
       <div class="card o ${mission.hard ? 'sel' : ''}" role="button" tabindex="0" data-a="hd" data-v="1">
-        <div><b>NASA CML 4: 35% reserve</b> ${renderDataBadge(DATA.marginPolicies.hard.verified)} — ${DATA.marginPolicies.hard.src}</div>
+        <div><b>NASA CML 4: 35% reserve</b> — ${DATA.marginPolicies.hard.src}</div>
       </div>
     </div>
     <button type="button" class="go" data-a="go2">Design the spacecraft &rarr;</button>
@@ -202,26 +239,28 @@ function renderPaletteTile(partId) {
 const getPartsByGroup = group => Object.keys(DATA.parts).filter(id => DATA.parts[id].g === group);
 
 export function renderBuilderStage() {
-  const renderSection = (group, title, ids) => `
-    <div class="${getLockClass(group)}">
+  const renderSection = (title, ids) => `
+    <div>
       <h3>${title}</h3>
       ${ids.map(renderPaletteTile).join('')}
     </div>
   `;
 
   const paletteHtml =
-    renderSection('stk', 'Structure', [...getPartsByGroup('bus'), 'tank', ...Object.keys(DATA.engines)]) +
-    renderSection('pow', 'Power', getPartsByGroup('pow')) +
-    renderSection('com', 'Communications', getPartsByGroup('com')) +
-    renderSection('sci', 'Science instruments', getPartsByGroup('sci'));
+    renderSection('Structure', [...getPartsByGroup('bus'), 'tank', ...Object.keys(DATA.engines)]) +
+    renderSection('Power', getPartsByGroup('pow')) +
+    renderSection('Communications', getPartsByGroup('com')) +
+    renderSection('Science instruments', getPartsByGroup('sci'));
 
   const launcherOptions = Object.keys(DATA.launchers)
     .map(k => `<option value="${k}">${DATA.launchers[k].n}</option>`)
     .join('');
 
+  const isLocked = !!appState.mission.locked;
+
   $('#s2').innerHTML = `
     <div id="b3">
-      <div id="pal" aria-label="Spacecraft parts palette">${paletteHtml}</div>
+      <div id="pal" aria-label="Spacecraft parts palette" class="${isLocked ? 'lock' : ''}">${paletteHtml}</div>
       <div>
         <div class="row" style="align-items: center;">
           <b id="mn"></b>
@@ -233,16 +272,21 @@ export function renderBuilderStage() {
           <label class="team-toggle" for="mir">
             <input type="checkbox" id="mir" ${appState.mission.mirror ? 'checked' : ''}> Mirror symmetry
           </label>
-          <button type="button" data-a="undo">Undo</button>
-          <button type="button" id="stk">Starter ship</button>
-          <button type="button" id="clr">Clear</button>
+          <button type="button" id="lck" class="lock-toggle ${isLocked ? 'locked-on' : ''}" aria-pressed="${isLocked}">
+            ${isLocked ? '&#128274; Design locked: ON' : '&#128275; Lock design: OFF'}
+          </button>
+          <button type="button" data-a="undo" ${isLocked ? 'disabled' : ''}>Undo</button>
+          <button type="button" id="stk" ${isLocked ? 'disabled' : ''}>Starter ship</button>
+          <button type="button" id="clr" ${isLocked ? 'disabled' : ''}>Clear</button>
+          <button type="button" id="save-build">Save build</button>
+          <button type="button" id="my-builds">My builds (${appState.savedBuilds.length})</button>
           <button type="button" id="cand">Save candidate</button>
           <button type="button" id="cmp">Compare</button>
           <span style="flex: 1;"></span>
           <button type="button" data-a="zo" aria-label="Zoom out">-</button>
           <button type="button" data-a="zi" aria-label="Zoom in">+</button>
         </div>
-        <div id="cv"><div id="wr"><div id="world"></div></div></div>
+        <div id="cv" class="${isLocked ? 'design-locked' : ''}"><div id="wr"><div id="world"></div></div></div>
         <div id="insp" aria-live="polite"></div>
       </div>
       <div id="mt" aria-live="polite"></div>
@@ -251,14 +295,37 @@ export function renderBuilderStage() {
 
   $('#sl').onchange = e => { appState.mission.L = e.target.value; refreshBuilderView(); };
   $('#so').onchange = e => { appState.mission.oi = +e.target.value; refreshBuilderView(); };
-  $('#mir').onchange = e => { appState.mission.mirror = e.target.checked; };
+  $('#mir').onchange = e => { appState.mission.mirror = e.target.checked; saveMissionProgress(); };
+
+  $('#lck').onclick = () => {
+    appState.mission.locked = !appState.mission.locked;
+    saveMissionProgress();
+    AudioEngine.click();
+    showToast(
+      appState.mission.locked
+        ? 'Design locked: spacecraft parts are fixed in place.'
+        : 'Design unlocked: drag, separate, rotate, or customize parts freely.'
+    );
+    renderBuilderStage();
+  };
 
   $('#clr').onclick = () => {
+    if (appState.mission.locked) return showToast('Design is locked. Click "Design locked: ON" to unlock.');
     saveUndoSnapshot();
     appState.mission.parts = [];
     appState.selectedPartUid = null;
     refreshBuilderView();
   };
+
+  $('#save-build').onclick = () => {
+    const res = saveNamedBuild();
+    if (!res.ok) return showToast(res.message);
+    AudioEngine.attach();
+    $('#my-builds').textContent = `My builds (${appState.savedBuilds.length})`;
+    showToast(`Saved "${res.entry.name}" to browser storage.`);
+  };
+
+  $('#my-builds').onclick = showSavedBuildsModal;
 
   $('#cand').onclick = () => {
     if (appState.candidates.length >= MAX_CANDIDATES) {
@@ -266,43 +333,36 @@ export function renderBuilderStage() {
     }
     const { parts, nu, L, oi, ci, hard, seed } = appState.mission;
     appState.candidates.push(JSON.stringify({ parts, nu, L, oi, ci, hard, seed }));
+    saveMissionProgress();
     showToast(`Saved as candidate ${'ABC'[appState.candidates.length - 1]}`);
   };
 
   $('#cmp').onclick = showCompareModal;
   $('#stk').onclick = () => {
+    if (appState.mission.locked) return showToast('Design is locked. Click "Design locked: ON" to unlock.');
     saveUndoSnapshot();
     buildStarterSpacecraft();
     appState.selectedPartUid = null;
-    refreshBuilderView();
+    autoFitBuilderCanvas();
   };
 
   autoFitBuilderCanvas();
 }
 
-function renderSpacecraftCanvas(telemetry) {
-  const connected = getConnectedPartUids();
+const getPartZIndex = part => {
+  const cat = getNodeCategory(part.id);
+  const base = cat === 'bus' ? 20 : cat === 'tank' ? 18 : cat === 'eng' ? 14 : 10;
+  return part.u === appState.selectedPartUid ? 35 : base;
+};
+
+function renderAttachmentNodesHtml() {
+  if (appState.mission.locked) return '';
   const occupied = getOccupiedNodes();
   const drag = appState.activeDrag;
   const isDragging = drag && drag.mv;
-
-  let html = appState.mission.parts.map(part => {
-    const [w, h] = getPartSize(part);
-    const selectedClass = part.u === appState.selectedPartUid ? ' sel' : '';
-    const floatingClass = connected.has(part.u) ? '' : ' float';
-    return `
-      <img class="pt${selectedClass}${floatingClass}"
-           tabindex="0"
-           role="button"
-           aria-label="${getPartDisplayName(part.id)}"
-           data-u="${part.u}"
-           src="assets/${getAssetFilename(part.id)}.svg"
-           style="left:${part.x - w / 2}px; top:${part.y - h / 2}px; width:${w}px; height:${h}px; transform:rotate(${part.rot}deg) scaleX(${part.flip ? -1 : 1});"
-           draggable="false">
-    `;
-  }).join('');
-
   const draggedSubtree = isDragging ? new Set(getSubtreeUids(drag.u)) : new Set();
+
+  let html = '';
   appState.mission.parts.forEach(part => {
     ATTACHMENT_NODES[getNodeCategory(part.id)].forEach(([nodeName]) => {
       if (occupied.has(`${part.u}:${nodeName}`)) return;
@@ -316,6 +376,36 @@ function renderSpacecraftCanvas(telemetry) {
     const [snapX, snapY] = getNodeWorldPosition(findPartByUid(drag.sn.h), drag.sn.hn);
     html += `<i class="nd hot" style="left:${snapX}px; top:${snapY}px;"></i>`;
   }
+  return html;
+}
+
+function renderSpacecraftCanvas(telemetry) {
+  const connected = getConnectedPartUids();
+  const drag = appState.activeDrag;
+  const isDragging = drag && drag.mv;
+  const draggedSet = isDragging ? new Set(getSubtreeUids(drag.u)) : new Set();
+
+  const sortedParts = [...appState.mission.parts].sort((a, b) => getPartZIndex(a) - getPartZIndex(b));
+
+  let html = sortedParts.map(part => {
+    const [w, h] = getPartSize(part);
+    const selectedClass = part.u === appState.selectedPartUid ? ' sel' : '';
+    const floatingClass = connected.has(part.u) ? '' : ' float';
+    const draggingClass = draggedSet.has(part.u) ? ' dragging' : '';
+    const zIndex = draggedSet.has(part.u) ? 45 : getPartZIndex(part);
+    return `
+      <img class="pt${selectedClass}${floatingClass}${draggingClass}"
+           tabindex="0"
+           role="button"
+           aria-label="${getPartDisplayName(part.id)}"
+           data-u="${part.u}"
+           src="assets/${getAssetFilename(part.id)}.svg"
+           style="left:${part.x - w / 2}px; top:${part.y - h / 2}px; width:${w}px; height:${h}px; z-index:${zIndex}; transform:rotate(${part.rot}deg) scaleX(${part.flip ? -1 : 1});"
+           draggable="false">
+    `;
+  }).join('');
+
+  html += `<div id="world-nodes">${renderAttachmentNodesHtml()}</div>`;
 
   if (connected.size > 0) {
     html += `
@@ -327,24 +417,70 @@ function renderSpacecraftCanvas(telemetry) {
   return html;
 }
 
+export function updateBuilderLiveDrag() {
+  const drag = appState.activeDrag;
+  if (!drag || !drag.mv) return;
 
+  const draggedSet = new Set(getSubtreeUids(drag.u));
+  appState.mission.parts.forEach(part => {
+    const el = $(`#world .pt[data-u="${part.u}"]`);
+    if (!el) return;
+    const [w, h] = getPartSize(part);
+    el.style.left = `${part.x - w / 2}px`;
+    el.style.top = `${part.y - h / 2}px`;
+    el.style.transform = `rotate(${part.rot}deg) scaleX(${part.flip ? -1 : 1})`;
+    el.classList.toggle('dragging', draggedSet.has(part.u));
+  });
 
+  const nodesLayer = $('#world-nodes');
+  if (nodesLayer) {
+    nodesLayer.innerHTML = renderAttachmentNodesHtml();
+  }
+}
 
+export function centerBuilderCanvas() {
+  const cv = $('#cv');
+  if (!cv) return;
+  const zoom = appState.canvasZoom;
+  const parts = appState.mission.parts;
+
+  if (parts.length) {
+    const bounds = parts.map(p => {
+      const [w, h] = getPartSize(p);
+      return [p.x - w / 2, p.y - h / 2, p.x + w / 2, p.y + h / 2];
+    });
+    const minX = Math.min(...bounds.map(b => b[0]));
+    const minY = Math.min(...bounds.map(b => b[1]));
+    const maxX = Math.max(...bounds.map(b => b[2]));
+    const maxY = Math.max(...bounds.map(b => b[3]));
+
+    const midX = WORLD_PAD_PX + ((minX + maxX) / 2) * zoom;
+    const midY = WORLD_PAD_PX + ((minY + maxY) / 2) * zoom;
+    cv.scrollLeft = Math.max(0, midX - cv.clientWidth / 2);
+    cv.scrollTop = Math.max(0, midY - cv.clientHeight / 2);
+  } else {
+    const midX = WORLD_PAD_PX + 480 * zoom;
+    const midY = WORLD_PAD_PX + 500 * zoom;
+    cv.scrollLeft = Math.max(0, midX - cv.clientWidth / 2);
+    cv.scrollTop = Math.max(0, midY - cv.clientHeight / 2);
+  }
+}
 
 function autoFitBuilderCanvas() {
   const cv = $('#cv');
   if (!cv) return;
-  const idealZoom = Math.max(0.75, Math.min(1.05, +(cv.clientWidth / 920).toFixed(2)));
+  const idealZoom = Math.max(0.8, Math.min(1.05, +(cv.clientWidth / 820).toFixed(2)));
   appState.canvasZoom = idealZoom;
   refreshBuilderView();
-  cv.scrollLeft = Math.max(0, (960 * idealZoom - cv.clientWidth) / 2);
-  cv.scrollTop = 40;
+  requestAnimationFrame(() => centerBuilderCanvas());
 }
 
 export function refreshBuilderView() {
   const mission = appState.mission;
   const telemetry = (mission.d = calculateTelemetry());
   const contract = telemetry.C;
+  const isLocked = !!mission.locked;
+  saveMissionProgress();
 
   const errorCount =
     telemetry.rows.filter(r => r.mg < 0).length +
@@ -358,36 +494,172 @@ export function refreshBuilderView() {
   $('#so').innerHTML = contract.orbits.map((o, i) => `<option value="${i}">${o.n}</option>`).join('');
   $('#so').value = mission.oi;
 
-  $('#wr').style.width = `${960 * appState.canvasZoom}px`;
-  $('#wr').style.height = `${1100 * appState.canvasZoom}px`;
+  // Generous scroll buffer around #world so centering never hits scroll bounds
+  $('#wr').style.width = `${WORLD_PAD_PX * 2 + 960 * appState.canvasZoom}px`;
+  $('#wr').style.height = `${WORLD_PAD_PX * 2 + 1100 * appState.canvasZoom}px`;
+  $('#world').style.left = `${WORLD_PAD_PX}px`;
+  $('#world').style.top = `${WORLD_PAD_PX}px`;
   $('#world').style.transform = `scale(${appState.canvasZoom})`;
   $('#world').innerHTML = renderSpacecraftCanvas(telemetry);
 
   const selectedPart = appState.selectedPartUid && findPartByUid(appState.selectedPartUid);
   $('#insp').innerHTML = selectedPart
-    ? `<b>${getPartDisplayName(selectedPart.id)}</b> <small>${formatPartSpecs(selectedPart.id)}</small> <button type="button" data-a="rot">Rotate (R)</button><button type="button" data-a="flp">Flip (F)</button><button type="button" data-a="del">Delete</button>`
-    : '<small>Drag parts onto glowing dots, or click/Enter a part to auto-attach. Click a placed part to rotate, flip, or delete.</small>';
+    ? `<b>${getPartDisplayName(selectedPart.id)}</b> <small>${formatPartSpecs(selectedPart.id)}</small> <button type="button" data-a="rot" ${isLocked ? 'disabled' : ''}>Rotate (R)</button><button type="button" data-a="flp" ${isLocked ? 'disabled' : ''}>Flip (F)</button><button type="button" data-a="del" ${isLocked ? 'disabled' : ''}>Delete</button>`
+    : isLocked
+      ? '<small>&#128274; Design is locked. Click <b>Design locked: ON</b> above to unlock and customize parts.</small>'
+      : '<small>Drag any part on the ship to separate &amp; re-attach, drag from palette, or click a part to rotate, flip, or delete.</small>';
 
-  const getStatusClass = row => (row.mg < 0 ? 'bad' : row.mg < appState.marginThreshold ? 'w' : 'ok');
-  let resourceIndex = 0;
+  const openMap = {};
+  $$('#mt details[data-dd]').forEach(el => {
+    openMap[el.dataset.dd] = el.open;
+  });
 
-  const resourceBarsHtml = telemetry.rows.map(r => {
-    const isSub = CONTENT.subResources.includes(r.n);
-    if (!isSub) resourceIndex++;
-    const status = getStatusClass(r);
-    const fillPct = r.cap > 0 ? Math.min(100, (r.use / r.cap) * 100) : 100;
-    const statusLabel = r.mg < 0 ? 'FAIL' : r.mg < appState.marginThreshold ? 'THIN' : 'OK';
+  const getStatusClass = row =>
+    row.mg < 0 ? 'bad' :
+    row.mg < appState.marginThreshold ? 'w' : 'ok';
+
+  const getStatusLabel = row =>
+    row.mg < 0 ? 'FAIL' :
+    row.mg < appState.marginThreshold ? 'THIN' : 'OK';
+
+  const getWorstStatus = rows => {
+    const valid = rows.filter(Boolean);
+    if (valid.some(r => r.mg < 0)) return { cls: 'bad', label: 'FAIL' };
+    if (valid.some(r => r.mg < appState.marginThreshold)) return { cls: 'w', label: 'THIN' };
+    return { cls: 'ok', label: 'OK' };
+  };
+
+  const renderResourceRow = (row, options = {}) => {
+    if (!row) return '';
+    const { number = null, isSubTopic = false } = options;
+    const status = getStatusClass(row);
+    const fillPct = row.cap > 0 ? Math.min(100, (row.use / row.cap) * 100) : 100;
+    const statusLabel = getStatusLabel(row);
 
     return `
-      <div class="m ${isSub ? 'sub' : ''}">
-        <span>${isSub ? '' : `<b>${resourceIndex}</b> `}${r.n}</span>
+      <div class="m${isSubTopic ? ' sub' : ''}">
+        <span>
+          ${isSubTopic ? '<span class="sub-branch" aria-hidden="true">&rarr;</span> ' : ''}
+          ${number !== null ? `<span class="resource-number">${number}.</span> ` : ''}
+          ${row.n}
+        </span>
         <i class="${status}"><u style="width:${fillPct}%"></u></i>
         <b class="${status}">${statusLabel}</b>
-        <em>${formatNumber(r.use)} needed / ${formatNumber(r.cap)} ${r.u} ${r.verified ? '' : '<span class="badge-simplified">simplified</span>'}</em>
-        ${r.mg < appState.marginThreshold ? `<p class="why">${r.why} <b>Fix:</b> ${r.fix}</p>` : ''}
+        <em>
+          ${formatNumber(row.use)} needed / ${formatNumber(row.cap)} ${row.u}
+          ${renderDataBadge(row.verified)}
+        </em>
+        ${row.mg < appState.marginThreshold ? `<p class="why">${row.why} <b>Fix:</b> ${row.fix}</p>` : ''}
       </div>
     `;
-  }).join('');
+  };
+
+  const renderStandaloneResourceCard = (row, number) => {
+    if (!row) return '';
+    const status = getStatusClass(row);
+    return `
+      <div class="resource-card ${status}">
+        ${renderResourceRow(row, { number })}
+      </div>
+    `;
+  };
+
+  const findResource = name => telemetry.rows.find(row => row.n === name);
+
+  const renderTopicDropdown = (key, number, topicTitle, primaryRow, subRows) => {
+    const validSubs = subRows.filter(Boolean);
+    const worst = getWorstStatus([primaryRow, ...validSubs]);
+    const isOpen = openMap[key] !== undefined ? openMap[key] : worst.cls !== 'ok';
+    const subNames = validSubs.map(r => r.n).join(' / ');
+
+    return `
+      <details class="resource-system ${worst.cls}" data-dd="${key}" ${isOpen ? 'open' : ''}>
+        <summary>
+          <span class="topic-title"><b>${number}.</b> ${topicTitle} <small class="topic-sub">(${subNames})</small></span>
+          <b class="topic-badge ${worst.cls}">${worst.label}</b>
+        </summary>
+        <div class="resource-system-content">
+          ${renderResourceRow(primaryRow)}
+          ${validSubs.map(sub => renderResourceRow(sub, { isSubTopic: true })).join('')}
+        </div>
+      </details>
+    `;
+  };
+
+  const massTopicHtml = renderTopicDropdown(
+    'topic-mass',
+    1,
+    CONTENT.uiLabels.massTopic,
+    findResource('Mass'),
+    [findResource('Delta-v')]
+  );
+
+  const powerTopicHtml = renderTopicDropdown(
+    'topic-power',
+    2,
+    CONTENT.uiLabels.powerTopic,
+    findResource('Power'),
+    [findResource('Battery'), findResource('Ion power')]
+  );
+
+  const otherResourcesHtml = ['Budget', 'Data storage', 'Comms', 'Time']
+    .map((name, index) => renderStandaloneResourceCard(findResource(name), index + 3))
+    .join('');
+
+  const alerts = [];
+  telemetry.rows.forEach(r => {
+    if (r.mg < 0) {
+      alerts.push({ level: 'bad', tag: CONTENT.uiLabels.alertCriticalTag, title: r.n, fix: r.fix });
+    } else if (r.mg < appState.marginThreshold) {
+      alerts.push({ level: 'w', tag: CONTENT.uiLabels.alertAmberTag, title: `${r.n} (${toPercent(r.mg)}% reserve)`, fix: r.fix });
+    }
+  });
+  telemetry.checks.forEach(c => {
+    if (c.st === 0) {
+      alerts.push({ level: 'bad', tag: CONTENT.uiLabels.alertCriticalTag, title: c.t, fix: c.fix });
+    } else if (c.st === 1) {
+      alerts.push({ level: 'w', tag: CONTENT.uiLabels.alertAmberTag, title: c.t, fix: c.fix });
+    }
+  });
+  if (telemetry.mb === 0 && telemetry.data > 0) {
+    alerts.push({
+      level: 'bad',
+      tag: CONTENT.uiLabels.alertCriticalTag,
+      title: 'Downlink antenna missing',
+      fix: CONTENT.uiLabels.commsEmptyHint
+    });
+  }
+
+  const redCount = alerts.filter(a => a.level === 'bad').length;
+  const amberCount = alerts.filter(a => a.level === 'w').length;
+  const alertHeaderClass = redCount > 0 ? 'bad' : amberCount > 0 ? 'w' : 'ok';
+  const isAlertsOpen = openMap.alerts === true;
+
+  const flagBadgesHtml = alerts.length
+    ? `<span class="alert-flags">
+        ${redCount > 0 ? `<span class="alert-flag bad" title="${redCount} critical alert(s)">&#9873; ${redCount}</span>` : ''}
+        ${amberCount > 0 ? `<span class="alert-flag w" title="${amberCount} thin margin alert(s)">&#9888; ${amberCount}</span>` : ''}
+      </span>`
+    : `<span class="alert-flag ok">&#10003; Clear</span>`;
+
+  const alertsDropdownHtml = `
+    <details class="alerts-box ${alertHeaderClass}" data-dd="alerts" ${isAlertsOpen ? 'open' : ''}>
+      <summary>
+        <span><b>${CONTENT.uiLabels.alertsHeading}</b></span>
+        ${flagBadgesHtml}
+      </summary>
+      <div class="alerts-list">
+        ${alerts.length
+          ? alerts.map(a => `
+              <div class="alert-item ${a.level}">
+                <span class="alert-pill ${a.level}">${a.level === 'bad' ? '&#9873;' : '&#9888;'} ${a.tag}</span>
+                <b>${a.title}:</b> <span>${a.fix}</span>
+              </div>
+            `).join('')
+          : `<p class="alert-clear">${CONTENT.uiLabels.alertsClear}</p>`}
+      </div>
+    </details>
+  `;
 
   const checksHtml = telemetry.checks.map(c => `
     <div class="chk ${['bad', 'w', 'ok'][c.st]}">
@@ -397,37 +669,85 @@ export function refreshBuilderView() {
   `).join('');
 
   const signOffChips = Object.keys(telemetry.sign).map(role => `
-    <span class="chip ${telemetry.sign[role] ? 'ok' : ''} ${appState.isTeamMode && role === appState.activeRole ? 'me' : ''}">
+    <span class="chip ${telemetry.sign[role] ? 'ok' : ''}">
       ${telemetry.sign[role] ? '✓ Signed' : '○ Pending'}: ${role}
     </span>
   `).join('');
 
   $('#mt').innerHTML = `
-    <b>Mission resources</b>
-    ${resourceBarsHtml}
-    <p><b>Assembly checks</b></p>
-    ${checksHtml}
-    <p>Predicted science <b>${telemetry.sciF.toFixed(0)}</b> / ${contract.target} pts. Transit ${formatNumber(telemetry.days)} days. Useful life ${Math.max(0, telemetry.life).toFixed(0)} months. Launch reliability <b>${toPercent(telemetry.reliability)}%</b> (multiplies your final score).</p>
-    <div class="row">${signOffChips}</div>
+    ${alertsDropdownHtml}
+    <div class="panel-section-label">Mission resources</div>
+    ${massTopicHtml}
+    ${powerTopicHtml}
+    ${otherResourcesHtml}
+    <div class="panel-card">
+      <div class="panel-card-title">Assembly checks</div>
+      ${checksHtml}
+    </div>
+    <div class="panel-card">
+      <div class="panel-card-title">Mission forecast &amp; sign-offs</div>
+      <div class="forecast-grid">
+        <div><small>Science</small><b>${telemetry.sciF.toFixed(0)} / ${contract.target} pts</b></div>
+        <div><small>Transit</small><b>${formatNumber(telemetry.days)} days</b></div>
+        <div><small>Useful life</small><b>${Math.max(0, telemetry.life).toFixed(0)} mo</b></div>
+        <div><small>Reliability</small><b>${toPercent(telemetry.reliability)}%</b></div>
+      </div>
+      <div class="row" style="margin-top:8px;">${signOffChips}</div>
+    </div>
     <button type="button" class="go" id="gol" data-a="rev" style="width:100%"></button>
     <button type="button" data-a="go1" style="width:100%; margin-top:8px">&larr; Back to objective</button>
   `;
 
   const isOverweight = telemetry.g('Mass').mg < 0;
   const isOverBudget = telemetry.g('Budget').mg < 0;
-  $('#gol').disabled = !!telemetry.bad || isOverweight || isOverBudget;
+  const isMissingComms = telemetry.mb === 0 && telemetry.data > 0;
+  $('#gol').disabled = !!telemetry.bad || isOverweight || isOverBudget || isMissingComms;
   $('#gol').textContent = telemetry.bad
     ? telemetry.bad.t
     : isOverweight
       ? 'Too heavy for this launcher'
       : isOverBudget
         ? 'Over budget'
-        : 'Design review and launch';
+        : isMissingComms
+          ? 'Attach an antenna to downlink data'
+          : 'Design review and launch';
 }
 
-/* ---- Modals: Design Review, Trade Space, Share/Load Code ---- */
+/* ---- Modals: Saved Builds, Design Review, Trade Space, Share/Load Code ---- */
 
-/** Predicted flight: the same deterministic result the launch will play out. No dice. */
+export function showSavedBuildsModal() {
+  const builds = appState.savedBuilds;
+  const defaultName = `${DATA.contracts[appState.mission.ci]?.n || 'Spacecraft'} #${builds.length + 1}`;
+
+  $('#rev').innerHTML = `
+    <div class="box modal-box" style="width: min(860px, 96vw);">
+      ${renderModalHeader('My Saved Spacecraft Builds')}
+      <div class="row" style="align-items: center; margin-bottom: 12px;">
+        <input type="text" id="new-build-name" placeholder="Build name (e.g. Mars Relay Mk II)" value="${defaultName}" style="flex: 1; min-width: 220px;" />
+        <button type="button" class="go" id="confirm-save-build" style="margin: 0;">Save current build</button>
+      </div>
+      ${builds.length
+        ? `<table class="rt">
+            <tr><th>Build Name</th><th>Mission &amp; Orbit</th><th>Specs</th><th>Saved</th><th>Actions</th></tr>
+            ${builds.map(b => `
+              <tr>
+                <td><b>${b.name}</b><br><small>${b.summary.partCount} parts</small></td>
+                <td>${b.summary.contract}<br><small>${b.summary.orbit} · ${b.summary.launcher}</small></td>
+                <td>${formatNumber(b.summary.massKg)} kg · ${formatNumber(b.summary.dvMs)} m/s · $${b.summary.costM}M</td>
+                <td><small>${b.savedAt}</small></td>
+                <td>
+                  <button type="button" data-load-build="${b.id}">Load</button>
+                  <button type="button" data-del-build="${b.id}">Delete</button>
+                </td>
+              </tr>
+            `).join('')}
+          </table>`
+        : '<p><small>No saved builds yet. Name your current spacecraft above and click <b>Save current build</b> to store it in your browser.</small></p>'}
+    </div>
+  `;
+  $('#rev').hidden = false;
+}
+
 const renderPredictedFlight = telemetry => {
   const flight = resolveFlight(telemetry);
   const text = CONTENT.predictedFlight;
@@ -455,7 +775,7 @@ export function showReviewModal() {
 
   $('#rev').innerHTML = `
     <div class="box modal-box">
-      <h2>Design review</h2>
+      ${renderModalHeader('Design review')}
       <p>${appState.mission.hard ? 'NASA CML 4 policy: 35% reserve.' : 'Rookie policy: 10% reserve.'} A concept passes readiness review when at least ${toPercent(DATA.reviewThreshold.v)}% of items are green (${DATA.reviewThreshold.src}).</p>
       <p><b class="${rev.pass ? 'g' : 'r'}">${rev.pass ? '✓ REVIEW PASSED' : '✗ NOT READY'}</b> — ${rev.g} green, ${rev.y} amber, ${rev.r} red of ${rev.n} items (${toPercent(rev.pct)}%)</p>
       <div class="row">
@@ -463,8 +783,7 @@ export function showReviewModal() {
       </div>
       ${renderPredictedFlight(telemetry)}
       <div class="row" style="margin-top:14px">
-        <button type="button" class="go" id="rgo" style="margin:0">Launch now</button>
-        <button type="button" id="rback">Back to design</button>
+        <button type="button" class="go" id="rgo" style="margin:0; width:100%;">Launch now</button>
       </div>
     </div>
   `;
@@ -500,14 +819,13 @@ export function showCompareModal() {
 
   $('#rev').innerHTML = `
     <div class="box modal-box" style="width: min(980px, 96vw);">
-      <h2>Trade space: compare candidates</h2>
+      ${renderModalHeader('Trade space: compare candidates')}
       <p><small>Compare cost, science, and risk side by side, then load a candidate to refine.</small></p>
       <table class="rt">
         <tr><th>Metric</th>${evaluations.map((_, i) => `<th>Candidate ${'ABC'[i]}</th>`).join('')}</tr>
         ${metrics.map(([title, formatter]) => `<tr><th>${title}</th>${evaluations.map(ev => `<td>${formatter(ev)}</td>`).join('')}</tr>`).join('')}
         <tr><th>Actions</th>${evaluations.map((_, i) => `<td><button type="button" data-c="${i}">Load</button> <button type="button" data-x="${i}">Delete</button></td>`).join('')}</tr>
       </table>
-      <button type="button" id="rback">Close</button>
     </div>
   `;
   $('#rev').hidden = false;
@@ -519,24 +837,25 @@ export function showDesignCodeModal() {
 
   $('#rev').innerHTML = `
     <div class="box modal-box">
-      <h2>Share or Load Design Code</h2>
+      ${renderModalHeader('Share or Load Design Code')}
       <p><label for="design-code-input">Copy your current spacecraft code or paste a teammate's code below:</label></p>
       <textarea id="design-code-input" class="code-box">${encoded}</textarea>
       <div class="row">
         <button type="button" id="copy-code-btn">Copy to clipboard</button>
         <button type="button" id="load-code-btn">Load pasted code</button>
-        <button type="button" id="rback">Close</button>
       </div>
     </div>
   `;
   $('#rev').hidden = false;
 }
 
-/* ---- Stage 3: Deterministic Launch Sequence ---- */
+/* ---- Stage 3: Launch Sequence ---- */
 
 function renderFlightSpacecraft() {
   const connected = getConnectedPartUids();
-  const parts = appState.mission.parts.filter(p => connected.has(p.u));
+  const parts = appState.mission.parts
+    .filter(p => connected.has(p.u))
+    .sort((a, b) => getPartZIndex(a) - getPartZIndex(b));
   if (!parts.length) return '';
 
   const bounds = parts.map(p => {
@@ -556,12 +875,13 @@ function renderFlightSpacecraft() {
 
   const hullHtml = parts.map(p => {
     const [w, h] = getPartSize(p);
-    return `<img class="pt" src="assets/${getAssetFilename(p.id)}.svg" alt="" style="left:${p.x * scale + offsetX - (w * scale) / 2}px; top:${p.y * scale + offsetY - (h * scale) / 2}px; width:${w * scale}px; height:${h * scale}px; transform:rotate(${p.rot}deg) scaleX(${p.flip ? -1 : 1});" draggable="false">`;
+    const zIndex = getPartZIndex(p);
+    return `<img class="pt" src="assets/${getAssetFilename(p.id)}.svg" alt="" style="left:${p.x * scale + offsetX - (w * scale) / 2}px; top:${p.y * scale + offsetY - (h * scale) / 2}px; width:${w * scale}px; height:${h * scale}px; z-index:${zIndex}; transform:rotate(${p.rot}deg) scaleX(${p.flip ? -1 : 1});" draggable="false">`;
   }).join('');
 
   const plumeHtml = parts.filter(p => getNodeCategory(p.id) === 'eng').map(p => {
     const [, h] = getPartSize(p);
-    return `<img class="pt plume" src="assets/${DATA.engines[p.id].pl}.svg" alt="" style="left:${p.x * scale + offsetX - 40 * scale}px; top:${p.y * scale + offsetY + (h * scale) / 2 - 14 * scale}px; width:${80 * scale}px; z-index:-1;" draggable="false">`;
+    return `<img class="pt plume" src="assets/${DATA.engines[p.id].pl}.svg" alt="" style="left:${p.x * scale + offsetX - 40 * scale}px; top:${p.y * scale + offsetY + (h * scale) / 2 - 18 * scale}px; width:${80 * scale}px; z-index:5;" draggable="false">`;
   }).join('');
 
   return hullHtml + plumeHtml;
@@ -1347,7 +1667,8 @@ function playBurnMinigame(view, kind, offerAll) {
 function describeFlightStep(step) {
   if (step.key === 'event') {
     const text = CONTENT.eventText[step.values.eventId];
-    return `<b>Event: ${text.n}.</b> ${text.txt} ${step.ok ? text.immT : text.hitT}`;
+    const headline = fillTemplate(text.txt, step.values);
+    return `<b>Anomaly: ${text.n}.</b> ${headline} ${step.ok ? text.immT : text.hitT}`;
   }
   if (step.key === 'briefing') return buildPlanetBriefing(step.values.contractId, true);
   return fillTemplate(CONTENT.flightLog[step.key], step.values);
@@ -1355,6 +1676,34 @@ function describeFlightStep(step) {
 
 const getFlightStepClass = step =>
   !step.ok ? 'bad' : ['ascent', 'arrival', 'event', 'burn_departure', 'burn_insertion'].includes(step.key) ? 'ok' : '';
+
+function promptMidFlightDecision(logEl, eventId) {
+  const text = CONTENT.eventText[eventId];
+  const choices = text?.choices;
+  if (!choices || !choices.length) return Promise.resolve(null);
+
+  return new Promise(resolve => {
+    const box = document.createElement('div');
+    box.className = 'decision-box';
+    box.innerHTML = `
+      <p><b>Flight Director Action Required — ${text.n}:</b> Choose how the spacecraft responds:</p>
+      <div class="decision-choices">
+        ${choices.map((c, idx) => `<button type="button" class="decision-btn" data-choice="${idx}">${c.label}</button>`).join('')}
+      </div>
+    `;
+    logEl.appendChild(box);
+    box.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+
+    box.addEventListener('click', e => {
+      const btn = e.target.closest('[data-choice]');
+      if (!btn) return;
+      AudioEngine.click();
+      const chosen = choices[+btn.dataset.choice];
+      box.innerHTML = `<p class="ok"><b>Decision executed:</b> ${chosen.label} — ${chosen.note}</p>`;
+      resolve(chosen);
+    });
+  });
+}
 
 export async function startLaunchSequence() {
   const mission = appState.mission;
@@ -1365,6 +1714,7 @@ export async function startLaunchSequence() {
 
   navigateToStage(3);
   appState.isFlying = true;
+  AudioEngine.setMusic(null);
 
   $('#s3').innerHTML = `
     <div class="fl3">
@@ -1417,6 +1767,8 @@ export async function startLaunchSequence() {
   let burnOffered = false;
   let autoAll = false; // the player picked "Auto-pilot all burns"
   const burns = {}; // the burns flown by hand so far: { departure, insertion }
+  let decisionMultiplier = 1.0; // Flight Director choices made during anomalies scale the final science
+  const decisionReasons = []; // kept apart from `flight`: a manual burn re-resolves it and would drop reasons pushed earlier
 
   /**
    * Offers one manual burn and shows the result. A burn flown by hand is re-resolved into the flight; steps
@@ -1481,7 +1833,21 @@ export async function startLaunchSequence() {
       AudioEngine.fail();
     }
 
+    // A Flight Director decision from an earlier anomaly scales the science shown on the operations line.
+    if (step.key === 'operations' && decisionMultiplier !== 1.0) {
+      step.values = { ...step.values, science: flight.science * decisionMultiplier };
+    }
+
     await logMessage(describeFlightStep(step), getFlightStepClass(step));
+
+    // A failed anomaly asks the player how to respond. The answer scales the final science.
+    if (step.key === 'event' && !step.ok) {
+      const chosen = await promptMidFlightDecision(logEl, step.values.eventId);
+      if (chosen) {
+        decisionMultiplier *= chosen.bonusFactor;
+        decisionReasons.push(`Flight Director response (${CONTENT.eventText[step.values.eventId].n}): ${chosen.label}.`);
+      }
+    }
 
     // Offer the departure burn once, right after the transfer line, only when the craft really survives it.
     const canOfferBurn = step.key === 'transfer' && step.ok && next && next.key === 'arrival' && flight.outcome !== 'lost';
@@ -1498,17 +1864,27 @@ export async function startLaunchSequence() {
     }
   }
 
+  // Apply the Flight Director decisions to the final result before the flight view shows it.
+  flight.reasons.push(...decisionReasons);
+  if (decisionMultiplier !== 1.0) {
+    flight.science = flight.science * decisionMultiplier;
+    flight.outcome = flight.science >= telemetry.C.target ? 'success' : flight.science > 0 ? 'partial' : 'lost';
+    const rescored = scoreFlight(telemetry, flight.outcome, flight.science);
+    flight.stars = rescored.stars;
+    flight.score = rescored.score;
+  }
+
   view.finish(flight.outcome);
   concludeMission(flight);
 }
 
-/** Stores the engine's result, plays the end sound and unlocks the debrief. */
 function concludeMission(flight) {
   const mission = appState.mission;
   const contract = mission.d.C;
 
   if (flight.outcome === 'success') AudioEngine.win();
   else if (flight.outcome === 'partial') AudioEngine.partial();
+  else AudioEngine.fail();
 
   appState.highScores[contract.id] = Math.max(appState.highScores[contract.id] || 0, flight.score);
   try {
@@ -1536,6 +1912,7 @@ function concludeMission(flight) {
     news
   };
   appState.isFlying = false;
+  saveMissionProgress();
 
   const levelUp = news.find(item => item.k === 'lv');
   if (levelUp) showToast(`Level up! Level ${levelUp.lv}: ${levelUp.title}. ${levelUp.planet} unlocked.`);
@@ -1637,7 +2014,7 @@ export function renderDebriefStage() {
   `;
 }
 
-/* ---- Career mode: debrief news and the Career window ---- */
+/* ---- Career Modal ---- */
 
 function renderCareerNews(news = []) {
   const career = getCareer();
@@ -1652,7 +2029,7 @@ function renderCareerNews(news = []) {
     : 'Every destination is unlocked.';
 
   const tip = career.streak >= 2
-    ? `<br><b class="y">Mission Control tip:</b> ${career.streak} losses in a row. Press Starter ship in the Build screen (it reaches Earth and the Moon safely; Mars and beyond need extra tanks and a bigger launcher), keep the Rookie 10% margin, and fix every red meter before you launch. Each red meter explains how to fix it.`
+    ? `<br><b class="y">Mission Control tip:</b> ${career.streak} losses in a row. Press Starter ship in the Build screen, attach an antenna, keep the Rookie 10% margin, and fix every red meter before you launch.`
     : '';
 
   return `<div class="pin">${items}<b>Career:</b> Level ${getCareerLevel()} - ${getCareerRank()}. ${nextLine}${tip}</div>`;
@@ -1661,24 +2038,33 @@ function renderCareerNews(news = []) {
 export function showCareerModal() {
   const career = getCareer();
   const achievementCount = Object.keys(career.ach).length;
+  const unlockedCount = DATA.contracts.filter(c => isContractOpen(c.id)).length;
+  const progressPct = Math.round((unlockedCount / DATA.contracts.length) * 100);
 
   $('#rev').innerHTML = `
-    <div class="box modal-box" style="width: min(900px, 96vw);">
-      <h2>Career: Level ${getCareerLevel()} - ${getCareerRank()}</h2>
-      <p>Safe arrivals: ${career.tot} - Missions lost: ${career.lost}. A safe arrival is any mission that is not lost. Levels go up in steps of 2. A good arrival is a safe arrival that also collects at least the threshold science.</p>
+    <div class="box modal-box" style="width: min(940px, 96vw);">
+      ${renderModalHeader(`Career: Level ${getCareerLevel()} — ${getCareerRank()}`)}
+      <div class="career-stats">
+        <div class="career-stat-pill"><small>Safe Arrivals</small><b>${career.tot}</b></div>
+        <div class="career-stat-pill"><small>Missions Lost</small><b>${career.lost}</b></div>
+        <div class="career-stat-pill"><small>Worlds Unlocked</small><b>${unlockedCount} / ${DATA.contracts.length}</b></div>
+        <div class="career-stat-pill"><small>Achievements</small><b>${achievementCount} / ${ACHIEVEMENTS.length}</b></div>
+      </div>
+      <div class="career-progress" title="${progressPct}% of Solar System unlocked"><i style="width:${progressPct}%"></i></div>
       <table class="rt">
-        <tr><th>Level</th><th>Title</th><th>Unlocks</th><th>Requirement</th><th></th></tr>
+        <tr><th>Level</th><th>Title</th><th>Unlocks</th><th>Requirement</th><th>Status</th></tr>
         <tr><td>0</td><td>Launch Pad Rookie</td><td>Earth, Moon, Mars</td><td>Start here</td><td class="g">Unlocked</td></tr>
         ${GATES.map(gate => {
-          const unlocked = career.un.includes(gate.id);
+          const unlocked = isContractOpen(gate.id);
           return `<tr><td>${gate.lv}</td><td>${gate.title}</td><td>${getPlanetName(gate.id)}</td><td>${describeGateNeed(gate)}</td><td class="${unlocked ? 'g' : 'y'}">${unlocked ? 'Unlocked' : 'Locked'}</td></tr>`;
         }).join('')}
       </table>
       <h3>Achievements (${achievementCount}/${ACHIEVEMENTS.length})</h3>
-      ${ACHIEVEMENTS.map(a => `<div class="chk ${career.ach[a.id] ? 'ok' : ''}">${career.ach[a.id] ? '&#9733;' : '&#9734;'} <b>${a.n}</b> - ${a.t}</div>`).join('')}
-      <div class="row" style="margin-top:12px;">
-        <button type="button" id="rback">Close</button>
-        <button type="button" id="creset">Reset career</button>
+      <div class="ach-grid">
+        ${ACHIEVEMENTS.map(a => `<div class="ach-card ${career.ach[a.id] ? 'ok' : ''}">${career.ach[a.id] ? '<span class="g">&#9733;</span>' : '&#9734;'} <b>${a.n}</b><br><small>${a.t}</small></div>`).join('')}
+      </div>
+      <div class="row" style="margin-top:14px;">
+        <button type="button" id="creset">Reset progress</button>
       </div>
     </div>
   `;

@@ -1,16 +1,18 @@
 /* File: js/ui/controls.js
  * Owner: Person B (Saurav)
- * AI-assisted: YES — Gemini, 2026-11-14. Reviewed by a human: NO.
+ * AI-assisted: YES — Gemini, 2026-11-15. Reviewed by a human: NO.
  * Sources used: none
  */
 import { DATA } from '../api/mockData.js';
-import { isContractOpen, resetCareer } from '../core/career.js';
-import { ROLES, ATTACHMENT_NODES, MAX_PARTS, SNAP_RADIUS_PX } from '../config.js';
+import { isContractOpen, toggleGodMode, resetCareer } from '../core/career.js';
+import { ATTACHMENT_NODES, MAX_PARTS, SNAP_RADIUS_PX } from '../config.js';
 import {
   appState,
   getNodeCategory,
-  canCurrentRoleEditPart,
   saveUndoSnapshot,
+  saveMissionProgress,
+  saveNamedBuild,
+  deleteSavedBuild,
   AudioEngine
 } from '../core/state.js';
 import {
@@ -32,6 +34,10 @@ import {
   navigateToStage,
   renderObjectiveStage,
   refreshBuilderView,
+  centerBuilderCanvas,
+  updateBuilderLiveDrag,
+  updateCareerButton,
+  showSavedBuildsModal,
   showReviewModal,
   showCompareModal,
   showDesignCodeModal,
@@ -49,8 +55,9 @@ function clientToWorldCoords(event) {
 }
 
 function rotateSelectedPart(direction) {
+  if (appState.mission.locked) return showToast('Design is locked. Click "Design locked: ON" to unlock.');
   const part = appState.selectedPartUid && findPartByUid(appState.selectedPartUid);
-  if (!part || !canCurrentRoleEditPart(part.id)) return;
+  if (!part) return;
 
   saveUndoSnapshot();
   const angle = direction * 90;
@@ -73,8 +80,9 @@ function rotateSelectedPart(direction) {
 }
 
 function flipSelectedPart() {
+  if (appState.mission.locked) return showToast('Design is locked. Click "Design locked: ON" to unlock.');
   const part = appState.selectedPartUid && findPartByUid(appState.selectedPartUid);
-  if (!part || !canCurrentRoleEditPart(part.id)) return;
+  if (!part) return;
 
   saveUndoSnapshot();
   const pivotX = part.par != null ? getNodeWorldPosition(part, part.cn)[0] : part.x;
@@ -91,8 +99,9 @@ function flipSelectedPart() {
 }
 
 function deleteSelectedPart() {
+  if (appState.mission.locked) return showToast('Design is locked. Click "Design locked: ON" to unlock.');
   const part = appState.selectedPartUid && findPartByUid(appState.selectedPartUid);
-  if (!part || !canCurrentRoleEditPart(part.id)) return;
+  if (!part) return;
 
   saveUndoSnapshot();
   deletePartSubtree(part.u);
@@ -102,6 +111,7 @@ function deleteSelectedPart() {
 }
 
 function undoLastAction() {
+  if (appState.mission.locked) return showToast('Design is locked. Click "Design locked: ON" to unlock.');
   const snapshot = appState.undoHistory.pop();
   if (!snapshot) return showToast('Nothing to undo.');
 
@@ -110,7 +120,88 @@ function undoLastAction() {
   refreshBuilderView();
 }
 
+function activateSecretGodMode() {
+  const enabled = toggleGodMode();
+  updateCareerButton();
+  if (appState.mission.stage === 1) renderObjectiveStage();
+  showToast(
+    enabled
+      ? 'Director Override active: all Solar System destinations unlocked.'
+      : 'Director Override off: standard Career locks restored.'
+  );
+}
+
+function closeOpenModals() {
+  $('#rev').hidden = true;
+  $('#help').hidden = true;
+}
+
+function syncAudioControls({ isSoundOn, volumePct }) {
+  const muteBtn = $('#mute');
+  const volSlider = $('#vol');
+  const wrapper = muteBtn?.closest('.audio-control');
+
+  if (muteBtn) {
+    muteBtn.textContent = `Sound: ${isSoundOn ? 'on' : 'off'}`;
+    muteBtn.classList.toggle('sound-on', isSoundOn);
+  }
+  if (volSlider) {
+    volSlider.value = isSoundOn ? String(volumePct) : '0';
+    volSlider.title = `Master volume (${isSoundOn ? volumePct : 0}%)`;
+  }
+  if (wrapper) {
+    wrapper.classList.toggle('is-muted', !isSoundOn);
+  }
+}
+
 export function bindGlobalControls() {
+  // Initialize volume slider state from saved AudioEngine volume
+  syncAudioControls({
+    isSoundOn: AudioEngine.isEnabled(),
+    volumePct: AudioEngine.getVolume()
+  });
+
+  document.addEventListener('dragstart', e => {
+    e.preventDefault();
+  });
+
+  $('#brand-home')?.addEventListener('click', e => {
+    e.preventDefault();
+    if (appState.isFlying) return;
+    closeOpenModals();
+    AudioEngine.click();
+    $('#title').hidden = false;
+    AudioEngine.setMusic('landing');
+  });
+
+  let logoClicks = 0;
+  let logoClickTimer = null;
+  $('#tt')?.addEventListener('click', () => {
+    logoClicks++;
+    clearTimeout(logoClickTimer);
+    logoClickTimer = setTimeout(() => { logoClicks = 0; }, 2200);
+    if (logoClicks >= 5) {
+      logoClicks = 0;
+      activateSecretGodMode();
+    }
+  });
+
+  let keyBuffer = '';
+  document.addEventListener('keydown', e => {
+    if (e.key === 'Escape') {
+      closeOpenModals();
+      return;
+    }
+    if (/SELECT|TEXTAREA|INPUT/.test(e.target.tagName)) return;
+    if (e.key && e.key.length === 1) {
+      keyBuffer = (keyBuffer + e.key.toLowerCase()).slice(-6);
+      if (keyBuffer === 'apogee') {
+        keyBuffer = '';
+        activateSecretGodMode();
+      }
+    }
+  });
+
   document.addEventListener('pointerdown', e => {
     if (appState.mission.stage !== 2) return;
 
@@ -119,44 +210,60 @@ export function bindGlobalControls() {
     if (!placedEl && !paletteEl) return;
     e.preventDefault();
 
+    if (appState.mission.locked) {
+      if (placedEl) {
+        const part = findPartByUid(+placedEl.dataset.u);
+        if (part && appState.selectedPartUid !== part.u) {
+          appState.selectedPartUid = part.u;
+          AudioEngine.click();
+          refreshBuilderView();
+        }
+      }
+      showToast('Design is locked. Click "Design locked: ON" to customize parts.');
+      return;
+    }
+
     if (paletteEl) {
-      appState.activeDrag = { nid: paletteEl.dataset.p, x: e.clientX, y: e.clientY, mv: false };
+      appState.activeDrag = {
+        nid: paletteEl.dataset.p,
+        pointerId: e.pointerId,
+        x: e.clientX,
+        y: e.clientY,
+        mv: false
+      };
       return;
     }
 
     const part = findPartByUid(+placedEl.dataset.u);
-    appState.selectedPartUid = part.u;
-    if (!canCurrentRoleEditPart(part.id)) {
-      showToast('That part belongs to another role. Pass the keyboard.');
+    if (!part) return;
+
+    if (appState.selectedPartUid !== part.u) {
+      appState.selectedPartUid = part.u;
+      AudioEngine.click();
       refreshBuilderView();
-      return;
     }
 
     appState.activeDrag = {
       u: part.u,
+      pointerId: e.pointerId,
       w0: clientToWorldCoords(e),
       x: e.clientX,
       y: e.clientY,
       mv: false
     };
-    refreshBuilderView();
   });
 
   document.addEventListener('pointermove', e => {
     const drag = appState.activeDrag;
-    if (!drag) return;
+    if (!drag || e.pointerId !== drag.pointerId) return;
 
     if (!drag.mv) {
-      if (Math.hypot(e.clientX - drag.x, e.clientY - drag.y) < 5) return;
+      if (Math.hypot(e.clientX - drag.x, e.clientY - drag.y) < 7) return;
 
       if (drag.nid) {
         const partId = drag.nid;
         const hasCategory = cat => appState.mission.parts.some(p => getNodeCategory(p.id) === cat);
 
-        if (!canCurrentRoleEditPart(partId)) {
-          appState.activeDrag = null;
-          return showToast('That part belongs to another role. Pass the keyboard.');
-        }
         if (hasCategory('bus') && getNodeCategory(partId) === 'bus') {
           appState.activeDrag = null;
           return showToast('One bus per ship. Click a different bus in the list to swap it.');
@@ -174,11 +281,25 @@ export function bindGlobalControls() {
         const worldPos = clientToWorldCoords(e);
         const newPart = createPartInstance(partId, worldPos[0], worldPos[1]);
         appState.selectedPartUid = newPart.u;
-        appState.activeDrag = { u: newPart.u, w0: worldPos, x: e.clientX, y: e.clientY, mv: true };
+        appState.activeDrag = {
+          u: newPart.u,
+          pointerId: e.pointerId,
+          w0: worldPos,
+          x: e.clientX,
+          y: e.clientY,
+          mv: true
+        };
+        refreshBuilderView();
       } else {
         saveUndoSnapshot();
-        findPartByUid(drag.u).par = null;
+        const rootPart = findPartByUid(drag.u);
+        if (!rootPart) {
+          appState.activeDrag = null;
+          return;
+        }
+        rootPart.par = null;
         drag.mv = true;
+        refreshBuilderView();
       }
 
       appState.activeDrag.orig = {};
@@ -194,6 +315,7 @@ export function bindGlobalControls() {
     const dx = worldPos[0] - activeDrag.w0[0];
     const dy = worldPos[1] - activeDrag.w0[1];
     const draggedPart = findPartByUid(activeDrag.u);
+    if (!draggedPart) return;
 
     getSubtreeUids(activeDrag.u).forEach(uid => {
       const q = findPartByUid(uid);
@@ -246,12 +368,12 @@ export function bindGlobalControls() {
       }
     }
 
-    refreshBuilderView();
+    updateBuilderLiveDrag();
   });
 
-  document.addEventListener('pointerup', e => {
+  const finishPointerDrag = e => {
     const drag = appState.activeDrag;
-    if (!drag) return;
+    if (!drag || (e.pointerId !== undefined && e.pointerId !== drag.pointerId)) return;
     appState.activeDrag = null;
 
     if (!drag.mv) {
@@ -283,7 +405,10 @@ export function bindGlobalControls() {
     }
 
     refreshBuilderView();
-  });
+  };
+
+  document.addEventListener('pointerup', finishPointerDrag);
+  document.addEventListener('pointercancel', finishPointerDrag);
 
   document.addEventListener('keydown', e => {
     if (e.key === 'Enter' || e.key === ' ') {
@@ -321,27 +446,6 @@ export function bindGlobalControls() {
     }
   });
 
-  document.addEventListener('keydown', e => {
-    if (appState.mission.stage !== 2 || /SELECT|TEXTAREA/.test(e.target.tagName)) return;
-    const key = e.key.toLowerCase();
-
-    if (e.ctrlKey || e.metaKey) {
-      if (key === 'z') {
-        e.preventDefault();
-        undoLastAction();
-      }
-      return;
-    }
-
-    if (key === 'r') rotateSelectedPart(e.shiftKey ? -1 : 1);
-    else if (key === 'f') flipSelectedPart();
-    else if (key === 'delete' || key === 'backspace') {
-      e.preventDefault();
-      deleteSelectedPart();
-    }
-  });
-
-  // Mouse-wheel zoom & drag-to-pan on the rocket builder canvas (#cv)
   let panState = null;
   document.addEventListener('wheel', e => {
     if (appState.mission.stage !== 2 || !e.target.closest('#cv')) return;
@@ -349,6 +453,7 @@ export function bindGlobalControls() {
     const delta = e.deltaY < 0 ? 0.08 : -0.08;
     appState.canvasZoom = Math.max(0.45, Math.min(1.5, +(appState.canvasZoom + delta).toFixed(2)));
     refreshBuilderView();
+    centerBuilderCanvas();
   }, { passive: false });
 
   document.addEventListener('pointerdown', e => {
@@ -368,9 +473,13 @@ export function bindGlobalControls() {
     panState = null;
   });
 
-
-
   document.addEventListener('click', e => {
+    if (e.target.closest('[data-close-modal]') || e.target.id === 'rev' || e.target.id === 'help') {
+      AudioEngine.click();
+      closeOpenModals();
+      return;
+    }
+
     const actionEl = e.target.closest('[data-a], [data-st]');
     if (actionEl) {
       AudioEngine.click();
@@ -381,19 +490,30 @@ export function bindGlobalControls() {
         if (!isContractOpen(DATA.contracts[+v].id)) return showToast('That destination is locked. Check Career for the requirement.');
         appState.mission.ci = +v;
         appState.mission.oi = 0;
+        saveMissionProgress();
         return renderObjectiveStage();
       }
-      if (a === 'oi') { appState.mission.oi = +v; return renderObjectiveStage(); }
-      if (a === 'L') { appState.mission.L = v; return renderObjectiveStage(); }
-      if (a === 'hd') { appState.mission.hard = +v; return renderObjectiveStage(); }
+      if (a === 'oi') { appState.mission.oi = +v; saveMissionProgress(); return renderObjectiveStage(); }
+      if (a === 'L') { appState.mission.L = v; saveMissionProgress(); return renderObjectiveStage(); }
+      if (a === 'hd') { appState.mission.hard = +v; saveMissionProgress(); return renderObjectiveStage(); }
       if (a === 'go2') return navigateToStage(2);
       if (a === 'go1') return navigateToStage(1);
       if (a === 'rot') return rotateSelectedPart(1);
       if (a === 'flp') return flipSelectedPart();
       if (a === 'del') return deleteSelectedPart();
       if (a === 'undo') return undoLastAction();
-      if (a === 'zi') { appState.canvasZoom = Math.min(1.3, appState.canvasZoom + 0.1); return refreshBuilderView(); }
-      if (a === 'zo') { appState.canvasZoom = Math.max(0.35, appState.canvasZoom - 0.1); return refreshBuilderView(); }
+      if (a === 'zi') {
+        appState.canvasZoom = Math.min(1.3, +(appState.canvasZoom + 0.1).toFixed(2));
+        refreshBuilderView();
+        centerBuilderCanvas();
+        return;
+      }
+      if (a === 'zo') {
+        appState.canvasZoom = Math.max(0.45, +(appState.canvasZoom - 0.1).toFixed(2));
+        refreshBuilderView();
+        centerBuilderCanvas();
+        return;
+      }
       if (a === 'rev') return showReviewModal();
       return;
     }
@@ -402,15 +522,49 @@ export function bindGlobalControls() {
       $('#rev').hidden = true;
       startLaunchSequence();
     }
-    if (e.target.id === 'rback') {
-      $('#rev').hidden = true;
-    }
 
     if (e.target.id === 'car') showCareerModal();
 
-    if (e.target.id === 'creset' && confirm('Erase all unlocked planets and achievements?')) {
+    if (e.target.id === 'creset') {
       resetCareer();
+      localStorage.removeItem('apogeeMissionState');
+      localStorage.removeItem('apogeeSavedBuilds');
       location.reload();
+    }
+
+    if (e.target.id === 'confirm-save-build') {
+      const inputEl = $('#new-build-name');
+      const res = saveNamedBuild(inputEl ? inputEl.value : '');
+      if (!res.ok) return showToast(res.message);
+      AudioEngine.attach();
+      const myBuildsBtn = $('#my-builds');
+      if (myBuildsBtn) myBuildsBtn.textContent = `My builds (${appState.savedBuilds.length})`;
+      showSavedBuildsModal();
+      showToast(`Saved "${res.entry.name}".`);
+    }
+
+    const loadBuildBtn = e.target.closest('[data-load-build]');
+    const delBuildBtn = e.target.closest('[data-del-build]');
+    if (loadBuildBtn) {
+      const build = appState.savedBuilds.find(b => b.id === loadBuildBtn.dataset.loadBuild);
+      if (build) {
+        if (DATA.contracts[build.mission.ci] && !isContractOpen(DATA.contracts[build.mission.ci].id)) {
+          return showToast('That saved build targets a destination still locked in Career mode.');
+        }
+        saveUndoSnapshot();
+        appState.mission = { ...appState.mission, ...JSON.parse(JSON.stringify(build.mission)), stage: 2, locked: false };
+        appState.selectedPartUid = null;
+        saveMissionProgress();
+        $('#rev').hidden = true;
+        navigateToStage(2);
+        showToast(`Loaded "${build.name}".`);
+      }
+    }
+    if (delBuildBtn) {
+      deleteSavedBuild(delBuildBtn.dataset.delBuild);
+      const myBuildsBtn = $('#my-builds');
+      if (myBuildsBtn) myBuildsBtn.textContent = `My builds (${appState.savedBuilds.length})`;
+      showSavedBuildsModal();
     }
 
     const loadCandidateBtn = e.target.closest('[data-c]');
@@ -418,43 +572,47 @@ export function bindGlobalControls() {
     if (loadCandidateBtn) {
       const candidateData = JSON.parse(appState.candidates[+loadCandidateBtn.dataset.c]);
       saveUndoSnapshot();
-      appState.mission = { ...appState.mission, ...candidateData, stage: 2 };
+      appState.mission = { ...appState.mission, ...candidateData, stage: 2, locked: false };
       appState.selectedPartUid = null;
+      saveMissionProgress();
       $('#rev').hidden = true;
       navigateToStage(2);
     }
     if (deleteCandidateBtn) {
       appState.candidates.splice(+deleteCandidateBtn.dataset.x, 1);
+      saveMissionProgress();
       appState.candidates.length ? showCompareModal() : ($('#rev').hidden = true);
     }
 
     if (e.target.id === 'start') {
       $('#title').hidden = true;
+      AudioEngine.setMusic('design');
       navigateToStage(1);
     }
 
     if (e.target.id === 'demo-ok') {
       $('#title').hidden = true;
+      appState.mission.locked = false;
       buildStarterSpacecraft();
+      autoAttachPart('ant_lg');
+      saveMissionProgress();
+      AudioEngine.setMusic('design');
       navigateToStage(2);
-      showToast('Loaded passing starter spacecraft. Click "Design review and launch" to simulate.');
+      showToast('Loaded complete starter spacecraft. Click "Design review and launch" to simulate.');
     }
 
     if (e.target.id === 'demo-fail') {
       $('#title').hidden = true;
+      appState.mission.locked = false;
       buildFailingDemoSpacecraft();
+      saveMissionProgress();
+      AudioEngine.setMusic('design');
       navigateToStage(2);
       showToast('Loaded overweight/under-fueled Mars design to inspect failure diagnostics.');
     }
 
-    if (['x', 'hp', 'hp2'].includes(e.target.id)) {
-      $('#help').hidden = e.target.id === 'x';
-    }
-
-    if (e.target.id === 'pass') {
-      const roles = Object.keys(ROLES);
-      appState.activeRole = roles[(roles.indexOf(appState.activeRole) + 1) % roles.length];
-      navigateToStage(appState.mission.stage);
+    if (['hp', 'hp2'].includes(e.target.id)) {
+      $('#help').hidden = false;
     }
 
     if (e.target.id === 'copy-code-btn') {
@@ -482,7 +640,8 @@ export function bindGlobalControls() {
           decoded.parts.every(p => p.id === 'tank' || DATA.parts[p.id] || DATA.engines[p.id]);
 
         if (isValid) {
-          appState.mission = { ...appState.mission, ...decoded, stage: 2 };
+          appState.mission = { ...appState.mission, ...decoded, stage: 2, locked: false };
+          saveMissionProgress();
           $('#rev').hidden = true;
           navigateToStage(2);
           showToast('Design loaded successfully.');
@@ -495,19 +654,13 @@ export function bindGlobalControls() {
     }
   });
 
-  $('#team').addEventListener('change', e => {
-    appState.isTeamMode = e.target.checked;
-    navigateToStage(appState.mission.stage);
+  $('#mute').addEventListener('click', () => {
+    syncAudioControls(AudioEngine.toggleMute());
   });
 
-  $('#mute')
-
-
-  $('#mute').addEventListener('click', e => {
-    const isNowOn = AudioEngine.toggleMute();
-    e.target.textContent = `Sound: ${isNowOn ? 'on' : 'off'}`;
+  $('#vol')?.addEventListener('input', e => {
+    syncAudioControls(AudioEngine.setVolume(e.target.value));
   });
-
 
   $('#copy').addEventListener('click', () => {
     showDesignCodeModal();

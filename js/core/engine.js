@@ -1,6 +1,6 @@
 /* File: js/core/engine.js
  * Owner: Person A (Ashmin)
- * AI-assisted: YES — Gemini, 2026-11-14; Claude, 2026-11-14; Claude, 2026-11-15 (two manual burns). Reviewed by a human: NO.
+ * AI-assisted: YES — Gemini, 2026-11-14; Gemini, 2026-11-15; Claude, 2026-11-14; Claude, 2026-11-15 (two manual burns). Reviewed by a human: NO.
  * Sources used: NASA_CUBESAT101, JPL_CML
  */
 import { DATA } from '../api/mockData.js';
@@ -11,15 +11,9 @@ import {
   appState,
   getNodeCategory,
   getDimensionKey,
-  canCurrentRoleEditPart,
   saveUndoSnapshot
 } from './state.js';
 
-/**
- * Deterministic Mulberry32 PRNG (Rule 8: Same inputs + same seed = same output).
- * COSMETIC USE ONLY (e.g. jitter in the launch visuals). It must never decide win or loss:
- * flight outcomes are fully decided by resolveFlight() from the design's numbers.
- */
 export function createSeededRng(seed = DEFAULT_SEED) {
   let state = seed >>> 0;
   return function nextRandom() {
@@ -155,13 +149,18 @@ export function mirrorPartIfEnabled(childPart) {
   attachParts(twinPart, childPart.cn, host, oppositeNode);
 }
 
+/**
+ * Builds the starter spacecraft centered at (480, 495) of the 960x1100 world canvas,
+ * omitting the communications antenna so players attach one before launching.
+ */
 export function buildStarterSpacecraft() {
   appState.mission.parts = [];
   appState.mission.nu = 1;
 
-  const bus = createPartInstance('bus_rad', 400, 170);
-  const tank = createPartInstance('tank', 400, 300);
-  const engine = createPartInstance('chem', 400, 420);
+  const centerX = 480;
+  const bus = createPartInstance('bus_rad', centerX, 395);
+  const tank = createPartInstance('tank', centerX, 515);
+  const engine = createPartInstance('chem', centerX, 625);
 
   attachParts(tank, 'top', bus, 'bottom');
   attachParts(engine, 'top', tank, 'bottom');
@@ -175,25 +174,22 @@ export function buildStarterSpacecraft() {
 
   mirrorPartIfEnabled(mountPart('sol_s', bus, 'R1'));
   mountPart('i_cam', bus, 'R2');
-  mountPart('ant_lg', bus, 'top');
   mountPart('bat', tank, 'R1');
 }
 
-/**
- * Loads an intentionally overweight / under-fueled preset for the "Try a Failing Design" demo.
- */
 export function buildFailingDemoSpacecraft() {
-  appState.mission.ci = 2; // Mars mission
-  appState.mission.oi = 0; // Low Mars orbit (5.6 km/s delta-v)
-  appState.mission.L = 'medium'; // 9,000 kg limit
+  appState.mission.ci = 2;
+  appState.mission.oi = 0;
+  appState.mission.L = 'medium';
   appState.mission.hard = 1;
   appState.mission.parts = [];
   appState.mission.nu = 1;
 
-  const bus = createPartInstance('bus_std', 400, 170);
-  const tank1 = createPartInstance('tank', 400, 300);
-  const tank2 = createPartInstance('tank', 400, 430);
-  const engine = createPartInstance('chem', 400, 550);
+  const centerX = 480;
+  const bus = createPartInstance('bus_std', centerX, 355);
+  const tank1 = createPartInstance('tank', centerX, 475);
+  const tank2 = createPartInstance('tank', centerX, 595);
+  const engine = createPartInstance('chem', centerX, 705);
 
   attachParts(tank1, 'top', bus, 'bottom');
   attachParts(tank2, 'top', tank1, 'bottom');
@@ -204,10 +200,6 @@ export function buildFailingDemoSpacecraft() {
 }
 
 export function autoAttachPart(partId) {
-  if (!canCurrentRoleEditPart(partId)) {
-    return { ok: false, message: 'That part belongs to another role. Pass the keyboard.' };
-  }
-
   const category = getNodeCategory(partId);
   const connected = getConnectedPartUids();
   const hosts = appState.mission.parts
@@ -220,7 +212,7 @@ export function autoAttachPart(partId) {
       bus.id = partId;
     } else {
       saveUndoSnapshot();
-      createPartInstance(partId, 400, 170);
+      createPartInstance(partId, 480, 395);
     }
     return { ok: true };
   }
@@ -299,6 +291,7 @@ export function calculateTelemetry(missionInput = appState.mission) {
   const orbit = contract.orbits[missionInput.oi];
   const launcher = DATA.launchers[missionInput.L];
   const tankSpec = DATA.tank;
+  const weather = appState.spaceWeather;
 
   const connectedUids = getConnectedPartUids();
   const connectedParts = missionInput.parts.filter(p => connectedUids.has(p.u));
@@ -318,7 +311,7 @@ export function calculateTelemetry(missionInput = appState.mission) {
     dry: busSpec.m + engineParts.length * engineSpec.m,
     load: busSpec.pw,
     gen: 0,
-    rg: 0, // radioisotope generator power: does not depend on sunlight
+    rg: 0,
     wh: 0,
     mb: 0,
     gb: DATA.constants.baseStorageGb.value,
@@ -393,11 +386,15 @@ export function calculateTelemetry(missionInput = appState.mission) {
     DATA.transitDaysBase[contract.dest].value * engineSpec.tf,
     engineSpec.dvDay ? (orbit.dv * 1000) / engineSpec.dvDay : 0
   );
-  // Far destinations carry their own design life (the trip alone can take years). Harsh radiation (rad 2) wears even hardened buses.
-  telemetry.baseLife = contract.life || DATA.constants.designLifeMonths.value;
-  telemetry.life = telemetry.baseLife * (orbit.rad && !busSpec.hard ? 0.6 : orbit.rad > 1 ? 0.7 : 1) - telemetry.days / 30;
 
-  // Section 6.2 margin convention: margin = (capacity - predictedUse) / predictedUse
+  const radWear = orbit.rad && !busSpec.hard
+    ? Math.max(0.5, 0.65 / (weather?.radiationMultiplier || 1))
+    : orbit.rad > 1
+      ? 0.75
+      : 1;
+  telemetry.baseLife = contract.life || DATA.constants.designLifeMonths.value;
+  telemetry.life = telemetry.baseLife * radWear - telemetry.days / 30;
+
   const buildCheckRow = (name, category, used, capacity, unit, src, verified) => {
     const margin = used <= 0 ? 1 : capacity > 0 ? (capacity - used) / used : -1;
     const lesson = CONTENT.lessons[name];
@@ -430,7 +427,7 @@ export function calculateTelemetry(missionInput = appState.mission) {
     buildCheckRow('Budget', 'budget', telemetry.cost, contract.cap, '$M', contract.src, contract.verified),
     buildCheckRow('Data storage', 'data', telemetry.data * (1 - orbit.contact), telemetry.gb, 'Gb', DATA.constants.baseStorageGb.src, false),
     buildCheckRow('Comms', 'comms', requiredContactHours, orbit.contact * 24, 'h/day', DATA.commsDistanceFactor[contract.dest].src, false),
-    buildCheckRow('Time', 'time', contract.months, telemetry.life, 'months', DATA.constants.designLifeMonths.src, false)
+    buildCheckRow('Time', 'time', contract.months, telemetry.life, 'months', weather?.isLive ? weather.src : DATA.constants.designLifeMonths.src, weather?.isLive || false)
   ];
 
   if (engineSpec.pw) {
@@ -519,7 +516,6 @@ export function calculateTelemetry(missionInput = appState.mission) {
     pass: countStatus(2) / itemCount >= DATA.reviewThreshold.v
   };
 
-  // Launch reliability: a visible number that scales the final score. It is never rolled against.
   const marginPenalty = telemetry.rows.reduce(
     (sum, r) => (r.mg >= 0 && r.mg < threshold ? sum + (threshold - r.mg) * flightModel.amberPenaltyFactor : sum),
     0
@@ -543,12 +539,8 @@ export function calculateTelemetry(missionInput = appState.mission) {
   return telemetry;
 }
 
-/* ---- Deterministic Flight Resolution (no dice) ---- */
+/* ---- Deterministic Flight Resolution & Present-Day Events ---- */
 
-/**
- * Fills {placeholders} in a CONTENT template. Numbers are rounded for display.
- * A key ending in "Pct" is a fraction shown as a whole percent (0.94 -> 94).
- */
 export function fillTemplate(template, values = {}) {
   return template.replace(/\{(\w+)\}/g, (match, key) => {
     const value = values[key];
@@ -560,6 +552,7 @@ export function fillTemplate(template, values = {}) {
 function doesEventTrigger(event, telemetry) {
   const { trigger } = event;
   if (trigger.dest !== undefined) return telemetry.C.dest === trigger.dest;
+  if (trigger.minTransitDays !== undefined) return telemetry.days >= trigger.minTransitDays;
   const value = telemetry.O[trigger.orbitField];
   if (trigger.gte !== undefined && value < trigger.gte) return false;
   if (trigger.lte !== undefined && value > trigger.lte) return false;
@@ -572,21 +565,25 @@ function isEventImmune(event, telemetry) {
   return !!telemetry.B.red;
 }
 
-/**
- * Every event this contract and orbit will cause, and whether the design is immune.
- * Same design = same list, every time.
- */
 export function getTriggeredEvents(telemetry) {
+  const weather = appState.spaceWeather;
   return DATA.events
     .filter(event => doesEventTrigger(event, telemetry))
-    .map(event => ({
-      id: event.id,
-      immune: isEventImmune(event, telemetry),
-      scienceFactor: isEventImmune(event, telemetry) ? 1 : event.scienceFactor
-    }));
+    .map(event => {
+      const immune = isEventImmune(event, telemetry);
+      let factor = event.scienceFactor;
+      if (!immune && event.id === 'solar_flare' && weather?.radiationMultiplier > 1) {
+        factor = Math.max(0.65, +(event.scienceFactor / weather.radiationMultiplier).toFixed(2));
+      }
+      return {
+        id: event.id,
+        immune,
+        scienceFactor: immune ? 1 : factor
+      };
+    });
 }
 
-function scoreFlight(telemetry, outcome, science) {
+export function scoreFlight(telemetry, outcome, science) {
   const weights = DATA.scoringWeights;
   const contract = telemetry.C;
 
@@ -697,7 +694,6 @@ export function resolveFlight(telemetry, burns = null) {
   });
 
   if (contract.doom) {
-    // The Sun cannot be reached by any design, so this branch never depends on the numbers above.
     CONTENT.sunDive.lines.forEach(([text, cls]) => {
       steps.push({ key: 'sun_dive', ok: cls !== 'bad', values: { text } });
     });
@@ -740,7 +736,15 @@ export function resolveFlight(telemetry, burns = null) {
 
   const events = getTriggeredEvents(telemetry);
   events.forEach(event => {
-    steps.push({ key: 'event', ok: event.immune, values: { eventId: event.id, scienceFactor: event.scienceFactor } });
+    steps.push({
+      key: 'event',
+      ok: event.immune,
+      values: {
+        eventId: event.id,
+        scienceFactor: event.scienceFactor,
+        flareClass: appState.spaceWeather?.flareClass || 'M1.4'
+      }
+    });
   });
 
   const science = events.reduce((total, event) => total * event.scienceFactor, telemetry.sciF) * (1 + burnBonus);
@@ -752,7 +756,6 @@ export function resolveFlight(telemetry, burns = null) {
 
   const outcome = science >= contract.target ? 'success' : science > 0 ? 'partial' : 'lost';
 
-  // Debrief reasons: every thin row, every lost-data note, every event that hurt, and the reliability maths.
   const reasons = telemetry.rows
     .filter(r => r.mg < appState.marginThreshold)
     .map(r => `${r.n}: ${r.why} Fix: ${r.fix} [${r.src}]`);
