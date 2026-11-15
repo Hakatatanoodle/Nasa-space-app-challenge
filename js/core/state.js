@@ -308,6 +308,7 @@ export const AudioEngine = (() => {
   let activeTrackKey = 'landing';
   let activeAudioEl = null;
   let pausedMusicEl = null;
+  let pausedCountdownEl = null;
   let unlockBound = false;
   let lastHoverAt = 0;
 
@@ -515,17 +516,44 @@ export const AudioEngine = (() => {
       return { isSoundOn, volumePct: Math.round(masterLevel * 100) };
     },
     setMusic: (key, forceRestart = false) => playTrack(key, forceRestart),
+    // Pre-launch terminal countdown (T-10 to lift-off)
+    countdown() {
+      if (!isSoundOn || masterLevel <= 0) return;
+      const el = getTrackElement('countdown');
+      if (!el || el.dataset.missing === '1') {
+        playTone(720, 0, 0.14, 'sine', 0.16);
+        return;
+      }
+      el.currentTime = 0;
+      el.volume = Math.min(1, 0.85 * masterLevel);
+      el.play().catch(() => playTone(720, 0, 0.14, 'sine', 0.16));
+    },
+    stopCountdown() {
+      const el = trackElements.countdown;
+      if (el) {
+        el.pause();
+        el.currentTime = 0;
+      }
+      pausedCountdownEl = null;
+    },
     pauseAll() {
       if (ctx && ctx.state === 'running') ctx.suspend().catch(() => {});
       if (activeAudioEl && !activeAudioEl.paused) {
         pausedMusicEl = activeAudioEl;
         activeAudioEl.pause();
       }
+      const cdEl = trackElements.countdown;
+      if (cdEl && !cdEl.paused) {
+        pausedCountdownEl = cdEl;
+        cdEl.pause();
+      }
     },
     resumeAll(playMusic = true) {
       if (ctx && ctx.state === 'suspended') ctx.resume().catch(() => {});
       if (pausedMusicEl && playMusic && pausedMusicEl === activeAudioEl) pausedMusicEl.play().catch(() => {});
+      if (pausedCountdownEl && playMusic) pausedCountdownEl.play().catch(() => {});
       pausedMusicEl = null;
+      pausedCountdownEl = null;
     },
     toggleMute() {
       isSoundOn = !isSoundOn;

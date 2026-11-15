@@ -85,9 +85,10 @@ const flightClock = {
   }
 };
 
-const flightDelay = ms => new Promise(resolve => {
+const flightDelay = (ms, view = null) => new Promise(resolve => {
+  if (view?.skip) return resolve();
   const startedAt = flightClock.now();
-  const check = () => (flightClock.now() - startedAt >= ms ? resolve() : setTimeout(check, 40));
+  const check = () => (view?.skip || flightClock.now() - startedAt >= ms ? resolve() : setTimeout(check, 40));
   setTimeout(check, Math.min(ms, 40));
 });
 
@@ -98,6 +99,9 @@ export function abortLaunchSequence() {
   }
   if (cancelActiveBurn) cancelActiveBurn();
   flightClock.resume();
+  AudioEngine.stopCountdown();
+  const countdownOverlay = $('#flcountdown');
+  if (countdownOverlay) countdownOverlay.hidden = true;
   AudioEngine.resumeAll(false);
   $('#flv')?.classList.remove('paused');
   const flightMenu = $('#flightmenu');
@@ -1931,6 +1935,36 @@ function promptMidFlightDecision(logEl, eventId, view) {
   });
 }
 
+/* ---- Stage 3: pre-launch terminal countdown (pause-aware, skippable) ---- */
+async function runLaunchCountdown(view, isAborted) {
+  const overlay = $('#flcountdown');
+  const numEl = $('#flcd-num');
+  const subEl = $('#flcd-sub');
+  if (!overlay || !numEl || !subEl || view.skip) {
+    if (overlay) overlay.hidden = true;
+    return;
+  }
+
+  overlay.hidden = false;
+  view.setHud(CONTENT.flightHud.countdown, CONTENT.flightHud.countdownDetail);
+  AudioEngine.countdown();
+
+  for (const beat of CONTENT.flightHud.countdownBeats) {
+    if (isAborted() || view.skip) break;
+    numEl.textContent = beat.label;
+    subEl.textContent = beat.sub;
+    numEl.classList.remove('pop');
+    void numEl.offsetWidth;
+    numEl.classList.add('pop');
+    await flightDelay(beat.ms, view);
+  }
+
+  overlay.hidden = true;
+  if (view.skip || isAborted()) {
+    AudioEngine.stopCountdown();
+  }
+}
+
 export async function startLaunchSequence() {
   const runId = ++flightRunId;
   flightClock.resume();
@@ -1960,6 +1994,10 @@ export async function startLaunchSequence() {
           <canvas id="flcv" role="img" aria-label="${CONTENT.flightHud.canvasLabel}"></canvas>
           <div id="flcw"><div class="flc" id="fl">${renderFlightSpacecraft()}</div></div>
           <div id="flhud"><span class="flph"></span><span class="flday"></span><span class="flsci"></span></div>
+          <div id="flcountdown" hidden aria-live="polite">
+            <strong id="flcd-num">10</strong>
+            <span id="flcd-sub"></span>
+          </div>
           <div id="flpause" aria-hidden="true">
             <div class="flpause-box">
               <strong>${CONTENT.flightHud.pausedTitle}</strong>
@@ -1997,6 +2035,9 @@ export async function startLaunchSequence() {
       view.skip = true;
       $('#fskip').disabled = true;
       $('#fskip').textContent = 'Skipping...';
+      const cd = $('#flcountdown');
+      if (cd) cd.hidden = true;
+      AudioEngine.stopCountdown();
       if (pendingDecisionResolver) {
         pendingDecisionResolver();
       }
@@ -2011,6 +2052,9 @@ export async function startLaunchSequence() {
         await flightDelay(420);
       }
     };
+
+    await runLaunchCountdown(view, () => aborted);
+    if (aborted) return;
 
     void craftEl.offsetWidth;
     craftEl.classList.add('fly');

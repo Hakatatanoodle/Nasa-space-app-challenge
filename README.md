@@ -1,5 +1,6 @@
 <!-- File: README.md
   Owner: Person C (Yochan)
+  Merge (update): Claude, 2026-11-15 - ported the pre-launch terminal countdown from the secondday branch into main; kept main's responsive layout, flight menu and Developer Mode. Reviewed by a human: NO (pending review by Person C, Yochan).
   AI-assisted: YES — Claude, 2026-11-15 (Developer Mode section and audio notes). Reviewed by a human: YES, Person C (Yochan).
   AI-assisted (update): ChatGPT, 2026-11-15 - reconciled source-backed data and policies, updated project structure, test results, credits and AI disclosure. Reviewed by a human: YES, Person C (Yochan).
   Sources used: NASA Planetary Fact Sheets, NASA CubeSat 101, Wessen et al. (2013), NASA DONKI and the project references listed below
@@ -60,6 +61,7 @@ Press **How to play** in the header at any time for the in-game guide.
 - **Save, load and compare builds,** plus a **Share / Load code** to copy a design as a text code.
 - **Live space weather** from NASA DONKI feeds a radiation multiplier, with an offline fallback (see [NASA resources used](#nasa-resources-used)).
 - **Optional manual burns** during the flight for up to +6% science.
+- **Terminal countdown** from T-10 to lift-off, with its own sound and a status line at each step. Pause, Resume and Skip work during the countdown.
 - **Audio:** per-stage music with a master volume and a mute button. Nothing plays until the player interacts with the page.
 - **Reduced-motion support:** the background video is removed and animations shorten.
 
@@ -162,7 +164,7 @@ Earth, the Moon and Mars start open. Safe arrivals unlock the rest in a chain:
 
 ## Flight view and manual burns
 
-Stage 3 plays the flight on a canvas. The ascent is one continuous camera move: the camera follows the rocket from the pad while zooming out, the ground curves into a horizon and then a globe, and the rocket shrinks into the arrow used on the transfer map. After that comes a top-down transfer map (Earth-centred for Earth and Moon missions, Sun-centred for planets, **not to scale**), orbit arrival, and the failure and Sun-dive sequences. The view only draws what `resolveFlight()` returns, so the picture can never disagree with the result.
+Stage 3 opens with a terminal countdown from T-10 to lift-off, shown over the flight window with a countdown sound and a status line at each step. It runs on the same pause clock as the flight, so Pause freezes it and Resume continues it. Skip animation ends it at once. Then the flight plays on a canvas. The ascent is one continuous camera move: the camera follows the rocket from the pad while zooming out, the ground curves into a horizon and then a globe, and the rocket shrinks into the arrow used on the transfer map. After that comes a top-down transfer map (Earth-centred for Earth and Moon missions, Sun-centred for planets, **not to scale**), orbit arrival, and the failure and Sun-dive sequences. The view only draws what `resolveFlight()` returns, so the picture can never disagree with the result.
 
 **Manual burns (optional).** You can fly two burns by hand, in mission order:
 
@@ -232,7 +234,7 @@ Apogee/
     ├── resources.md               # Asset source notes
     ├── assets/
     │   ├── *.svg                  # Spacecraft parts, destinations, launchers, instruments and plumes
-    │   ├── audio/                 # Landing.mp3, design.mp3, win.mp3, loss.mp3
+    │   ├── audio/                 # Landing.mp3, design.mp3, win.mp3, loss.mp3, countdown.mp3
     │   └── bg/                    # space.mp4 and README.txt
     ├── css/
     │   ├── variables.css          # Colors and fonts
@@ -324,6 +326,7 @@ NASA is not affiliated with this project and does not endorse it. No NASA logos 
 | Mission-design inspiration | [NASA GSFC Integrated Design Center: Dome Lab](https://etd.gsfc.nasa.gov/integrated-design-center/dome-lab/) |
 | Mission visualization reference | [NASA Mission Viz: Web Mission Visualization Tutorial Series](https://nasa.github.io/mission-viz/X3Dom/WebMissionVisualizationTutorialSeries.html) |
 | Background video | [NASA Image and Video Library](https://images.nasa.gov/search?q=orion&page=1&media=video,audio&yearStart=1920&yearEnd=2026) (clip: *A Future in Orbit*, see `resources.md`) |
+| Sound references | [NASA on SoundCloud](https://soundcloud.com/nasa) (team-provided link; not yet confirmed as the source of any file in `assets/audio/`) |
 
 ### Music
 
@@ -335,6 +338,7 @@ All tracks are in `assets/audio/`. Audio never autoplays; it starts only after t
 | Build (design) | `design.mp3` | *Misty Echoes of Neptune* (AI-generated) | [StockTune](https://stocktune.com/free-music/misty-echoes-of-neptune-279973-165413?signup=true) |
 | Success (win) | `win.mp3` | *Interstellar Jazz Adventure* (AI-generated) | [StockTune](https://stocktune.com/free-music/interstellar-jazz-adventure-148637-98792) |
 | Mission lost | `loss.mp3` | Kevin MacLeod (not AI-generated; track title to be added; CC BY 4.0 as stated by the team) | [incompetech.com](https://incompetech.com/) |
+| Pre-launch countdown | `countdown.mp3` | Countdown sound effect | Source not recorded in the repository yet; add the creator and licence before submission |
 
 Each track is used under the licence stated on its source page.
 
@@ -356,6 +360,7 @@ AI tools assisted with parts of the implementation and presentation:
 - **Not AI-generated:** `Landing.mp3` is by Scott Buckley (CC BY 4.0); `loss.mp3` is by Kevin MacLeod via incompetech.com; `space.mp4` is from the NASA Image and Video Library.
 - **Human contribution:** the team created the concept and mission scenarios, made the design decisions, and chose the data sources.
 - AI-assisted source files carry headers naming the tool, date and human reviewer, Person C (Yochan).
+- The pre-launch countdown was ported from the `secondday` branch with AI assistance (Claude, 2026-11-15). It is marked as not yet reviewed by a human.
 
 ---
 
