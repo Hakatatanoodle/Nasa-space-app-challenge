@@ -1,7 +1,7 @@
 /* File: js/api/mockData.js
  * Owner: Person A (Ashmin - structure), Person C (Yochan - values)
- * AI-assisted (update): Gemini, 2026-11-15 - rebalanced higher mission difficulty & tighter margins. Reviewed by a human: NO.
- * AI-assisted (update): Claude, 2026-11-15 - win/loss tightening (outcome bands, audio, demos). Reviewed by a human: NO.
+ * AI-assisted (update): Gemini, 2026-11-15 - rebalanced higher mission difficulty & tighter margins. Reviewed by a human: Yes Reviewed by Person C (Yochan)
+ * AI-assisted (update): Claude, 2026-11-15 - win/loss tightening (outcome bands, audio, demos). Reviewed by a human: Yes Reviewed by Person C (Yochan)
  * AI-assisted: YES — Gemini, 2026-11-14; Gemini, 2026-11-15; Claude, 2026-11-14; Claude, 2026-11-15 (two manual burns). Reviewed by a human: Yes Reviewed by Person C (Yochan)
  * Sources used: NASA_CUBESAT101, JPL_CML, NASA_SE_WEBINAR
  */
