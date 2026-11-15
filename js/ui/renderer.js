@@ -1,5 +1,6 @@
 /* File: js/ui/renderer.js
  * Owner: Person B (Saurav)
+ * AI-assisted (update): Claude, 2026-11-15 - win/loss tightening (outcome bands, audio, demos). Reviewed by a human: NO.
  * AI-assisted: YES — Gemini, 2026-11-14; Gemini, 2026-11-15; Claude, 2026-11-14; Claude, 2026-11-15 (two manual burns). Reviewed by a human:YES Reviewd by Person C (Yochan)
  * Sources used: NASA_CUBESAT101, JPL_CML
  */
@@ -28,6 +29,7 @@ import {
   scoreBurn,
   createSeededRng,
   scoreFlight,
+  classifyOutcome,
   buildStarterSpacecraft,
   DEVELOPER_PREBUILTS
 } from '../core/engine.js';
@@ -1859,7 +1861,7 @@ export async function startLaunchSequence() {
       if (step.key === 'deltav_short') await view.coast(Math.max(0.08, Math.min(0.92, haveMs / needMs)), true);
       if (step.key === 'ion_short') await view.coast(0.18, true);
 
-      const canOfferInsertion = step.key === 'arrival' && !autoAll && flight.outcome !== 'lost';
+      const canOfferInsertion = step.key === 'arrival' && !autoAll && flight.arrived;
       if (step.key === 'arrival') {
         await view.coast(1);
         if (aborted) return;
@@ -1892,7 +1894,7 @@ export async function startLaunchSequence() {
         }
       }
 
-      const canOfferBurn = step.key === 'transfer' && step.ok && next && next.key === 'arrival' && flight.outcome !== 'lost';
+      const canOfferBurn = step.key === 'transfer' && step.ok && next && next.key === 'arrival' && flight.arrived;
       if (canOfferBurn && !burnOffered) {
         burnOffered = true;
         autoAll = await offerBurn('departure', true);
@@ -1910,7 +1912,7 @@ export async function startLaunchSequence() {
     flight.reasons.push(...decisionReasons);
     if (decisionMultiplier !== 1.0) {
       flight.science = flight.science * decisionMultiplier;
-      flight.outcome = flight.science >= telemetry.C.target ? 'success' : flight.science > 0 ? 'partial' : 'lost';
+      flight.outcome = classifyOutcome(flight.science, telemetry.C);
       const rescored = scoreFlight(telemetry, flight.outcome, flight.science);
       flight.stars = rescored.stars;
       flight.score = rescored.score;
@@ -1934,7 +1936,7 @@ function concludeMission(flight) {
 
   if (flight.outcome === 'success') AudioEngine.win();
   else if (flight.outcome === 'partial') AudioEngine.partial();
-  else AudioEngine.fail();
+  else if (!flight.steps.some(step => step.fatal)) AudioEngine.fail(); // a fatal step already played the failure sound
 
   appState.highScores[contract.id] = Math.max(appState.highScores[contract.id] || 0, flight.score);
   try {

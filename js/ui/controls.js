@@ -1,5 +1,6 @@
 /* File: js/ui/controls.js
  * Owner: Person B (Saurav)
+ * AI-assisted (update): Claude, 2026-11-15 - win/loss tightening (outcome bands, audio, demos). Reviewed by a human: NO.
  * AI-assisted: YES — Gemini, 2026-11-15. Reviewed by a human: YES Reviewd by Person C (Yochan)
  * Sources used: none
  */
@@ -616,12 +617,18 @@ export function bindGlobalControls() {
     if (e.target.id === 'demo-ok') {
       $('#title').hidden = true;
       appState.mission.locked = false;
+      appState.mission.ci = 1; // Moon, so the demo always meets its goal
+      appState.mission.oi = 0;
+      appState.mission.L = 'medium';
+      appState.mission.hard = 0;
       buildStarterSpacecraft();
-      autoAttachPart('ant_lg');
+      autoAttachPart('i_spec');
+      autoAttachPart('ant_mg');
+      autoAttachPart('rec');
       saveMissionProgress();
       AudioEngine.setMusic('design');
       navigateToStage(2);
-      showToast('Loaded complete starter spacecraft. Click "Design review and launch" to simulate.');
+      showToast('Loaded a complete Moon spacecraft that meets the science goal. Click "Design review and launch" to fly it.');
     }
 
     if (e.target.id === 'demo-fail') {
@@ -631,7 +638,7 @@ export function bindGlobalControls() {
       saveMissionProgress();
       AudioEngine.setMusic('design');
       navigateToStage(2);
-      showToast('Loaded overweight/under-fueled Mars design to inspect failure diagnostics.');
+      showToast('Loaded an under-fueled Mars design. Launch it to see why it fails.');
     }
 
     if (['hp', 'hp2'].includes(e.target.id)) {

@@ -1,5 +1,6 @@
 /* File: js/core/state.js
  * Owner: Person A (Ashmin)
+ * AI-assisted (update): Claude, 2026-11-15 - win/loss tightening (outcome bands, audio, demos). Reviewed by a human: NO.
  * AI-assisted: YES — Gemini, 2026-11-15. Reviewed by a human: Yes Reviewed by Person C (Yochan).
  * Sources used: none
  */
@@ -424,7 +425,7 @@ export const AudioEngine = (() => {
       [523, 659, 784, 1047].forEach((f, i) => playTone(f, i * 0.14, 0.45, 'triangle', 0.16));
     },
     partial: () => {
-      playTrack('win', true);
+      // Partial success is not a win: short two-note chime only, no victory track.
       [523, 659].forEach((f, i) => playTone(f, i * 0.2, 0.45, 'triangle', 0.14));
     },
     fail: () => {

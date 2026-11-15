@@ -1,5 +1,6 @@
 /* File: js/core/engine.js
  * Owner: Person A (Ashmin)
+ * AI-assisted (update): Claude, 2026-11-15 - win/loss tightening (outcome bands, audio, demos). Reviewed by a human: NO.
  * AI-assisted: YES — Gemini, 2026-11-14; Gemini, 2026-11-15; Claude, 2026-11-14; Claude, 2026-11-15 (two manual burns). Reviewed by a human: Yes Reviewed by Person C (Yochan).
  * Sources used: NASA_CUBESAT101, JPL_CML
  */
@@ -178,25 +179,34 @@ export function buildStarterSpacecraft() {
 }
 
 export function buildFailingDemoSpacecraft() {
+  // A design that passes every launch check but cannot be flown: a heavy radar craft with one tank is
+  // short on delta-v for a low Mars orbit, so the flight (and the debrief) explains why it fails.
   appState.mission.ci = 2;
   appState.mission.oi = 0;
   appState.mission.L = 'medium';
-  appState.mission.hard = 1;
+  appState.mission.hard = 0;
   appState.mission.parts = [];
   appState.mission.nu = 1;
 
   const centerX = 480;
-  const bus = createPartInstance('bus_std', centerX, 355);
-  const tank1 = createPartInstance('tank', centerX, 475);
-  const tank2 = createPartInstance('tank', centerX, 595);
-  const engine = createPartInstance('chem', centerX, 705);
+  const bus = createPartInstance('bus_red', centerX, 395);
+  const tank = createPartInstance('tank', centerX, 515);
+  const engine = createPartInstance('chem', centerX, 625);
 
-  attachParts(tank1, 'top', bus, 'bottom');
-  attachParts(tank2, 'top', tank1, 'bottom');
-  attachParts(engine, 'top', tank2, 'bottom');
+  attachParts(tank, 'top', bus, 'bottom');
+  attachParts(engine, 'top', tank, 'bottom');
 
-  const radar = createPartInstance('i_radar', 0, 0);
-  attachParts(radar, 'in', bus, 'R1');
+  const mountPart = (partId, host, hostNode) => {
+    const part = createPartInstance(partId, 0, 0);
+    attachParts(part, 'in', host, hostNode);
+    return part;
+  };
+
+  mountPart('sol_l', bus, 'L1');
+  mountPart('sol_l', bus, 'R1');
+  mountPart('i_radar', bus, 'R2');
+  mountPart('bat', tank, 'R1');
+  autoAttachPart('ant_hg');
 }
 
 /* ---- Developer Mode Prebuilt Reference Designs (3-Star Perfect Configurations) ---- */
@@ -813,6 +823,21 @@ export function scoreFlight(telemetry, outcome, science) {
   return { stars, score };
 }
 
+/**
+ * One place that decides how a flight ends, so the flight, the re-score after mid-flight decisions and the
+ * predicted flight can never disagree.
+ *   success = science reaches the contract baseline (target)
+ *   partial = science reaches the minimum (threshold) but not the baseline
+ *   lost    = no science, or less than the minimum
+ * The minimum is the contract threshold times DATA.flightModel.failBelowThresholdFactor.
+ */
+export function classifyOutcome(science, contract) {
+  const minimum = contract.thr * DATA.flightModel.failBelowThresholdFactor;
+  if (science >= contract.target) return 'success';
+  if (science > 0 && science >= minimum) return 'partial';
+  return 'lost';
+}
+
 const clamp01 = value => Math.max(0, Math.min(1, Number(value) || 0));
 
 const BURN_ORDER = ['departure', 'insertion'];
@@ -835,8 +860,9 @@ export function resolveFlight(telemetry, burns = null) {
   const contract = telemetry.C;
   const steps = [];
 
-  const finish = (outcome, science, events, reasons) => ({
+  const finish = (outcome, science, events, reasons, arrived = false) => ({
     outcome,
+    arrived, // true once the craft is safely in orbit, even if the science was too low to count
     science,
     events,
     reasons,
@@ -940,11 +966,16 @@ export function resolveFlight(telemetry, burns = null) {
     values: { returnedPct: telemetry.ret, science, target: contract.target }
   });
 
-  const outcome = science >= contract.target ? 'success' : science > 0 ? 'partial' : 'lost';
+  const outcome = classifyOutcome(science, contract);
+  const minimumScience = contract.thr * model.failBelowThresholdFactor;
 
-  const reasons = telemetry.rows
+  const reasons = [];
+  if (outcome === 'lost') {
+    reasons.push(fillTemplate(CONTENT.flightFailures.belowMinimum, { sciPts: science, minPts: minimumScience }));
+  }
+  reasons.push(...telemetry.rows
     .filter(r => r.mg < appState.marginThreshold)
-    .map(r => `${r.n}: ${r.why} Fix: ${r.fix} [${r.src}]`);
+    .map(r => `${r.n}: ${r.why} Fix: ${r.fix} [${r.src}]`));
 
   if (telemetry.ret < 1 && telemetry.data) {
     reasons.push(fillTemplate(CONTENT.flightFailures.dataReturn, { returnedPct: telemetry.ret }));
@@ -979,5 +1010,5 @@ export function resolveFlight(telemetry, burns = null) {
   });
   reasons.push(reliabilityLine + (telemetry.reliabilityParts.adjustment < 0 ? CONTENT.flightFailures.reliabilityFix : ''));
 
-  return finish(outcome, science, events, reasons);
+  return finish(outcome, science, events, reasons, true);
 }

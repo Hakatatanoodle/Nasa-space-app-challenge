@@ -1,5 +1,6 @@
 /* File: js/api/mockData.js
  * Owner: Person A (Ashmin - structure), Person C (Yochan - values)
+ * AI-assisted (update): Claude, 2026-11-15 - win/loss tightening (outcome bands, audio, demos). Reviewed by a human: NO.
  * AI-assisted: YES — Gemini, 2026-11-14; Gemini, 2026-11-15; Claude, 2026-11-14; Claude, 2026-11-15 (two manual burns). Reviewed by a human:  modified:   js/core/career.js
         modified:   js/core/engine.js
         modified:   js/core/planets.js
@@ -140,7 +141,7 @@ export const DATA = {
       ]
     },
     {
-      id: 'moon', months: 24, n: 'Moon · Selene Watch', dest: 'moon', target: 50, cap: 380,
+      id: 'moon', months: 24, n: 'Moon · Selene Watch', dest: 'moon', target: 60, cap: 380,
       src: 'SIMPLIFIED_FOR_GAMEPLAY', verified: false,
       orbits: [
         { n: 'Low polar orbit', dv: 3.9, ecl: 0.38, per: 2, contact: 0.5, res: 1.0, rad: 1, src: 'SIMPLIFIED_FOR_GAMEPLAY', verified: false },
@@ -182,6 +183,9 @@ export const DATA = {
     balanceGoodPx: 14,
     balanceLimitPx: 40,
     balancePenaltyAtLimit: 0.2,
+    // A craft that arrives but returns less than (contract.thr x this) science counts as a failed mission.
+    // 1.0 = strict (use the full threshold), 0.7 = default, 0.5 = forgiving.
+    failBelowThresholdFactor: 0.7,
     amberPenaltyFactor: 0.75,
     signOffBonus: 0.03,
     reviewFailPenalty: 0.06,
